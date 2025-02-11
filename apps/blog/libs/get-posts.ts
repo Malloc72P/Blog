@@ -7,8 +7,11 @@ import { getPageMap } from 'nextra/page-map';
  * @returns 모든 포스트 페이지
  */
 export async function getPosts() {
+  const pageMap = await getPageMap('/posts');
+  console.log('pageMap: ', pageMap);
+
   const { directories } = normalizePages({
-    list: await getPageMap('/posts'),
+    list: pageMap,
     route: '/posts',
   });
   return directories

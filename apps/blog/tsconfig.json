@@ -20,7 +20,8 @@
     "next.config.js",
     ".next/types/**/*.ts",
     "app/page.mdx",
-    "app/algorithm/page.mdx"
+    "app/algorithm/page.mdx",
+    "app/posts/page.tsx"
   ],
   "exclude": ["node_modules"]
 }

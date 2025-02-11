@@ -1,9 +1,7 @@
-import { Footer, Layout, Navbar, ThemeSwitch } from 'nextra-theme-blog';
-import { Banner, Head, Search } from 'nextra/components';
+import { NextraTheme } from '@components/nextra-theme';
+import { Banner, Head } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
-import 'nextra-theme-blog/style.css';
 import { PropsWithChildren } from 'react';
-import { NextraTheme } from './_components/nextra-theme';
 
 export const metadata = {
   title: 'Malloc72P',

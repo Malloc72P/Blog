@@ -1,5 +1,5 @@
+import { TOC } from '@components/toc';
 import { useMDXComponents as getNextraComponents } from 'nextra/mdx-components';
-import { TOC } from './app/_components/toc';
 import { ReactElement } from 'react';
 
 const defaultComponents = getNextraComponents({
