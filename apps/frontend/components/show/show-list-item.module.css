@@ -1,0 +1,10 @@
+.show {
+  @media (min-width: $mantine-breakpoint-md) {
+    max-width: 320px;
+  }
+
+  @media (max-width: $mantine-breakpoint-md) {
+    width: 100%;
+    max-width: unset;
+  }
+}

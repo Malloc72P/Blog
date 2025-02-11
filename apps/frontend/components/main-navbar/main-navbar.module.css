@@ -1,0 +1,26 @@
+.tab {
+  height: 48px;
+  font-weight: 700;
+  color: light-dark(var(--mantine-color-gray-6), var(--mantine-color-dark-1));
+  position: relative;
+  bottom: -1px;
+  padding-left: 8px;
+  padding-right: 8px;
+
+  &[data-active] {
+    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+    border-bottom-color: light-dark(var(--mantine-color-blue-7), var(--mantine-color-orange-5));
+  }
+
+  @mixin hover {
+    color: light-dark(var(--mantine-color-black), var(--mantine-color-white));
+  }
+}
+
+.tabsList {
+  gap: 0.5rem;
+
+  &::before {
+    display: none;
+  }
+}

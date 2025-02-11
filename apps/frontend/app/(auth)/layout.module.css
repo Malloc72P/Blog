@@ -1,0 +1,10 @@
+.main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.main > * {
+  flex-shrink: 0;
+  width: 100%;
+}

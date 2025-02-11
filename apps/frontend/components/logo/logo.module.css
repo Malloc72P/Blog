@@ -1,0 +1,5 @@
+.logo {
+  font-size: var(--mantine-font-size-xl);
+  font-weight: 700;
+  cursor: pointer;
+}

@@ -1,0 +1,11 @@
+.footer {
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark));
+}
+
+.errorMsg {
+  display: flex;
+  align-items: center;
+  color: var(--mantine-color-red-7);
+  font-weight: 700;
+  gap: 5;
+}
