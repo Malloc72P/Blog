@@ -1,27 +1,35 @@
-import { NextraTheme } from '@components/nextra-theme';
-import { Banner, Head } from 'nextra/components';
-import { getPageMap } from 'nextra/page-map';
+import { getPosts, getTags } from '@libs/get-posts';
 import { PropsWithChildren } from 'react';
+import './global.css';
 
 export const metadata = {
   title: 'Malloc72P',
 };
 
 export default async function RootLayout({ children }: PropsWithChildren) {
-  const banner = (
-    <Banner storageKey="4.0-release">
-      🎉 Nextra 4.0 is released.{' '}
-      <a href="#" className="x:text-primary-600">
-        Read more →
-      </a>
-    </Banner>
-  );
+  const posts = await getPosts();
+  const tags = await getTags();
+
+  console.log('tags', tags);
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <Head backgroundColor={{ dark: '#0f172a', light: '#fefce8' }} />
+      <head></head>
+
       <body>
-        <NextraTheme pageMap={await getPageMap()}>{children}</NextraTheme>
+        <div>
+          <h1>Posts</h1>
+          {posts.map((post) => (
+            <div key={post.route}>{post.title}</div>
+          ))}
+        </div>
+
+        <div>
+          <h1>Tags</h1>
+          {tags.map((tag) => (
+            <div key={tag}>{tag}</div>
+          ))}
+        </div>
       </body>
     </html>
   );
