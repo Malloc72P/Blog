@@ -1,4 +1,4 @@
-import { TOC } from '@components/toc';
+import { TOC } from 'src/components/toc';
 import { useMDXComponents as getNextraComponents } from 'nextra/mdx-components';
 import { ReactElement } from 'react';
 

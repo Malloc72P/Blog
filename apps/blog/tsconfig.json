@@ -8,9 +8,10 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@components/*": ["components/*"],
-      "@libs/*": ["libs/*"],
-      "@hooks/*": ["hooks/*"]
+      "@components/*": ["src/components/*"],
+      "@libs/*": ["src/libs/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@interfaces/*": ["src/interfaces/*"]
     }
   },
   "include": [
@@ -19,9 +20,9 @@
     "next-env.d.ts",
     "next.config.js",
     ".next/types/**/*.ts",
-    "app/page.mdx",
-    "app/algorithm/page.mdx",
-    "app/posts/page.tsx"
+    "src/app/page.mdx",
+    "src/app/algorithm/page.mdx",
+    "src/app/posts/page.tsx"
   ],
   "exclude": ["node_modules"]
 }

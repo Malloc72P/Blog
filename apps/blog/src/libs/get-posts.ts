@@ -1,5 +1,6 @@
 import { normalizePages } from 'nextra/normalize-pages';
 import { getPageMap } from 'nextra/page-map';
+import { TagMap } from './tag-map';
 
 /**
  * post 밑의 모든 포스트를 가져오는 함수
@@ -32,7 +33,5 @@ export async function getPosts() {
  * @returns 모든 태그
  */
 export async function getTags() {
-  const posts = await getPosts();
-  const tags = posts.flatMap((post) => post.frontMatter.tags).filter((v) => v);
-  return tags;
+  return Object.entries(TagMap).map(([tagKey]) => tagKey);
 }

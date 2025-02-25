@@ -1,5 +1,6 @@
 import { PostCard } from 'nextra-theme-blog';
 import { getPosts, getTags } from '../../../libs/get-posts';
+import Link from 'next/link';
 
 export interface GenerateMetadataProps {
   params: any;
@@ -29,9 +30,11 @@ export default async function TagPage(props: TagPageProps) {
     <>
       <h1>{title}</h1>
       {posts
-        .filter((post) => post.frontMatter.tags.includes(decodeURIComponent(params.tag)))
+        .filter((post) => post.frontMatter.tags?.includes(decodeURIComponent(params.tag)))
         .map((post) => (
-          <PostCard key={post.route} post={post} />
+          <div key={post.route}>
+            <Link href={post.route}>{post.name}</Link>
+          </div>
         ))}
     </>
   );
