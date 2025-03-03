@@ -20,7 +20,7 @@
     "next-env.d.ts",
     "next.config.js",
     ".next/types/**/*.ts",
-    "src/app/page.mdx",
+    "src/app/page.tsx",
     "src/app/algorithm/page.mdx",
     "src/app/posts/page.tsx"
   ],

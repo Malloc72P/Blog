@@ -1,48 +1,28 @@
-import { getPosts, getTags } from 'src/libs/get-posts';
 import { PropsWithChildren } from 'react';
 import './global.css';
-import Link from 'next/link';
-import { TagMap } from '@libs/tag-map';
+import { Noto_Sans_KR } from 'next/font/google';
+
+const font = Noto_Sans_KR({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-noto-sans-kr',
+});
 
 export const metadata = {
   title: 'Malloc72P',
 };
 
+/**
+ * 앱 전체에 적용되는 레이아웃.
+ *
+ * 폰트 설정 및 공통 메타데이터 설정은 이곳에서 한다.
+ */
 export default async function RootLayout({ children }: PropsWithChildren) {
-  const posts = await getPosts();
-  const tags = await getTags();
-
-  console.log('tags', tags);
-
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ko" className={`${font.variable}`}>
       <head></head>
 
-      <body>
-        <div>
-          <h1>Posts</h1>
-          {posts.map((post) => (
-            <div key={post.route}>
-              <Link href={post.route}>{post.title}</Link>
-            </div>
-          ))}
-        </div>
-
-        <div>
-          <h1>Tags</h1>
-          {tags.map((tag) => {
-            const tagInfo = TagMap[tag];
-
-            return (
-              <div key={tag}>
-                <Link href={`/tags/${tag}`}>{tag}</Link>
-              </div>
-            );
-          })}
-        </div>
-
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
