@@ -1,13 +1,23 @@
 import { normalizePages } from 'nextra/normalize-pages';
 import { getPageMap } from 'nextra/page-map';
 import { TagMap } from './tag-map';
+import { prepareParam } from './param-util';
+
+export interface GetPostsProps {
+  orderBy?: 'latest';
+  limit?: number;
+}
+
+const GetPostDefaultOption: GetPostsProps = { orderBy: 'latest' };
 
 /**
  * post 밑의 모든 포스트를 가져오는 함수
  *
  * @returns 모든 포스트 페이지
  */
-export async function getPosts() {
+export async function getPosts(param: GetPostsProps = GetPostDefaultOption) {
+  const { orderBy, limit } = prepareParam<GetPostsProps>(param, GetPostDefaultOption);
+
   const pageMap = await getPageMap('/posts');
 
   /**
@@ -21,11 +31,23 @@ export async function getPosts() {
     route: '/posts',
   });
 
-  return directories
+  let posts = directories
     .filter((post) => post.name !== 'index')
-    .sort(
-      (a, b) => new Date(b.frontMatter.date).getTime() - new Date(a.frontMatter.date).getTime()
+    .map((dir) => dir.children)
+    .flat()
+    .filter((post) => !post.frontMatter.isSeriesLanding);
+
+  if (orderBy) {
+    posts.sort(
+      (a, b) => new Date(b.frontMatter?.date).getTime() - new Date(a.frontMatter?.date).getTime()
     );
+  }
+
+  if (limit) {
+    posts = posts.filter((_, i) => i < limit);
+  }
+
+  return posts;
 }
 
 /**

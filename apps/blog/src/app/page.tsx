@@ -1,12 +1,18 @@
 import { Lorem } from '@libs/debug';
+import { getPosts } from '@libs/get-posts';
 import classNames from 'classnames';
+import Link from 'next/link';
 
 /**
  * 랜딩 페이지.
  *
  * 루트 경로로 접속하는 경우 해당 페이지가 렌더링된다.
  */
-export default function LandingPage() {
+export default async function LandingPage() {
+  const posts = await getPosts({
+    limit: 20,
+  });
+
   return (
     <div className="blog-landing-page h-full">
       {/* ------------------------------------------------------ */}
@@ -27,10 +33,14 @@ export default function LandingPage() {
       {/* ------------------------------------------------------ */}
       {/* ARTICLE */}
       {/* ------------------------------------------------------ */}
-      <div className="blog-landing-main bg-slate-100 min-h-[100%] relative z-10">
-        <article className="pb-[200px]">
-          {Array.from({ length: 2 }, (_, i) => (
-            <p key={i}>{Lorem.p}</p>
+      <div className="blog-landing-main bg-slate-100 min-h-[100%] relative z-10 h-full">
+        <article className="pb-[200px] max-w-[1000px] h-full mx-auto pt-[100px]">
+          {posts.map((post) => (
+            <div key={post.route} className="py-5 px-3 border rounded-md shadow-sm mb-5">
+              <Link href={post.route}>
+                <p className="text-lg">{post.title}</p>
+              </Link>
+            </div>
           ))}
         </article>
       </div>
