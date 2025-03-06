@@ -1,7 +1,7 @@
 import { normalizePages } from 'nextra/normalize-pages';
 import { getPageMap } from 'nextra/page-map';
-import { TagMap } from './tag-map';
-import { prepareParam } from './param-util';
+import { TagMap } from '../tag-map';
+import { prepareParam } from '../param-util';
 
 export interface GetPostsProps {
   orderBy?: 'latest';
@@ -48,12 +48,4 @@ export async function getPosts(param: GetPostsProps = GetPostDefaultOption) {
   }
 
   return posts;
-}
-
-/**
- * 모든 태그 정보를 가져오는 함수
- * @returns 모든 태그
- */
-export async function getTags() {
-  return Object.entries(TagMap).map(([tagKey]) => tagKey);
 }

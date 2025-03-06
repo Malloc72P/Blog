@@ -1,6 +1,7 @@
 import { PostCard } from 'nextra-theme-blog';
-import { getPosts, getTags } from '../../../libs/get-posts';
+import { getPosts } from '../../../libs/api/get-posts';
 import Link from 'next/link';
+import { getTags } from '@libs/api/get-tags';
 
 export interface GenerateMetadataProps {
   params: any;

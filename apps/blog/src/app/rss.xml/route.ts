@@ -1,4 +1,4 @@
-import { getPosts } from '../../libs/get-posts';
+import { getPosts } from '../../libs/api/get-posts';
 
 const CONFIG = {
   title: 'My Blog',
