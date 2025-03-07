@@ -41,6 +41,11 @@ export default async function LandingPage() {
                 <p className="text-lg">{post.title}</p>
               </Link>
               <div className="mt-5 flex flex-wrap gap-3">
+                <span className="border px-3 py-1 rounded-md">
+                  <Link href={`/series-list/${post.frontMatter.series}`}>
+                    {post.frontMatter.series}
+                  </Link>
+                </span>
                 {post.frontMatter.tags.map((tag: string) => (
                   <span className="border px-3 py-1 rounded-md" key={tag}>
                     <Link href={`/tags/${tag}`}>{tag}</Link>
