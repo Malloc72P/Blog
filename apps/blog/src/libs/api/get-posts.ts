@@ -1,4 +1,4 @@
-import { normalizePages } from 'nextra/normalize-pages';
+import { Item, normalizePages } from 'nextra/normalize-pages';
 import { getPageMap } from 'nextra/page-map';
 import { TagMap } from '../tag-map';
 import { prepareParam } from '../param-util';
@@ -6,6 +6,7 @@ import { prepareParam } from '../param-util';
 export interface GetPostsProps {
   orderBy?: 'latest';
   limit?: number;
+  route?: string;
 }
 
 const GetPostDefaultOption: GetPostsProps = { orderBy: 'latest' };
@@ -16,9 +17,10 @@ const GetPostDefaultOption: GetPostsProps = { orderBy: 'latest' };
  * @returns 모든 포스트 페이지
  */
 export async function getPosts(param: GetPostsProps = GetPostDefaultOption) {
-  const { orderBy, limit } = prepareParam<GetPostsProps>(param, GetPostDefaultOption);
+  const { orderBy, limit, route } = prepareParam<GetPostsProps>(param, GetPostDefaultOption);
+  const fullRoute = ['/posts', route].filter((v) => v).join('/');
 
-  const pageMap = await getPageMap('/posts');
+  const pageMap = await getPageMap(fullRoute);
 
   /**
    * normalizePages는 각 페이지의 구조와 메타데이터를 기반으로 계층적이고 일관된 네비게이션 데이터를 생성하는 유틸리티이다.
@@ -32,15 +34,12 @@ export async function getPosts(param: GetPostsProps = GetPostDefaultOption) {
   });
 
   let posts = directories
-    .filter((post) => post.name !== 'index')
-    .map((dir) => dir.children)
+    .reduce((acc, curr) => collectPost(acc, curr), [] as Item[])
     .flat()
-    .filter((post) => !post.frontMatter.isSeriesLanding);
+    .filter((post) => post.frontMatter);
 
   if (orderBy) {
-    posts.sort(
-      (a, b) => new Date(b.frontMatter?.date).getTime() - new Date(a.frontMatter?.date).getTime()
-    );
+    posts.sort(sortPostByCreatedAt);
   }
 
   if (limit) {
@@ -49,3 +48,18 @@ export async function getPosts(param: GetPostsProps = GetPostDefaultOption) {
 
   return posts;
 }
+
+function collectPost(posts: Item[], current: Item) {
+  posts.push(current);
+
+  if (current.children) {
+    for (const child of current.children) {
+      collectPost(posts, child);
+    }
+  }
+
+  return posts;
+}
+
+const sortPostByCreatedAt = (a: Item, b: Item): number =>
+  new Date(b.frontMatter?.date).getTime() - new Date(a.frontMatter?.date).getTime();
