@@ -36,7 +36,8 @@ export async function getPosts(param: GetPostsProps = GetPostDefaultOption) {
   let posts = directories
     .reduce((acc, curr) => collectPost(acc, curr), [] as Item[])
     .flat()
-    .filter((post) => post.frontMatter);
+    .filter((post) => post.frontMatter)
+    .filter((post) => !post.frontMatter.isSeriesLanding);
 
   if (orderBy) {
     posts.sort(sortPostByCreatedAt);

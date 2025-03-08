@@ -34,7 +34,9 @@ export default async function MainLayout({ children }: PropsWithChildren) {
       {/* ------------------------------------------------------ */}
       {/* ARTICLE */}
       {/* ------------------------------------------------------ */}
-      <div className="blog-landing-main relative z-10 min-h-[100vh] bg-white">{children}</div>
+      <div className="blog-landing-main relative z-10 min-h-[100vh] bg-white">
+        <div className="max-w-[1400px] mx-auto">{children}</div>
+      </div>
 
       {/* ------------------------------------------------------ */}
       {/* Footer */}

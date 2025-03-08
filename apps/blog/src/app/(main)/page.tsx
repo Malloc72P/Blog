@@ -2,6 +2,12 @@ import { Lorem } from '@libs/debug';
 import { getPosts } from '@libs/api/get-posts';
 import classNames from 'classnames';
 import Link from 'next/link';
+import { IntroduceCard } from '@components/introduce-card';
+import { getTags } from '@libs/api/get-tags';
+import { getSeriesList } from '@libs/api/get-series';
+import { SeriesBadge } from '@components/series-badge';
+import { TagBadge } from '@components/tag-badge';
+import { PostCard } from '@components/post-card';
 
 /**
  * 랜딩 페이지.
@@ -13,32 +19,47 @@ export default async function LandingPage() {
     limit: 20,
   });
 
+  const seriesList = await getSeriesList();
+
   return (
-    <div className="blog-landing-page h-full">
+    <div className="blog-landing-page">
       {/* ------------------------------------------------------ */}
-      {/* ARTICLE */}
+      {/* INTRODUCE CARD */}
       {/* ------------------------------------------------------ */}
-      {posts.map((post) => (
-        <div key={post.route} className="py-5 px-3 border rounded-md shadow-sm mb-5">
-          <Link href={post.route}>
-            <p className="text-lg">{post.title}</p>
-          </Link>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <span className="border px-3 py-1 rounded-md">
-              <Link href={`/posts/${post.frontMatter.series}`}>{post.frontMatter.series}</Link>
-            </span>
-            {post.frontMatter.tags.map((tag: string) => (
-              <span className="border px-3 py-1 rounded-md" key={tag}>
-                <Link href={`/tags/${tag}`}>{tag}</Link>
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
+      <IntroduceCard />
+
+      {/* ------------------------------------------------------ */}
+      {/* SERIES */}
+      {/* ------------------------------------------------------ */}
+      <div className="my-[65px] flex flex-wrap gap-5">
+        <SeriesBadge seriesId={null} title="최신 글" />
+
+        {seriesList.map((series) => (
+          <SeriesBadge seriesId={series.frontMatter.id} title={series.title} />
+        ))}
+      </div>
+
+      {/* ------------------------------------------------------ */}
+      {/* DIVIDER */}
+      {/* ------------------------------------------------------ */}
+      <div className="bg-gray-200 h-[1px]"></div>
 
       {/* ------------------------------------------------------ */}
       {/* ARTICLE */}
       {/* ------------------------------------------------------ */}
+      <div className="my-[65px]">
+        {posts.map((post) => {
+          const series = seriesList.find(
+            (currentSeries) => currentSeries.frontMatter.id === post.frontMatter.series
+          );
+
+          if (!series) {
+            return;
+          }
+
+          return <PostCard key={post.route} post={post} seriesItem={series} />;
+        })}
+      </div>
     </div>
   );
 }

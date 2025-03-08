@@ -5,5 +5,5 @@ import { TagMap } from '@libs/tag-map';
  * @returns 모든 태그
  */
 export async function getTags() {
-  return Object.entries(TagMap).map(([tagKey]) => tagKey);
+  return Object.entries(TagMap).map(([_, tag]) => tag);
 }

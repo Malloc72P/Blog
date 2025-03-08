@@ -9,6 +9,7 @@ import { DateUtil } from './date-util';
  */
 export const TagMap: Record<string, Tag> = {
   frontend: {
+    id: 'frontend',
     name: 'Frontend',
     createdAt: DateUtil.Dayjs('2025-02-25'),
   },
