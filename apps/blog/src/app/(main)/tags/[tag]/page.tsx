@@ -1,5 +1,5 @@
 import { PostCard } from 'nextra-theme-blog';
-import { getPosts } from '../../../libs/api/get-posts';
+import { getPosts } from '@libs/api/get-posts';
 import Link from 'next/link';
 import { getTags } from '@libs/api/get-tags';
 
