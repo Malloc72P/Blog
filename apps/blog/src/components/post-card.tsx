@@ -10,7 +10,7 @@ export interface PostCardProps {
 
 export function PostCard({ post, series }: PostCardProps) {
   return (
-    <div key={post.route} className="md:py-5 px-3 mb-[42px] md:mb-5">
+    <div key={post.route} className="px-3 mb-[42px]">
       {/* === POST TITLE AND LINK === */}
       <Link href={post.route}>
         <span className="text-xs md:text-lg font-bold">{post.title}</span>

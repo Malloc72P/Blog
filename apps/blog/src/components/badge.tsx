@@ -8,7 +8,7 @@ export interface BadgeProps extends PropsWithChildren {
   color?: 'primary' | 'secondary';
 }
 
-export function Badge({ href, children, onClick, color = 'primary' }: BadgeProps) {
+export function Badge({ href, children, onClick, color = 'secondary' }: BadgeProps) {
   const onBadgeClick = onClick
     ? (e: React.MouseEvent) => {
         e.preventDefault();
@@ -24,7 +24,8 @@ export function Badge({ href, children, onClick, color = 'primary' }: BadgeProps
         'transition-all duration-200 ease-in-out',
         'px-[8px] py-[6px]',
         'md:px-[12px]',
-        color === 'primary' ? '' : 'opacity-50'
+        color === 'primary' ? '' : 'opacity-50',
+        'hover:opacity-100'
       )}
     >
       <Link href={href} className="text-[10px] md:text-[16px]" onClick={onBadgeClick}>

@@ -7,7 +7,7 @@ export interface SeriesBadgeProps {
   color?: 'primary' | 'secondary';
 }
 
-export function SeriesBadge({ seriesId, title, onClick, color = 'primary' }: SeriesBadgeProps) {
+export function SeriesBadge({ seriesId, title, onClick, color = 'secondary' }: SeriesBadgeProps) {
   return (
     <Badge href={seriesId ? `/posts/${seriesId}` : '#'} onClick={onClick} color={color}>
       {title}

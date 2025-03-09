@@ -21,9 +21,9 @@ export default async function MainLayout({ children }: PropsWithChildren) {
       {/* HEADER */}
       {/* ------------------------------------------------------ */}
       <header
-        className={classNames('blog-main-header bg-black px-5 text-white', 'h-[60px] md:h-[128px]')}
+        className={classNames('blog-main-header bg-black text-white', 'h-[60px] md:h-[128px]')}
       >
-        <div className="flex items-center max-w-[850px] h-full mx-auto">
+        <div className="flex items-center max-w-[1400px] h-full mx-auto px-5">
           <h1 className="text-[16px] md:text-[40px]">Malloc72p.Tech</h1>
           <span className="grow"></span>
 
@@ -45,7 +45,7 @@ export default async function MainLayout({ children }: PropsWithChildren) {
       {/* ARTICLE */}
       {/* ------------------------------------------------------ */}
       <div className="blog-landing-main relative z-10 min-h-[100vh] bg-white">
-        <div className="max-w-[850px] mx-auto px-[16px] md:px-0">{children}</div>
+        <div className="max-w-[1400px] mx-auto px-5">{children}</div>
       </div>
 
       {/* ------------------------------------------------------ */}
