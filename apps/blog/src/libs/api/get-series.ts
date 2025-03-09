@@ -1,4 +1,3 @@
-import { TagMap } from '@libs/tag-map';
 import { normalizePages } from 'nextra/normalize-pages';
 import { getPageMap, normalizePageMap } from 'nextra/page-map';
 

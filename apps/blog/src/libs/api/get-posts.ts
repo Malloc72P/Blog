@@ -1,6 +1,5 @@
 import { Item, normalizePages } from 'nextra/normalize-pages';
 import { getPageMap } from 'nextra/page-map';
-import { TagMap } from '../tag-map';
 import { prepareParam } from '../param-util';
 
 export interface GetPostsProps {

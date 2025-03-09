@@ -1,15 +1,16 @@
-import Link from 'next/link';
+import { Badge } from './badge';
 
 export interface SeriesBadgeProps {
   seriesId: string | null;
   title: string;
   onClick?: () => void;
+  color?: 'primary' | 'secondary';
 }
 
-export function SeriesBadge({ seriesId, title, onClick }: SeriesBadgeProps) {
+export function SeriesBadge({ seriesId, title, onClick, color = 'primary' }: SeriesBadgeProps) {
   return (
-    <span className="border px-3 py-1 rounded-md" onClick={onClick}>
-      <Link href={seriesId ? `/posts/${seriesId}` : '#'}>{title}</Link>
-    </span>
+    <Badge href={seriesId ? `/posts/${seriesId}` : '#'} onClick={onClick} color={color}>
+      {title}
+    </Badge>
   );
 }

@@ -10,6 +10,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@tabler/icons-react": "^3.31.0",
     "classnames": "^2.5.1",
     "dayjs": "^1.11.13",
     "next": "^15.1.0",

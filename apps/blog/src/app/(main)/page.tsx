@@ -1,18 +1,16 @@
-import { Lorem } from '@libs/debug';
-import { getPosts } from '@libs/api/get-posts';
-import classNames from 'classnames';
-import Link from 'next/link';
 import { IntroduceCard } from '@components/introduce-card';
-import { getTags } from '@libs/api/get-tags';
-import { getSeriesList } from '@libs/api/get-series';
-import { SeriesBadge } from '@components/series-badge';
-import { TagBadge } from '@components/tag-badge';
+import { LandingPageClient } from '@components/landing-page-client';
 import { PostCard } from '@components/post-card';
+import { SeriesBadge } from '@components/series-badge';
+import { getPosts } from '@libs/api/get-posts';
+import { getSeriesList } from '@libs/api/get-series';
+import { PostModel, SeriesModel } from '@libs/types/commons';
 
 /**
- * 랜딩 페이지.
+ * 블로그 랜딩 페이지.
  *
  * 루트 경로로 접속하는 경우 해당 페이지가 렌더링된다.
+ * 소개 카드 및 포스트 필터, 포스트 목록이 표시된다
  */
 export default async function LandingPage() {
   const posts = await getPosts({
@@ -21,45 +19,25 @@ export default async function LandingPage() {
 
   const seriesList = await getSeriesList();
 
-  return (
-    <div className="blog-landing-page">
-      {/* ------------------------------------------------------ */}
-      {/* INTRODUCE CARD */}
-      {/* ------------------------------------------------------ */}
-      <IntroduceCard />
+  const seriesModels: SeriesModel[] = seriesList.map((series) => ({
+    id: series.frontMatter.id,
+    title: series.title,
+  }));
 
-      {/* ------------------------------------------------------ */}
-      {/* SERIES */}
-      {/* ------------------------------------------------------ */}
-      <div className="my-[65px] flex flex-wrap gap-5">
-        <SeriesBadge seriesId={null} title="최신 글" />
+  const postModels: PostModel[] = posts.map((post) => {
+    const series = seriesModels.find((series) => series.id === post.frontMatter.series);
 
-        {seriesList.map((series) => (
-          <SeriesBadge seriesId={series.frontMatter.id} title={series.title} />
-        ))}
-      </div>
+    if (!series) {
+      throw new Error('Series Not Found!!!');
+    }
 
-      {/* ------------------------------------------------------ */}
-      {/* DIVIDER */}
-      {/* ------------------------------------------------------ */}
-      <div className="bg-gray-200 h-[1px]"></div>
+    return {
+      route: post.route,
+      title: post.frontMatter.title,
+      series: series,
+      tags: post.frontMatter.tags.map((tag: string) => ({ id: tag })),
+    };
+  });
 
-      {/* ------------------------------------------------------ */}
-      {/* ARTICLE */}
-      {/* ------------------------------------------------------ */}
-      <div className="my-[65px]">
-        {posts.map((post) => {
-          const series = seriesList.find(
-            (currentSeries) => currentSeries.frontMatter.id === post.frontMatter.series
-          );
-
-          if (!series) {
-            return;
-          }
-
-          return <PostCard key={post.route} post={post} seriesItem={series} />;
-        })}
-      </div>
-    </div>
-  );
+  return <LandingPageClient posts={postModels} seriesList={seriesModels} />;
 }

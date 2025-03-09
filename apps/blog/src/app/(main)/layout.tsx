@@ -3,6 +3,7 @@ import { getPosts } from '@libs/api/get-posts';
 import classNames from 'classnames';
 import Link from 'next/link';
 import { PropsWithChildren } from 'react';
+import { MenuIcon } from 'nextra/icons';
 
 /**
  * Main Layout
@@ -19,14 +20,23 @@ export default async function MainLayout({ children }: PropsWithChildren) {
       {/* ------------------------------------------------------ */}
       {/* HEADER */}
       {/* ------------------------------------------------------ */}
-      <header className={classNames('blog-main-header h-[128px] bg-black', 'px-5 text-white')}>
-        <div className="flex items-center max-w-[1400px] h-full mx-auto">
-          <h1 className="text-[40px]">Malloc72p.Tech</h1>
+      <header
+        className={classNames('blog-main-header bg-black px-5 text-white', 'h-[60px] md:h-[128px]')}
+      >
+        <div className="flex items-center max-w-[850px] h-full mx-auto">
+          <h1 className="text-[16px] md:text-[40px]">Malloc72p.Tech</h1>
           <span className="grow"></span>
-          <div className="flex gap-5">
+
+          {/* === HEADER >= MD: RIGHT SECTION === */}
+          <div className="gap-5 hidden md:flex">
             <div>About Me</div>
             <div>Series</div>
             <div>Topics</div>
+          </div>
+
+          {/* === HEADER < MD: RIGHT SECTION === */}
+          <div className="flex md:hidden">
+            <MenuIcon className="w-4 h-4" />
           </div>
         </div>
       </header>
@@ -35,7 +45,7 @@ export default async function MainLayout({ children }: PropsWithChildren) {
       {/* ARTICLE */}
       {/* ------------------------------------------------------ */}
       <div className="blog-landing-main relative z-10 min-h-[100vh] bg-white">
-        <div className="max-w-[1400px] mx-auto">{children}</div>
+        <div className="max-w-[850px] mx-auto px-[16px] md:px-0">{children}</div>
       </div>
 
       {/* ------------------------------------------------------ */}
@@ -46,11 +56,7 @@ export default async function MainLayout({ children }: PropsWithChildren) {
           'blog-footer h-[410px] bg-slate-300 sticky left-0 bottom-0',
           'opacity-80 border-t-4 border-slate-800 border-dashed'
         )}
-      >
-        {Array.from({ length: 3 }, (_, i) => (
-          <p key={i}>{Lorem.p}</p>
-        ))}
-      </footer>
+      ></footer>
     </div>
   );
 }

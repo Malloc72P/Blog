@@ -1,13 +1,15 @@
 import Link from 'next/link';
+import { Badge } from './badge';
 
 export interface TagBadgeProps {
   tagId: string;
+  onClick?: () => void;
 }
 
-export function TagBadge({ tagId }: TagBadgeProps) {
+export function TagBadge({ tagId, onClick }: TagBadgeProps) {
   return (
-    <span className="border px-3 py-1 rounded-md" key={tagId}>
-      <Link href={`/tags/${tagId}`}>{tagId}</Link>
-    </span>
+    <Badge href={`/tags/${tagId}`} onClick={onClick}>
+      {tagId}
+    </Badge>
   );
 }
