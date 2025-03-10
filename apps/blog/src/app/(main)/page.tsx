@@ -2,8 +2,9 @@ import { IntroduceCard } from '@components/introduce-card';
 import { LandingPageClient } from '@components/landing-page-client';
 import { PostCard } from '@components/post-card';
 import { SeriesBadge } from '@components/series-badge';
-import { getPosts } from '@libs/api/get-posts';
+import { findPosts } from '@libs/api/find-posts';
 import { getSeriesList } from '@libs/api/get-series';
+import { Mapper } from '@libs/mapper';
 import { PostModel, SeriesModel } from '@libs/types/commons';
 
 /**
@@ -13,31 +14,24 @@ import { PostModel, SeriesModel } from '@libs/types/commons';
  * 소개 카드 및 포스트 필터, 포스트 목록이 표시된다
  */
 export default async function LandingPage() {
-  const posts = await getPosts({
-    limit: 20,
-  });
+  const seriesModels: SeriesModel[] = await getSeries();
+  const seriesPosts: Record<string, PostModel[]> = {};
 
+  for (const series of seriesModels) {
+    const seriesPost = await findPosts({
+      limit: 20,
+      route: series.id,
+    });
+
+    seriesPosts[series.id] = seriesPost.map((item) => Mapper.toPostModel({ item, seriesModels }));
+  }
+
+  return <LandingPageClient seriesList={seriesModels} seriesPosts={seriesPosts} />;
+}
+
+async function getSeries() {
   const seriesList = await getSeriesList();
 
-  const seriesModels: SeriesModel[] = seriesList.map((series) => ({
-    id: series.frontMatter.id,
-    title: series.title,
-  }));
-
-  const postModels: PostModel[] = posts.map((post) => {
-    const series = seriesModels.find((series) => series.id === post.frontMatter.series);
-
-    if (!series) {
-      throw new Error('Series Not Found!!!');
-    }
-
-    return {
-      route: post.route,
-      title: post.frontMatter.title,
-      series: series,
-      tags: post.frontMatter.tags.map((tag: string) => ({ id: tag })),
-    };
-  });
-
-  return <LandingPageClient posts={postModels} seriesList={seriesModels} />;
+  const seriesModels: SeriesModel[] = seriesList.map(Mapper.toSeriesModel);
+  return seriesModels;
 }

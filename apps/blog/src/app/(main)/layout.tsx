@@ -1,9 +1,7 @@
-import { Lorem } from '@libs/debug';
-import { getPosts } from '@libs/api/get-posts';
+import { findPosts } from '@libs/api/find-posts';
 import classNames from 'classnames';
-import Link from 'next/link';
-import { PropsWithChildren } from 'react';
 import { MenuIcon } from 'nextra/icons';
+import { PropsWithChildren } from 'react';
 
 /**
  * Main Layout
@@ -11,7 +9,7 @@ import { MenuIcon } from 'nextra/icons';
  * 포스트, 시리즈, 태그 페이지는 해당 레이아웃을 기본적으로 사용한다
  */
 export default async function MainLayout({ children }: PropsWithChildren) {
-  const posts = await getPosts({
+  const posts = await findPosts({
     limit: 20,
   });
 

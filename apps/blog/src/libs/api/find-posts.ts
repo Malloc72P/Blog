@@ -2,21 +2,21 @@ import { Item, normalizePages } from 'nextra/normalize-pages';
 import { getPageMap } from 'nextra/page-map';
 import { prepareParam } from '../param-util';
 
-export interface GetPostsProps {
+export interface FindPostsProps {
   orderBy?: 'latest';
   limit?: number;
   route?: string;
 }
 
-const GetPostDefaultOption: GetPostsProps = { orderBy: 'latest' };
+const GetPostDefaultOption: FindPostsProps = { orderBy: 'latest' };
 
 /**
  * post 밑의 모든 포스트를 가져오는 함수
  *
  * @returns 모든 포스트 페이지
  */
-export async function getPosts(param: GetPostsProps = GetPostDefaultOption) {
-  const { orderBy, limit, route } = prepareParam<GetPostsProps>(param, GetPostDefaultOption);
+export async function findPosts(param: FindPostsProps = GetPostDefaultOption) {
+  const { orderBy, limit, route } = prepareParam<FindPostsProps>(param, GetPostDefaultOption);
   const fullRoute = ['/posts', route].filter((v) => v).join('/');
 
   const pageMap = await getPageMap(fullRoute);

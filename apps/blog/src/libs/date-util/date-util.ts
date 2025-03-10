@@ -3,6 +3,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import 'dayjs/locale/ko';
 import { DateFormat, IDateFormat } from './date-format';
+import { PostModel } from '@libs/types/commons';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -41,4 +42,5 @@ export const DateUtil = {
     seoul: 'Asia/Seoul',
     toronto: 'America/Toronto',
   },
+  postSorter: (a: PostModel, b: PostModel) => b.date.getTime() - a.date.getTime(),
 };

@@ -1,5 +1,5 @@
 import { PostCard } from 'nextra-theme-blog';
-import { getPosts } from '@libs/api/get-posts';
+import { findPosts } from '@libs/api/find-posts';
 import Link from 'next/link';
 import { getTags } from '@libs/api/get-tags';
 
@@ -26,7 +26,7 @@ export interface TagPageProps {
 export default async function TagPage(props: TagPageProps) {
   const params = await props.params;
   const { title } = await generateMetadata({ params });
-  const posts = await getPosts();
+  const posts = await findPosts();
   return (
     <>
       <h1>{title}</h1>

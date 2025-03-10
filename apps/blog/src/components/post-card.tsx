@@ -2,6 +2,7 @@ import { PostModel, SeriesModel } from '@libs/types/commons';
 import Link from 'next/link';
 import { SeriesBadge } from './series-badge';
 import { TagBadge } from './tag-badge';
+import { DateUtil } from '@libs/date-util';
 
 export interface PostCardProps {
   post: PostModel;
@@ -16,8 +17,10 @@ export function PostCard({ post, series }: PostCardProps) {
         <span className="text-xs md:text-lg font-bold">{post.title}</span>
       </Link>
 
+      <div className="text-gray-400">{DateUtil.Dayjs(post.date).format('YYYY/MM/DD a hh:mm')}</div>
+
       {/* === POST SERIES & TAG CONTAINER === */}
-      <div className="mt-5 flex flex-wrap gap-3">
+      <div className="mt-3 flex flex-wrap gap-3">
         {/* === POST SERIES === */}
         <SeriesBadge seriesId={series.id} title={series.title} />
 

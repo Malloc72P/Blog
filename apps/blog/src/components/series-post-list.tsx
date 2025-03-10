@@ -1,4 +1,4 @@
-import { getPosts } from '@libs/api/get-posts';
+import { findPosts } from '@libs/api/find-posts';
 import Link from 'next/link';
 
 export interface SeriesPostListProps {
@@ -6,7 +6,7 @@ export interface SeriesPostListProps {
 }
 
 export async function SeriesPostList({ route }: SeriesPostListProps) {
-  const posts = await getPosts({ route });
+  const posts = await findPosts({ route });
 
   return (
     <>

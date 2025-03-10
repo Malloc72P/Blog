@@ -1,4 +1,4 @@
-import { getPosts } from '../../libs/api/get-posts';
+import { findPosts } from '../../libs/api/get-posts';
 
 const CONFIG = {
   title: 'My Blog',
@@ -8,7 +8,7 @@ const CONFIG = {
 };
 
 export async function GET() {
-  const allPosts = await getPosts();
+  const allPosts = await findPosts();
   const posts = allPosts
     .map(
       (post) => `    <item>
