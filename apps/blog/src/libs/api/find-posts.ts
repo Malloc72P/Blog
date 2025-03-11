@@ -1,11 +1,12 @@
 import { Item, normalizePages } from 'nextra/normalize-pages';
 import { getPageMap } from 'nextra/page-map';
 import { prepareParam } from '../param-util';
+import { Constants } from '@libs/constants';
 
 export interface FindPostsProps {
   orderBy?: 'latest';
   limit?: number;
-  route?: string;
+  seriesId?: string;
 }
 
 const GetPostDefaultOption: FindPostsProps = { orderBy: 'latest' };
@@ -16,8 +17,8 @@ const GetPostDefaultOption: FindPostsProps = { orderBy: 'latest' };
  * @returns 모든 포스트 페이지
  */
 export async function findPosts(param: FindPostsProps = GetPostDefaultOption) {
-  const { orderBy, limit, route } = prepareParam<FindPostsProps>(param, GetPostDefaultOption);
-  const fullRoute = ['/posts', route].filter((v) => v).join('/');
+  const { orderBy, limit, seriesId } = prepareParam<FindPostsProps>(param, GetPostDefaultOption);
+  const fullRoute = resolveSeriesQuery(seriesId);
 
   const pageMap = await getPageMap(fullRoute);
 
@@ -63,3 +64,11 @@ function collectPost(posts: Item[], current: Item) {
 
 const sortPostByCreatedAt = (a: Item, b: Item): number =>
   new Date(b.frontMatter?.date).getTime() - new Date(a.frontMatter?.date).getTime();
+
+function resolveSeriesQuery(seriesId?: string) {
+  if (!seriesId || seriesId === Constants.series.latestId) {
+    return '/posts';
+  }
+
+  return ['/posts', seriesId].filter((v) => v).join('/');
+}

@@ -1,4 +1,4 @@
-import { normalizePages } from 'nextra/normalize-pages';
+import { Item, normalizePages } from 'nextra/normalize-pages';
 import { getPageMap, normalizePageMap } from 'nextra/page-map';
 
 export interface SeriesInfo {
@@ -11,14 +11,32 @@ export interface SeriesInfo {
  * @returns 모든 시리즈
  */
 export async function getSeriesList() {
+  const series: Item[] = [];
+
   const items = await getPageMap('/posts');
   const { directories } = normalizePages({
     list: items,
     route: '/posts',
   });
 
-  return directories
-    .map((dir) => dir.children)
-    .flat()
-    .filter((item) => item.frontMatter?.isSeriesLanding);
+  directories.forEach((item) => collectSeries(item));
+
+  return series.sort(seriesSorter);
+
+  function collectSeries(item: Item) {
+    if (item.frontMatter?.isSeriesLanding) {
+      series.push(item);
+    }
+
+    if (!item.children) {
+      return;
+    }
+
+    for (const child of item.children) {
+      collectSeries(child);
+    }
+  }
 }
+
+const seriesSorter = (a: Item, b: Item) =>
+  new Date(a.frontMatter?.date).getTime() - new Date(b.frontMatter?.date).getTime();

@@ -3,8 +3,13 @@
 import { IntroduceCard } from '@components/introduce-card';
 import { PostCard } from '@components/post-card';
 import { SeriesBadge } from '@components/series-badge';
+import { Constants } from '@libs/constants';
 import { DateUtil } from '@libs/date-util';
+import { PageLinkMap } from '@libs/page-link-map';
 import { PostModel, SeriesModel } from '@libs/types/commons';
+import { IconArrowRight } from '@tabler/icons-react';
+import classNames from 'classnames';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 export interface LandingPageClientProps {
@@ -15,15 +20,6 @@ export interface LandingPageClientProps {
 interface SeriesFilterModel extends SeriesModel {
   active: boolean;
 }
-
-const VIRTUAL_SERIES_LIST = 'latest' as const;
-const VIRTUAL_SERIES: Record<typeof VIRTUAL_SERIES_LIST, SeriesFilterModel> = {
-  latest: {
-    id: VIRTUAL_SERIES_LIST,
-    title: '최신글',
-    active: true,
-  },
-};
 
 /**
  * 블로그 랜딩 페이지.
@@ -41,11 +37,15 @@ export function LandingPageClient({ seriesList, seriesPosts }: LandingPageClient
     [seriesPosts]
   );
 
+  // 현재 선택된 시리즈 필터
+  const [currentSeriesFilter, setCurrentSeriesFilter] = useState<SeriesFilterModel>(
+    seriesList.find((series) => series.id === Constants.series.latestId) as SeriesFilterModel
+  );
+
   // 시리즈 필터
-  const [seriesFilters, setSeriesFilters] = useState<SeriesFilterModel[]>([
-    VIRTUAL_SERIES.latest,
-    ...seriesList.map((s) => ({ ...s, active: false })),
-  ]);
+  const [seriesFilters, setSeriesFilters] = useState<SeriesFilterModel[]>(
+    seriesList.map((s) => ({ ...s, active: s.id === currentSeriesFilter.id }))
+  );
 
   // 현재 포스트 목록
   const [posts, setPosts] = useState<PostModel[]>(originalPosts);
@@ -61,6 +61,9 @@ export function LandingPageClient({ seriesList, seriesPosts }: LandingPageClient
       return;
     }
 
+    // 현재 선택된 시리즈 필터 갱신
+    setCurrentSeriesFilter(targetSeries);
+
     // 선택된 시리즈의 액티브 상태를 활성화한다.
     targetSeries.active = true;
 
@@ -72,7 +75,7 @@ export function LandingPageClient({ seriesList, seriesPosts }: LandingPageClient
 
     // 현재 포스트 목록을 필터링한다.
     const nextPosts =
-      targetSeries.id === VIRTUAL_SERIES.latest.id
+      targetSeries.id === Constants.series.latestId
         ? [...originalPosts]
         : originalPosts.filter((post) => post.series.id === targetSeries.id);
 
@@ -119,6 +122,19 @@ export function LandingPageClient({ seriesList, seriesPosts }: LandingPageClient
 
           return <PostCard key={post.route} post={post} series={series} />;
         })}
+        {
+          <Link href={PageLinkMap.series.landing(currentSeriesFilter.id)}>
+            <div
+              className={classNames(
+                'font-bold flex items-center gap-2 cursor-pointer px-3',
+                'opacity-70 hover:opacity-90 active:opacity-100'
+              )}
+            >
+              <span>"{currentSeriesFilter.title}" 시리즈의 포스트 더 보러가기</span>
+              <IconArrowRight className="w-4 h-4" />
+            </div>
+          </Link>
+        }
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ const toPostModel = ({ item, seriesModels }: { item: Item; seriesModels: SeriesM
   const series = seriesModels.find((series) => series.id === item.frontMatter.series);
 
   if (!series) {
+    console.error(item, series);
     throw new Error('Series Not Found!!!');
   }
 

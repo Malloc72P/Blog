@@ -6,7 +6,7 @@ export default async function BlogMakingSeriesPage() {
     <>
       <h1>블로그 만들기 프로젝트</h1>
 
-      <SeriesPostList route="blog-making-series" />
+      <SeriesPostList seriesId="blog-making-series" />
     </>
   );
 }
@@ -14,6 +14,6 @@ export default async function BlogMakingSeriesPage() {
 export const metadata = {
   id: 'blog-making-series',
   title: '블로그 만들기 프로젝트',
-  createdAt: DateUtil.Dayjs('2025-03-08 21:18'),
+  date: DateUtil.Dayjs('2025-03-08 21:18'),
   isSeriesLanding: true,
 };
