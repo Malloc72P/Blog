@@ -83,7 +83,7 @@ export function LandingPageClient({ seriesList, seriesPosts }: LandingPageClient
   };
 
   return (
-    <div className="blog-landing-page pb-[200px]">
+    <div className="blog-landing-page pb-[10rem]">
       {/* ------------------------------------------------------ */}
       {/* INTRODUCE CARD */}
       {/* ------------------------------------------------------ */}
@@ -130,7 +130,7 @@ export function LandingPageClient({ seriesList, seriesPosts }: LandingPageClient
                 'opacity-70 hover:opacity-90 active:opacity-100'
               )}
             >
-              <span>"{currentSeriesFilter.title}" 시리즈의 포스트 더 보러가기</span>
+              <span>포스트 더 보기</span>
               <IconArrowRight className="w-4 h-4" />
             </div>
           </Link>

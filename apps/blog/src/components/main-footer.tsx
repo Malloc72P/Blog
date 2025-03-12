@@ -9,38 +9,39 @@ export interface MainFooterProps {
 
 export function MainFooter({ seriesList }: MainFooterProps) {
   return (
-    <footer className="blog-main-footer h-[410px] sticky left-0 bottom-0 px-5 py-8 bg-gray-100">
+    <footer className="blog-main-footer sticky left-0 bottom-0 px-8 2xl:px-5 pt-8 pb-8 md:pb-16 bg-gray-100">
       {/* === MAIN FOOTER CONTAINER === */}
-      <div className="max-w-[1400px] mx-auto flex min-h-full">
-        {/* === MAIN FOOTER LEFT SECTION === */}
-        <div className={classNames('blog-main-footer-left-section grow flex flex-col min-h-full')}>
-          {/* === MAIN FOOTER LEFT SECTION TOP BUTTON === */}
-          <LinkButton color="primary" leftIcon={IconArrowUp}>
-            <span>Back to top</span>
-          </LinkButton>
+      <div className="max-w-[1400px] mx-auto min-h-full flex flex-col">
+        <div className="flex grow flex-col md:flex-row">
+          {/* === MAIN FOOTER LEFT SECTION === */}
+          <div className="blog-main-footer-left-section grow flex flex-col min-h-full">
+            {/* === MAIN FOOTER LEFT SECTION TOP BUTTON === */}
+            <LinkButton color="primary" leftIcon={IconArrowUp}>
+              <span>Back to top</span>
+            </LinkButton>
+          </div>
 
-          <span className="grow"></span>
+          {/* === MAIN FOOTER RIGHT SECTION SERIES LIST === */}
+          <FooterList
+            label="SERIES"
+            items={seriesList.map((series) => ({ id: series.id, label: series.title }))}
+          />
 
-          <div className="text-gray-400">
+          {/* === MAIN FOOTER RIGHT SECTION SITE MAP === */}
+          <FooterList
+            label="ONLINE"
+            items={[
+              { id: 'github', label: 'Github' },
+              { id: 'aboutme', label: 'About Malloc72P' },
+            ]}
+          />
+        </div>
+        <div>
+          <div className="text-gray-400 pt-5">
             <div>Malloc72P©</div>
-            <div className="text-[40px]">SeungChul Na.</div>
+            <div className="text-2xl font-bold md:text-[40px] pt-1">SeungChul Na.</div>
           </div>
         </div>
-
-        {/* === MAIN FOOTER RIGHT SECTION SERIES LIST === */}
-        <FooterList
-          label="SERIES"
-          items={seriesList.map((series) => ({ id: series.id, label: series.title }))}
-        />
-
-        {/* === MAIN FOOTER RIGHT SECTION SITE MAP === */}
-        <FooterList
-          label="ONLINE"
-          items={[
-            { id: 'github', label: 'Github' },
-            { id: 'aboutme', label: 'About Malloc72P' },
-          ]}
-        />
       </div>
     </footer>
   );
@@ -60,7 +61,7 @@ interface FooterListProps {
 
 function FooterList({ label, items }: FooterListProps) {
   return (
-    <div className="w-[200px] ">
+    <div className="md:w-[200px] md:ml-10 mt-10 md:mt-0 mb-10">
       {/* === MAIN FOOTER LIST === */}
       <h4 className="text-gray-400 font-bold">{label}</h4>
       {/* === MAIN FOOTER LIST ITEM === */}
