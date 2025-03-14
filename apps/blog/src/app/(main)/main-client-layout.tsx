@@ -67,7 +67,11 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
               <DropdownMenu
                 title="Topics"
                 width={100}
-                items={tags.map((tag) => ({ id: tag.id, label: tag.id, href: '#' }))}
+                items={tags.map((tag) => ({
+                  id: tag.id,
+                  label: tag.id,
+                  href: PageLinkMap.tags.landing(tag.id),
+                }))}
               />
             </div>
 

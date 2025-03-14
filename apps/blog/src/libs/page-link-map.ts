@@ -5,4 +5,7 @@ export const PageLinkMap = {
   series: {
     landing: (seriesId: string) => `/posts/${seriesId}`,
   },
+  tags: {
+    landing: (tagId: string) => `/tags/${tagId}`,
+  },
 };
