@@ -87,6 +87,10 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
     setPosts(nextPosts);
   };
 
+  /* ------------------------------------------------------ */
+  /* ### RENDER ###  */
+  /* ------------------------------------------------------ */
+
   return (
     <div className="blog-landing-page pb-[10rem]">
       {/* ------------------------------------------------------ */}
