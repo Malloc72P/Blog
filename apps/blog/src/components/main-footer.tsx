@@ -1,6 +1,8 @@
+import { PageLinkMap } from '@libs/page-link-map';
 import { SeriesModel } from '@libs/types/commons';
 import { IconArrowUp } from '@tabler/icons-react';
 import classNames from 'classnames';
+import Link from 'next/link';
 import React, { PropsWithChildren, ReactElement, ReactNode, useMemo } from 'react';
 
 export interface MainFooterProps {
@@ -24,15 +26,19 @@ export function MainFooter({ seriesList }: MainFooterProps) {
           {/* === MAIN FOOTER RIGHT SECTION SERIES LIST === */}
           <FooterList
             label="SERIES"
-            items={seriesList.map((series) => ({ id: series.id, label: series.title }))}
+            items={seriesList.map((series) => ({
+              id: series.id,
+              label: series.title,
+              href: PageLinkMap.series.landing(series.id),
+            }))}
           />
 
           {/* === MAIN FOOTER RIGHT SECTION SITE MAP === */}
           <FooterList
             label="ONLINE"
             items={[
-              { id: 'github', label: 'Github' },
-              { id: 'aboutme', label: 'About Malloc72P' },
+              { id: 'github', label: 'Github', href: 'https://github.com/Malloc72P' },
+              //   { id: 'aboutme', label: 'About Malloc72P', href: '#' },
             ]}
           />
         </div>
@@ -68,7 +74,9 @@ function FooterList({ label, items }: FooterListProps) {
       <ul className="mt-5">
         {items.map((item) => (
           <li key={item.id}>
-            <LinkButton color="primary">{item.label}</LinkButton>
+            <LinkButton href={item.href} color="primary">
+              {item.label}
+            </LinkButton>
           </li>
         ))}
       </ul>
@@ -91,17 +99,19 @@ function LinkButton({
   color = 'secondary',
 }: LinkButtonProps) {
   return (
-    <div
-      className={classNames(
-        'transition-all duration-200 ease-in-out',
-        'flex items-center gap-1 cursor-pointer',
-        color === 'primary'
-          ? 'text-gray-400 hover:text-gray-700'
-          : 'text-gray-400 hover:text-gray-500'
-      )}
-    >
-      {Icon && <Icon className="w-4 h-4" />}
-      <div className="w-full whitespace-nowrap overflow-hidden text-ellipsis">{children}</div>
-    </div>
+    <Link href={href ?? '#'}>
+      <div
+        className={classNames(
+          'transition-all duration-200 ease-in-out',
+          'flex items-center gap-1 cursor-pointer',
+          color === 'primary'
+            ? 'text-gray-400 hover:text-gray-700'
+            : 'text-gray-400 hover:text-gray-500'
+        )}
+      >
+        {Icon && <Icon className="w-4 h-4" />}
+        <div className="w-full whitespace-nowrap overflow-hidden text-ellipsis">{children}</div>
+      </div>
+    </Link>
   );
 }
