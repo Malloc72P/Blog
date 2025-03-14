@@ -10,7 +10,7 @@ export interface SeriesInfo {
  *
  * @returns 모든 시리즈
  */
-export async function getSeriesList() {
+export async function findSeriesList() {
   const series: Item[] = [];
 
   const items = await getPageMap('/posts');

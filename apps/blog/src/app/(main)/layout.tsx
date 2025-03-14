@@ -1,5 +1,5 @@
 import { MainFooter } from '@components/main-footer';
-import { getSeriesList } from '@libs/api/get-series';
+import { findSeriesList } from '@libs/api/find-series';
 import { Mapper } from '@libs/mapper';
 import { IconArrowBarToUp, IconArrowUp } from '@tabler/icons-react';
 import classNames from 'classnames';
@@ -12,7 +12,7 @@ import { PropsWithChildren } from 'react';
  * 포스트, 시리즈, 태그 페이지는 해당 레이아웃을 기본적으로 사용한다
  */
 export default async function MainLayout({ children }: PropsWithChildren) {
-  const seriesList = (await getSeriesList()).map((series) => Mapper.toSeriesModel(series));
+  const seriesList = (await findSeriesList()).map((series) => Mapper.toSeriesModel(series));
 
   return (
     <div className="blog-main-layout h-full">

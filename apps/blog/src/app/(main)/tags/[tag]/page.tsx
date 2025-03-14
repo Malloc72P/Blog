@@ -1,7 +1,7 @@
 import { PostCard } from 'nextra-theme-blog';
 import { findPosts } from '@libs/api/find-posts';
 import Link from 'next/link';
-import { getTags } from '@libs/api/get-tags';
+import { findTags } from '@libs/api/find-tags';
 
 export interface GenerateMetadataProps {
   params: any;
@@ -15,7 +15,7 @@ export async function generateMetadata(props: GenerateMetadataProps) {
 }
 
 export async function generateStaticParams() {
-  const allTags = await getTags();
+  const allTags = await findTags();
   return [...new Set(allTags)].map((tag) => ({ tag }));
 }
 
