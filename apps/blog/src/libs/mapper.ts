@@ -23,7 +23,12 @@ const toSeriesModel = (series: Item) => ({
   title: series.title,
 });
 
+const toTagModel = (tag: string) => ({
+  id: tag,
+});
+
 export const Mapper = {
   toPostModel,
   toSeriesModel,
+  toTagModel,
 };

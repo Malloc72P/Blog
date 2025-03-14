@@ -10,11 +10,10 @@ import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
 import { IconArrowRight } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
+import { MainLayoutContext } from './main-client-layout';
 
-export interface LandingPageClientProps {
-  seriesList: SeriesModel[];
-  tags: TagModel[];
+export interface MainClientPageProps {
   seriesPosts: Record<string, PostModel[]>;
 }
 
@@ -28,7 +27,12 @@ interface SeriesFilterModel extends SeriesModel {
  * 루트 경로로 접속하는 경우 해당 페이지가 렌더링된다.
  * 소개 카드 및 포스트 필터, 포스트 목록이 표시된다
  */
-export function LandingPageClient({ seriesList, seriesPosts, tags }: LandingPageClientProps) {
+export function MainClientPage({ seriesPosts }: MainClientPageProps) {
+  /* ------------------------------------------------------ */
+  /* CONTEXT */
+  /* ------------------------------------------------------ */
+  const { seriesList, tags } = useContext(MainLayoutContext);
+
   /* ------------------------------------------------------ */
   /* STATES */
   /* ------------------------------------------------------ */

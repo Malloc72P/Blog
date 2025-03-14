@@ -1,4 +1,4 @@
-import { LandingPageClient } from '@components/landing-page-client';
+import { MainClientPage } from 'src/app/(main)/main-client-page';
 import { findPosts } from '@libs/api/find-posts';
 import { findSeriesList } from '@libs/api/find-series';
 import { findTags } from '@libs/api/find-tags';
@@ -14,7 +14,6 @@ import { PostModel, SeriesModel } from '@libs/types/commons';
  */
 export default async function LandingPage() {
   const seriesModels: SeriesModel[] = await getSeries();
-  const tags = await findTags();
   const seriesPosts: Record<string, PostModel[]> = {};
 
   for (const series of seriesModels) {
@@ -30,13 +29,7 @@ export default async function LandingPage() {
     seriesPosts[series.id] = seriesPost.map((item) => Mapper.toPostModel({ item, seriesModels }));
   }
 
-  return (
-    <LandingPageClient
-      seriesList={seriesModels}
-      seriesPosts={seriesPosts}
-      tags={tags.map((tag) => ({ id: tag }))}
-    />
-  );
+  return <MainClientPage seriesPosts={seriesPosts} />;
 }
 
 async function getSeries() {
