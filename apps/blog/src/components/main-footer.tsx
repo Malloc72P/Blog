@@ -13,7 +13,7 @@ export function MainFooter({ seriesList }: MainFooterProps) {
   return (
     <footer className="blog-main-footer sticky left-0 bottom-0 px-8 2xl:px-5 pt-8 pb-8 md:pb-16 bg-gray-100">
       {/* === MAIN FOOTER CONTAINER === */}
-      <div className="max-w-[1400px] mx-auto min-h-full flex flex-col">
+      <div className="max-w-[1080px] mx-auto min-h-full flex flex-col">
         <div className="flex grow flex-col md:flex-row">
           {/* === MAIN FOOTER LEFT SECTION === */}
           <div className="blog-main-footer-left-section grow flex flex-col min-h-full">

@@ -42,7 +42,7 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
         <header
           className={classNames('blog-main-header bg-black text-white', 'h-[60px] md:h-[128px]')}
         >
-          <div className="flex items-center max-w-[1400px] h-full mx-auto px-5">
+          <div className="flex items-center max-w-[1080px] h-full mx-auto px-5">
             <Link href={PageLinkMap.main.landing()}>
               <h1 className="text-[16px] md:text-[40px]">Malloc72p.Tech</h1>
             </Link>
@@ -86,7 +86,7 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
         {/* ARTICLE */}
         {/* ------------------------------------------------------ */}
         <div className="blog-landing-main relative z-10 min-h-[100vh] bg-white">
-          <div className="max-w-[1400px] mx-auto px-5">{children}</div>
+          <div className="max-w-[1080px] mx-auto px-5">{children}</div>
         </div>
 
         {/* ------------------------------------------------------ */}
