@@ -6,6 +6,7 @@ import { DateFormat, DateUtil } from '@libs/date-util';
 import { TagBadge } from '@components/tag-badge';
 import { IconChevronsLeft, IconChevronsRight } from '@tabler/icons-react';
 import { Divider } from '@components/divider';
+import classNames from 'classnames';
 
 export interface PostDetailProps extends PropsWithChildren {
   toc: Heading[];
@@ -17,7 +18,7 @@ export interface PostDetailProps extends PropsWithChildren {
 
 export function PostDetail({ children, series, post, tags, bottomContent, toc }: PostDetailProps) {
   return (
-    <section className={classes.postDetail}>
+    <section>
       {/* ------------------------------------------------------ */}
       {/* POST DETAIL HEADER */}
       {/* ------------------------------------------------------ */}
@@ -38,7 +39,7 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
         {/* === TAGS === */}
         <div className="py-[28px] flex gap-5">
           {tags.map((tag) => (
-            <TagBadge tagId={tag.id} />
+            <TagBadge key={tag.id} tagId={tag.id} />
           ))}
         </div>
       </header>
@@ -48,14 +49,14 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
       {/* ------------------------------------------------------ */}
       {/* POST DETAIL BODY */}
       {/* ------------------------------------------------------ */}
-      <article className="post-detail-body py-[65px]"></article>
+      <article className={classNames('post-detail-body py-[65px]', classes.postDetail)}>
+        {children}
+      </article>
 
       {/* ------------------------------------------------------ */}
       {/* POST DETAIL BODY */}
       {/* ------------------------------------------------------ */}
-      <footer className="post-detail-footer"></footer>
-      {children}
-      {bottomContent}
+      <footer className="post-detail-footer">{bottomContent}</footer>
     </section>
   );
 }

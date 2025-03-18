@@ -2,6 +2,67 @@
   h1,
   h2,
   h3 {
+    font-weight: 700;
+    padding: 20px 0;
+  }
+
+  h1 {
+    font-size: 32px;
+  }
+
+  h2 {
     font-size: 24px;
+  }
+
+  h1 {
+    font-size: 16px;
+  }
+
+  p {
+    padding-top: 16px;
+    padding-bottom: 24px;
+    line-height: 28px;
+  }
+
+  ul {
+    padding-top: 16px;
+    padding-bottom: 24px;
+  }
+
+  li {
+    line-height: 28px;
+    list-style-type: disc;
+    margin-left: 22px;
+  }
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    transition: 0.3s;
+    @apply text-blue-600;
+  }
+
+  a:hover {
+    @apply text-blue-800;
+    text-decoration: underline;
+  }
+
+  p code {
+    @apply bg-gray-100;
+    padding: 4px 8px;
+    border-radius: 6px;
+    margin: 0 3px;
+    transition: 0.3s;
+  }
+  p code:hover {
+    @apply shadow-lg;
+  }
+
+  pre {
+    @apply bg-gray-100;
+    padding: 16px 16px 16px 24px;
+    border-radius: 16px;
+    margin-top: 16px;
+    margin-bottom: 24px;
   }
 }

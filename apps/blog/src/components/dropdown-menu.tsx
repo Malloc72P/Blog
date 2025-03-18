@@ -16,11 +16,12 @@ export interface DropdownMenuProps {
   title: string;
   width?: number;
   items: DropdownMenuItemProps[];
+  leftOffset?: number;
 }
 
-const HIDE_TIMEOUT_LENGTH = 100;
+const HIDE_TIMEOUT_LENGTH = 0;
 
-export function DropdownMenu({ title, items, ...option }: DropdownMenuProps) {
+export function DropdownMenu({ title, items, leftOffset = 0, ...option }: DropdownMenuProps) {
   /* ------------------------------------------------------ */
   /* STATES */
   /* ------------------------------------------------------ */
@@ -137,10 +138,10 @@ export function DropdownMenu({ title, items, ...option }: DropdownMenuProps) {
       <ul
         ref={dropdownBodyRef}
         className={classNames(
-          'absolute top-6 bg-gray-950 z-50 p-5 flex-col gap-5 transition-all duration-300',
+          'absolute top-6 bg-gray-950 z-50 px-2 py-4 flex-col transition-all duration-300',
           'hidden opacity-0 rounded-b-lg drop-shadow-2xl'
         )}
-        style={{ width: option.width ?? '100%', left: offsetX }}
+        style={{ width: option.width ?? '100%', left: offsetX + leftOffset }}
       >
         {/* ------------------------------------------------------ */}
         {/* DROPDOWN BODY ITEMS */}
@@ -148,7 +149,7 @@ export function DropdownMenu({ title, items, ...option }: DropdownMenuProps) {
         {items.map((item) => (
           <li
             key={item.id}
-            className="hover:underline"
+            className="hover:underline hover:bg-gray-800 p-3 w-full cursor-pointer rounded-md transition-all duration-300"
             onClick={() => {
               setVisible(false);
             }}

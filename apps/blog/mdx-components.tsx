@@ -1,3 +1,4 @@
+import { PostImage } from '@components/post-detail';
 import { PostDetail } from '@components/post-detail/post-detail';
 import { findSeriesList } from '@libs/api/find-series';
 import { Mapper } from '@libs/mapper';
@@ -33,6 +34,7 @@ const defaultComponents = getNextraComponents({
       </>
     );
   },
+  img: PostImage,
 });
 
 export const useMDXComponents = (components: ReactElement[]) => ({

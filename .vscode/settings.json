@@ -18,5 +18,6 @@
   ],
   "files.associations": {
     "*.css": "postcss"
-  }
+  },
+  "css.customData": [".vscode/tailwind.json"]
 }
