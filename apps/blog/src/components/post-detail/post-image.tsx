@@ -10,7 +10,7 @@ export interface PostImageProps {
 
 export function PostImage(props: any) {
   const { src, alt, blur } = props as PostImageProps;
-  console.log(props);
+
   return (
     <span className="block px-5 text-center">
       <Image className="mx-auto" src={src} alt={alt} placeholder={blur} priority />

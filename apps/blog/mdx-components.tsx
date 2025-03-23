@@ -1,4 +1,5 @@
 import { PostImage } from '@components/post-detail';
+import { PostCodeblock } from '@components/post-detail/post-codeblock';
 import { PostDetail } from '@components/post-detail/post-detail';
 import { findSeriesList } from '@libs/api/find-series';
 import { Mapper } from '@libs/mapper';
@@ -35,6 +36,7 @@ const defaultComponents = getNextraComponents({
     );
   },
   img: PostImage,
+  pre: PostCodeblock,
 });
 
 export const useMDXComponents = (components: ReactElement[]) => ({

@@ -1,3 +1,5 @@
+'use client';
+
 import { PropsWithChildren, ReactNode } from 'react';
 import classes from './post-detail.module.scss';
 import { Heading, NextraMetadata } from 'nextra';
