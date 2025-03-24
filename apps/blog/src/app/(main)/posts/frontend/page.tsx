@@ -1,14 +1,8 @@
-import { SeriesPostList } from '@components/series-post-list';
+import { SeriesDetail } from '@components/series-detail/series-detail';
 import { DateUtil } from '@libs/date-util';
 
 export default async function FrontendPage() {
-  return (
-    <>
-      <h1>프론트엔드 이야기</h1>
-
-      <SeriesPostList seriesId="frontend" />
-    </>
-  );
+  return <SeriesDetail series={{ ...metadata }} />;
 }
 
 export const metadata = {

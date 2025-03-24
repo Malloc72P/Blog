@@ -9,6 +9,7 @@ import { TagBadge } from '@components/tag-badge';
 import { IconChevronsLeft, IconChevronsRight } from '@tabler/icons-react';
 import { Divider } from '@components/divider';
 import classNames from 'classnames';
+import { ArticleHeader } from '@components/article';
 
 export interface PostDetailProps extends PropsWithChildren {
   toc: Heading[];
@@ -24,27 +25,7 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
       {/* ------------------------------------------------------ */}
       {/* POST DETAIL HEADER */}
       {/* ------------------------------------------------------ */}
-      <header className="post-detail-header pt-[98px] pb-[42px] flex flex-col items-center">
-        {/* === SERIES TITLE === */}
-        <h4 className="flex items-center gap-1 text-gray-400">
-          <IconChevronsLeft className="w-4 h-4" />
-          {series.title}
-          <IconChevronsRight className="w-4 h-4" />
-        </h4>
-
-        {/* === POST TITLE === */}
-        <h1 className="py-[40px] text-[40px] leading-[63px] font-bold ">{post.title}</h1>
-
-        {/* === DATE === */}
-        <p className="text-gray-400 leading-[24px]">{DateUtil.format(post.date, 'long')}</p>
-
-        {/* === TAGS === */}
-        <div className="py-[28px] flex gap-5">
-          {tags.map((tag) => (
-            <TagBadge key={tag.id} tagId={tag.id} />
-          ))}
-        </div>
-      </header>
+      <ArticleHeader subTitle={series.title} title={post.title} date={post.date} tags={post.tags} />
 
       <Divider />
 

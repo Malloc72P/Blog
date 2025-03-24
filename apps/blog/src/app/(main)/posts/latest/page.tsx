@@ -1,14 +1,8 @@
-import { SeriesPostList } from '@components/series-post-list';
+import { SeriesDetail } from '@components/series-detail/series-detail';
 import { DateUtil } from '@libs/date-util';
 
 export default async function LatestPage() {
-  return (
-    <>
-      <h1>최신 글</h1>
-
-      <SeriesPostList seriesId="latest" />
-    </>
-  );
+  return <SeriesDetail series={{ ...metadata }} />;
 }
 
 export const metadata = {

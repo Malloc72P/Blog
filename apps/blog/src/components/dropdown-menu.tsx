@@ -149,12 +149,16 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
         {items.map((item) => (
           <li
             key={item.id}
-            className="hover:underline hover:bg-gray-800 p-3 w-full cursor-pointer rounded-md transition-all duration-300"
             onClick={() => {
               setVisible(false);
             }}
           >
-            <Link href={item.href}>{item.label}</Link>
+            <Link
+              href={item.href}
+              className="block hover:underline hover:bg-gray-800 p-3 w-full cursor-pointer rounded-md transition-all duration-300"
+            >
+              {item.label}
+            </Link>
           </li>
         ))}
       </ul>
