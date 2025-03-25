@@ -63,9 +63,9 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
                 }))}
               />
 
-              {/* === TAGS(Topic) DROPDOWN MENU === */}
+              {/* === TAGS DROPDOWN MENU === */}
               <DropdownMenu
-                title="Topics"
+                title="Tags"
                 width={220}
                 // leftOffset={-25}
                 items={tags.map((tag) => ({

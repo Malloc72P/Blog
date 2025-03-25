@@ -2,6 +2,10 @@ import { PostCard } from 'nextra-theme-blog';
 import { findPosts } from '@libs/api/find-posts';
 import Link from 'next/link';
 import { findTags } from '@libs/api/find-tags';
+import { findSeriesList } from '@libs/api/find-series';
+import { Mapper } from '@libs/mapper';
+import { PostModel, TagModel } from '@libs/types/commons';
+import { TagDetail } from '@components/tag-detail';
 
 export interface GenerateMetadataProps {
   params: any;
@@ -9,6 +13,7 @@ export interface GenerateMetadataProps {
 
 export async function generateMetadata(props: GenerateMetadataProps) {
   const params = await props.params;
+
   return {
     title: `Posts Tagged with “${decodeURIComponent(params.tag)}”`,
   };
@@ -24,19 +29,21 @@ export interface TagPageProps {
 }
 
 export default async function TagPage(props: TagPageProps) {
+  // 태그 조회 & 데이터 가공
   const params = await props.params;
+  const tagId = decodeURIComponent(params.tag);
+  const tagModel: TagModel = { id: tagId };
+
+  //   포스트 조회
   const { title } = await generateMetadata({ params });
-  const posts = await findPosts();
-  return (
-    <>
-      <h1>{title}</h1>
-      {posts
-        .filter((post) => post.frontMatter.tags?.includes(decodeURIComponent(params.tag)))
-        .map((post) => (
-          <div key={post.route}>
-            <Link href={post.route}>{post.name}</Link>
-          </div>
-        ))}
-    </>
+  const posts = await findPosts().then((list) =>
+    list.filter((post) => post.frontMatter.tags?.includes(tagId))
   );
+
+  //   PostModel로 가공
+  const seriesList = await findSeriesList();
+  const seriesModels = seriesList.map(Mapper.toSeriesModel);
+  const postModels: PostModel[] = posts.map((p) => Mapper.toPostModel({ item: p, seriesModels }));
+
+  return <TagDetail tag={tagModel} posts={postModels} />;
 }
