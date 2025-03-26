@@ -13,7 +13,13 @@ export function PostImage(props: any) {
 
   return (
     <span className="block px-5 text-center">
-      <Image className="mx-auto" src={src} alt={alt} placeholder={blur} priority />
+      <Image
+        className="rounded-md mx-auto shadow-xl border border-gray-100 bg-gray-100"
+        src={src}
+        alt={alt}
+        placeholder={blur}
+        priority
+      />
       <span className="block text-gray-400 text-center leading-[28px] italic py-5 break-words">
         "{alt}"
       </span>

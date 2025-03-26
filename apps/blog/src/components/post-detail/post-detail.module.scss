@@ -47,14 +47,14 @@
     text-decoration: underline;
   }
 
-  p code {
+  code:not(pre code) {
     @apply bg-gray-100;
     padding: 4px 8px;
     border-radius: 6px;
     margin: 0 3px;
     transition: 0.3s;
   }
-  p code:hover {
+  code:not(pre code):hover {
     @apply shadow-lg;
   }
 
