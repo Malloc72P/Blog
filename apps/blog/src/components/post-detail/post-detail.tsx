@@ -32,7 +32,9 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
       {/* ------------------------------------------------------ */}
       {/* POST DETAIL BODY */}
       {/* ------------------------------------------------------ */}
-      <article className={classNames('post-detail-body py-[65px]', classes.postDetail)}>
+      <article
+        className={classNames('post-detail-body py-[30px] md:py-[65px]', classes.postDetail)}
+      >
         {children}
       </article>
 

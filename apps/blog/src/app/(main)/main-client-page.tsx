@@ -136,7 +136,8 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
             <div
               className={classNames(
                 'font-bold flex items-center gap-2 cursor-pointer px-3',
-                'opacity-70 hover:opacity-90 active:opacity-100'
+                'opacity-70 hover:opacity-90 active:opacity-100',
+                'text-xs sm:text-[16px]'
               )}
             >
               <span>포스트 더 보기</span>

@@ -14,7 +14,7 @@
     font-size: 24px;
   }
 
-  h1 {
+  h3 {
     font-size: 16px;
   }
 
@@ -64,5 +64,77 @@
     border-radius: 16px;
     margin-top: 16px;
     margin-bottom: 24px;
+  }
+
+  @media only screen and (max-width: 800px) {
+    h1,
+    h2,
+    h3 {
+      font-weight: 700;
+      padding: 10px 0;
+    }
+
+    h1 {
+      font-size: 24px;
+    }
+
+    h2 {
+      font-size: 16px;
+    }
+
+    h3 {
+      font-size: 14px;
+    }
+
+    p {
+      padding-top: 8px;
+      padding-bottom: 12px;
+      line-height: 20px;
+      font-size: 12px;
+    }
+
+    ul {
+      padding-top: 8px;
+      padding-bottom: 12px;
+      line-height: 20px;
+      font-size: 12px;
+    }
+
+    li {
+      line-height: 28px;
+      list-style-type: disc;
+      margin-left: 22px;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      transition: 0.3s;
+      @apply text-blue-600;
+    }
+
+    a:hover {
+      @apply text-blue-800;
+      text-decoration: underline;
+    }
+
+    code:not(pre code) {
+      @apply bg-gray-100;
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin: 0 3px;
+      transition: 0.3s;
+    }
+    code:not(pre code):hover {
+      @apply shadow-lg;
+    }
+
+    pre {
+      @apply bg-gray-100;
+      padding: 16px 16px 16px 24px;
+      border-radius: 16px;
+      margin-top: 16px;
+      margin-bottom: 24px;
+    }
   }
 }

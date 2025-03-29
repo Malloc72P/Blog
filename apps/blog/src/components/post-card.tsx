@@ -17,7 +17,9 @@ export function PostCard({ post, series }: PostCardProps) {
         <span className="text-xs md:text-lg font-bold">{post.title}</span>
       </Link>
 
-      <div className="text-gray-400">{DateUtil.Dayjs(post.date).format('YYYY/MM/DD a hh:mm')}</div>
+      <div className="text-gray-400 text-xs sm:text-[16px] mt-1 sm:mt-2">
+        {DateUtil.Dayjs(post.date).format('YYYY/MM/DD a hh:mm')}
+      </div>
 
       {/* === POST SERIES & TAG CONTAINER === */}
       <div className="mt-3 flex flex-wrap gap-3">
