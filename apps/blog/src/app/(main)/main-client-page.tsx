@@ -12,6 +12,7 @@ import classNames from 'classnames';
 import Link from 'next/link';
 import { useContext, useMemo, useState } from 'react';
 import { MainLayoutContext } from './main-client-layout';
+import { ArticleContainer } from '@components/article-container';
 
 export interface MainClientPageProps {
   seriesPosts: Record<string, PostModel[]>;
@@ -92,60 +93,62 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
   /* ------------------------------------------------------ */
 
   return (
-    <div className="blog-landing-page pb-[10rem]">
-      {/* ------------------------------------------------------ */}
-      {/* INTRODUCE CARD */}
-      {/* ------------------------------------------------------ */}
-      <IntroduceCard />
+    <ArticleContainer>
+      <div className="blog-landing-page pb-[10rem]">
+        {/* ------------------------------------------------------ */}
+        {/* INTRODUCE CARD */}
+        {/* ------------------------------------------------------ */}
+        <IntroduceCard />
 
-      {/* ------------------------------------------------------ */}
-      {/* SERIES */}
-      {/* ------------------------------------------------------ */}
-      <div className="my-[30px] md:my-[65px] flex flex-wrap gap-5">
-        {seriesFilters.map((series) => (
-          <SeriesBadge
-            key={series.id}
-            seriesId={series.id}
-            title={series.title}
-            color={series.active ? 'primary' : 'secondary'}
-            onClick={() => changeSeriesFilter(series.id)}
-          />
-        ))}
-      </div>
+        {/* ------------------------------------------------------ */}
+        {/* SERIES */}
+        {/* ------------------------------------------------------ */}
+        <div className="my-[30px] md:my-[65px] flex flex-wrap gap-5">
+          {seriesFilters.map((series) => (
+            <SeriesBadge
+              key={series.id}
+              seriesId={series.id}
+              title={series.title}
+              color={series.active ? 'primary' : 'secondary'}
+              onClick={() => changeSeriesFilter(series.id)}
+            />
+          ))}
+        </div>
 
-      {/* ------------------------------------------------------ */}
-      {/* DIVIDER */}
-      {/* ------------------------------------------------------ */}
-      <div className="bg-gray-200 h-[1px]"></div>
+        {/* ------------------------------------------------------ */}
+        {/* DIVIDER */}
+        {/* ------------------------------------------------------ */}
+        <div className="bg-gray-200 h-[1px]"></div>
 
-      {/* ------------------------------------------------------ */}
-      {/* ARTICLE */}
-      {/* ------------------------------------------------------ */}
-      <div className="my-[30px] md:my-[65px]">
-        {posts.map((post) => {
-          const series = seriesList.find((currentSeries) => currentSeries.id === post.series.id);
+        {/* ------------------------------------------------------ */}
+        {/* ARTICLE */}
+        {/* ------------------------------------------------------ */}
+        <div className="my-[30px] md:my-[65px]">
+          {posts.map((post) => {
+            const series = seriesList.find((currentSeries) => currentSeries.id === post.series.id);
 
-          if (!series) {
-            return;
+            if (!series) {
+              return;
+            }
+
+            return <PostCard key={post.route} post={post} series={series} />;
+          })}
+          {
+            <Link href={PageLinkMap.series.landing(currentSeriesFilter.id)}>
+              <div
+                className={classNames(
+                  'font-bold flex items-center gap-2 cursor-pointer px-3',
+                  'opacity-70 hover:opacity-90 active:opacity-100',
+                  'text-xs sm:text-[16px]'
+                )}
+              >
+                <span>포스트 더 보기</span>
+                <IconArrowRight className="w-4 h-4" />
+              </div>
+            </Link>
           }
-
-          return <PostCard key={post.route} post={post} series={series} />;
-        })}
-        {
-          <Link href={PageLinkMap.series.landing(currentSeriesFilter.id)}>
-            <div
-              className={classNames(
-                'font-bold flex items-center gap-2 cursor-pointer px-3',
-                'opacity-70 hover:opacity-90 active:opacity-100',
-                'text-xs sm:text-[16px]'
-              )}
-            >
-              <span>포스트 더 보기</span>
-              <IconArrowRight className="w-4 h-4" />
-            </div>
-          </Link>
-        }
+        </div>
       </div>
-    </div>
+    </ArticleContainer>
   );
 }
