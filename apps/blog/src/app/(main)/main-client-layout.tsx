@@ -66,7 +66,7 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
               {/* === TAGS DROPDOWN MENU === */}
               <DropdownMenu
                 title="Tags"
-                width={220}
+                width={100}
                 // leftOffset={-25}
                 items={tags.map((tag) => ({
                   id: tag.id,
@@ -86,9 +86,7 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
         {/* ------------------------------------------------------ */}
         {/* ARTICLE */}
         {/* ------------------------------------------------------ */}
-        <div className="blog-landing-main relative z-10 min-h-[100vh] bg-white">
-          <div className="max-w-[1080px] mx-auto px-5">{children}</div>
-        </div>
+        {children}
 
         {/* ------------------------------------------------------ */}
         {/* Footer */}

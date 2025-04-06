@@ -1,15 +1,14 @@
 'use client';
 
-import { PropsWithChildren, ReactNode } from 'react';
-import classes from './post-detail.module.scss';
-import { Heading, NextraMetadata } from 'nextra';
-import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
-import { DateFormat, DateUtil } from '@libs/date-util';
-import { TagBadge } from '@components/tag-badge';
-import { IconChevronsLeft, IconChevronsRight } from '@tabler/icons-react';
-import { Divider } from '@components/divider';
-import classNames from 'classnames';
 import { ArticleHeader } from '@components/article';
+import { ArticleContainer } from '@components/article-container';
+import { Divider } from '@components/divider';
+import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
+import classNames from 'classnames';
+import { Heading } from 'nextra';
+import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
+import classes from './post-detail.module.scss';
+import { Toc } from './toc';
 
 export interface PostDetailProps extends PropsWithChildren {
   toc: Heading[];
@@ -20,28 +19,107 @@ export interface PostDetailProps extends PropsWithChildren {
 }
 
 export function PostDetail({ children, series, post, tags, bottomContent, toc }: PostDetailProps) {
+  const [activeTocId, setActiveTocId] = useState('');
+
+  useEffect(() => {
+    const scrollHandler = () => {
+      const currentScroll = document.documentElement.scrollTop;
+      const tocScrolls = toc
+        .map((item) => document.getElementById(item.id))
+        .filter((v) => v)
+        .map((el) => {
+          if (!el) {
+            return null;
+          }
+
+          return {
+            el,
+            y: el.offsetTop,
+          };
+        });
+
+      let min = 0;
+      let max = Infinity;
+
+      for (let i = 0; i < tocScrolls.length; i++) {
+        const item = tocScrolls[i];
+        const nextItem = tocScrolls[i + 1];
+
+        if (!item) {
+          continue;
+        }
+
+        min = i === 0 ? 0 : item.y;
+        max = nextItem ? nextItem.y : Infinity;
+
+        console.log(min, max);
+
+        if (min <= currentScroll && currentScroll < max) {
+          setActiveTocId(item.el.id);
+          break;
+        }
+      }
+    };
+
+    scrollHandler();
+    window.addEventListener('scroll', scrollHandler);
+
+    return () => {
+      window.removeEventListener('scroll', scrollHandler);
+    };
+  }, []);
+
   return (
-    <section>
-      {/* ------------------------------------------------------ */}
-      {/* POST DETAIL HEADER */}
-      {/* ------------------------------------------------------ */}
-      <ArticleHeader subTitle={series.title} title={post.title} date={post.date} tags={post.tags} />
+    <ArticleContainer
+      right={
+        <div className="post-detail-toc-container justify-center sticky top-0 left-0 hidden 2xl:flex">
+          <Toc
+            toc={toc}
+            activeId={activeTocId}
+            onFragIdChanged={({ fragId }) => {
+              const targetEl = document.getElementById(fragId);
 
-      <Divider />
+              if (!targetEl) {
+                return;
+              }
 
-      {/* ------------------------------------------------------ */}
-      {/* POST DETAIL BODY */}
-      {/* ------------------------------------------------------ */}
-      <article
-        className={classNames('post-detail-body py-[30px] md:py-[65px]', classes.postDetail)}
-      >
-        {children}
-      </article>
+              targetEl.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+        </div>
+      }
+    >
+      <section>
+        {/* ------------------------------------------------------ */}
+        {/* POST DETAIL BODY */}
+        {/* ------------------------------------------------------ */}
 
-      {/* ------------------------------------------------------ */}
-      {/* POST DETAIL BODY */}
-      {/* ------------------------------------------------------ */}
-      <footer className="post-detail-footer">{bottomContent}</footer>
-    </section>
+        {/* ------------------------------------------------------ */}
+        {/* POST DETAIL HEADER */}
+        {/* ------------------------------------------------------ */}
+        <ArticleHeader
+          subTitle={series.title}
+          title={post.title}
+          date={post.date}
+          tags={post.tags}
+        />
+
+        <Divider />
+
+        {/* ------------------------------------------------------ */}
+        {/* POST DETAIL BODY */}
+        {/* ------------------------------------------------------ */}
+        <article
+          className={classNames('post-detail-body py-[30px] md:py-[65px]', classes.postDetail)}
+        >
+          {children}
+        </article>
+
+        {/* ------------------------------------------------------ */}
+        {/* POST DETAIL BODY */}
+        {/* ------------------------------------------------------ */}
+        <footer className="post-detail-footer">{bottomContent}</footer>
+      </section>
+    </ArticleContainer>
   );
 }

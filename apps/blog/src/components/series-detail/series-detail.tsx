@@ -1,4 +1,5 @@
 import { ArticleHeader } from '@components/article';
+import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
 import { PostCard } from '@components/post-card';
 import { findPosts } from '@libs/api/find-posts';
@@ -18,16 +19,18 @@ export async function SeriesDetail({ series }: SeriesDetailProps) {
   const posts = allPosts.map((item) => Mapper.toPostModel({ item, seriesModels }));
 
   return (
-    <div className="pb-[200px]">
-      <ArticleHeader subTitle={'Malloc72p.Tech.Series'} title={series.title} />
+    <ArticleContainer>
+      <div className="pb-[200px]">
+        <ArticleHeader subTitle={'Malloc72p.Tech.Series'} title={series.title} />
 
-      <Divider />
+        <Divider />
 
-      <article className="py-[65px]">
-        {posts.map((post) => (
-          <PostCard key={post.route} post={post} series={series} />
-        ))}
-      </article>
-    </div>
+        <article className="py-[65px]">
+          {posts.map((post) => (
+            <PostCard key={post.route} post={post} series={series} />
+          ))}
+        </article>
+      </div>
+    </ArticleContainer>
   );
 }

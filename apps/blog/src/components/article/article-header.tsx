@@ -35,7 +35,8 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
       <h1
         className={classNames(
           'py-[20px] text-[20px] ',
-          'md:py-[40px] md:text-[40px]',
+          'md:py-[40px] md:text-[30px]',
+          'lg:text-[40px]',
           'leading-[32px] md:leading-[64px] font-bold'
         )}
       >

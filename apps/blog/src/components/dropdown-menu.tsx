@@ -4,7 +4,7 @@ import { IconChevronDown } from '@tabler/icons-react';
 import classNames from 'classnames';
 import { Html } from 'next/document';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export interface DropdownMenuItemProps {
   id: string;
@@ -60,7 +60,7 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   /* ------------------------------------------------------ */
   /* EFFECTS */
   /* ------------------------------------------------------ */
-  useEffect(() => {
+  useLayoutEffect(() => {
     adjustOffsetX();
 
     window.addEventListener('resize', adjustOffsetX);
@@ -71,32 +71,24 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   }, []);
 
   useEffect(() => {
-    const body = dropdownBodyRef.current;
-
-    if (!body) {
+    if (!rootRef.current) {
       return;
     }
 
-    let timeout: any = null;
+    const handler = (e: MouseEvent) => {
+      if (rootRef.current && rootRef.current.contains(e.target as HTMLElement)) {
+        return;
+      }
 
-    if (visible) {
-      body.style.display = 'flex';
-      timeout = setTimeout(() => {
-        timeout && clearTimeout(timeout);
-        body.style.opacity = '1';
-      });
-    } else {
-      body.style.opacity = '0';
-      timeout = setTimeout(() => {
-        timeout && clearTimeout(timeout);
-        body.style.display = 'none';
-      }, 300);
-    }
+      setVisible(false);
+    };
+
+    document.body.addEventListener('click', handler);
 
     return () => {
-      timeout && clearTimeout(timeout);
+      document.body.removeEventListener('click', handler);
     };
-  }, [visible]);
+  }, []);
 
   /* ------------------------------------------------------ */
   /* ### RENDER ###  */
@@ -106,19 +98,8 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
     <div
       ref={rootRef}
       className="relative"
-      onPointerEnter={() => {
-        if (hideTimeoutRef.current) {
-          clearTimeout(hideTimeoutRef.current);
-        }
-
-        setVisible(true);
-      }}
-      onPointerLeave={() => {
-        if (hideTimeoutRef.current) {
-          clearTimeout(hideTimeoutRef.current);
-        }
-
-        hideTimeoutRef.current = setTimeout(() => setVisible(false), HIDE_TIMEOUT_LENGTH);
+      onClick={() => {
+        setVisible((prev) => !prev);
       }}
     >
       {/* ------------------------------------------------------ */}
@@ -139,7 +120,8 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
         ref={dropdownBodyRef}
         className={classNames(
           'absolute top-6 bg-gray-950 z-50 px-2 py-4 flex-col transition-all duration-300',
-          'hidden opacity-0 rounded-b-lg drop-shadow-2xl'
+          'rounded-b-lg drop-shadow-2xl',
+          visible ? 'block' : 'hidden'
         )}
         style={{ width: option.width ?? '100%', left: offsetX + leftOffset }}
       >
@@ -155,7 +137,7 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
           >
             <Link
               href={item.href}
-              className="block hover:underline hover:bg-gray-800 p-3 w-full cursor-pointer rounded-md transition-all duration-300"
+              className="block hover:underline p-3 w-full cursor-pointer rounded-md transition-all duration-300"
             >
               {item.label}
             </Link>
