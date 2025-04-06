@@ -25,8 +25,8 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
   return (
     <ArticleContainer
       right={
-        <div className="post-detail-toc-container flex justify-center sticky top-0 left-0">
-          <Toc toc={toc} />
+        <div className="post-detail-toc-container justify-center sticky top-0 left-0 hidden 2xl:flex">
+          <Toc toc={toc} activeId="" />
         </div>
       }
     >
