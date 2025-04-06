@@ -12,8 +12,6 @@ export interface TocProps {
 }
 
 export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
-  const router = useRouter();
-  const params = useSearchParams();
   const [fragId, setFragId] = useState('');
 
   /**
