@@ -26,7 +26,19 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
     <ArticleContainer
       right={
         <div className="post-detail-toc-container justify-center sticky top-0 left-0 hidden 2xl:flex">
-          <Toc toc={toc} activeId="" />
+          <Toc
+            toc={toc}
+            activeId=""
+            onFragIdChanged={({ fragId }) => {
+              const targetEl = document.getElementById(fragId);
+
+              if (!targetEl) {
+                return;
+              }
+
+              targetEl.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
         </div>
       }
     >

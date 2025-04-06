@@ -1,18 +1,41 @@
 'use client';
 
 import classNames from 'classnames';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Heading } from 'nextra';
+import { useEffect, useState } from 'react';
 
 export interface TocProps {
   toc: Heading[];
   activeId: string;
+  onFragIdChanged: (param: { fragId: string }) => void;
 }
 
-export function Toc({ toc, activeId }: TocProps) {
+export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
   const router = useRouter();
+  const params = useSearchParams();
+  const [fragId, setFragId] = useState('');
 
-  console.log(toc);
+  /**
+   * url의 Fragment Identifier를 읽어서 상태로 저장함.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (window.location.hash) {
+      setFragId(window.location.hash);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!fragId) {
+      return;
+    }
+
+    onFragIdChanged({ fragId });
+  }, [fragId]);
 
   return (
     <div className="w-[320px] mt-[200px]">
@@ -21,8 +44,7 @@ export function Toc({ toc, activeId }: TocProps) {
           <li
             key={item.id}
             onClick={() => {
-              console.log(item.id);
-              //   router.push(item.id);
+              setFragId(item.id);
             }}
             className={classNames(
               'hover:cursor-pointer hover:underline list-decimal',
