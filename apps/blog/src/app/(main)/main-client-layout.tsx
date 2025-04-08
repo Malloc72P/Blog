@@ -1,13 +1,9 @@
 'use client';
 
-import { DropdownMenu } from '@components/dropdown-menu';
 import { MainFooter } from '@components/main-footer';
-import { PageLinkMap } from '@libs/page-link-map';
+import { MainHeader } from '@components/main-header';
 import { SeriesModel, TagModel } from '@libs/types/commons';
-import classNames from 'classnames';
-import Link from 'next/link';
-import { MenuIcon } from 'nextra/icons';
-import { createContext, PropsWithChildren, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useMemo } from 'react';
 
 export interface MainClientLayoutProps extends PropsWithChildren {
   tags: TagModel[];
@@ -35,53 +31,11 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
 
   return (
     <MainLayoutContext.Provider value={contextState}>
-      <div className="blog-main-layout h-full">
+      <div className="blog-main-layout w-[100vw] h-full overflow-x-hidden">
         {/* ------------------------------------------------------ */}
         {/* HEADER */}
         {/* ------------------------------------------------------ */}
-        <header
-          className={classNames('blog-main-header bg-black text-white', 'h-[60px] md:h-[128px]')}
-        >
-          <div className="flex items-center max-w-[1080px] h-full mx-auto px-5">
-            <Link href={PageLinkMap.main.landing()}>
-              <h1 className="text-[16px] md:text-[40px]">Malloc72p.Tech</h1>
-            </Link>
-            <span className="grow"></span>
-
-            {/* === HEADER >= MD: RIGHT SECTION === */}
-            <div className="gap-5 hidden md:flex">
-              {/* <div>About Me</div> */}
-
-              {/* === SERIES DROPDOWN MENU === */}
-              <DropdownMenu
-                title="Series"
-                width={200}
-                items={seriesList.map((series) => ({
-                  id: series.id,
-                  label: series.title,
-                  href: PageLinkMap.series.landing(series.id),
-                }))}
-              />
-
-              {/* === TAGS DROPDOWN MENU === */}
-              <DropdownMenu
-                title="Tags"
-                width={100}
-                // leftOffset={-25}
-                items={tags.map((tag) => ({
-                  id: tag.id,
-                  label: tag.id,
-                  href: PageLinkMap.tags.landing(tag.id),
-                }))}
-              />
-            </div>
-
-            {/* === HEADER < MD: RIGHT SECTION === */}
-            <div className="flex md:hidden">
-              <MenuIcon className="w-4 h-4" />
-            </div>
-          </div>
-        </header>
+        <MainHeader seriesList={seriesList} tags={tags} />
 
         {/* ------------------------------------------------------ */}
         {/* ARTICLE */}

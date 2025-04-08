@@ -52,8 +52,6 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
         min = i === 0 ? 0 : item.y;
         max = nextItem ? nextItem.y : Infinity;
 
-        console.log(min, max);
-
         if (min <= currentScroll && currentScroll < max) {
           setActiveTocId(item.el.id);
           break;
