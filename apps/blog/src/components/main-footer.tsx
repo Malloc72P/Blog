@@ -3,7 +3,7 @@ import { SeriesModel } from '@libs/types/commons';
 import { IconArrowUp } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
-import React, { PropsWithChildren, ReactElement, ReactNode, useMemo } from 'react';
+import React, { PropsWithChildren, ReactNode } from 'react';
 
 export interface MainFooterProps {
   seriesList: SeriesModel[];
@@ -18,7 +18,15 @@ export function MainFooter({ seriesList }: MainFooterProps) {
           {/* === MAIN FOOTER LEFT SECTION === */}
           <div className="blog-main-footer-left-section grow flex flex-col min-h-full">
             {/* === MAIN FOOTER LEFT SECTION TOP BUTTON === */}
-            <LinkButton color="primary" leftIcon={IconArrowUp}>
+            <LinkButton
+              color="primary"
+              leftIcon={IconArrowUp}
+              onClick={() => {
+                const el = document.querySelector('.blog-main-layout');
+
+                el?.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            >
               <span>Back to top</span>
             </LinkButton>
           </div>
@@ -99,7 +107,18 @@ function LinkButton({
   color = 'secondary',
 }: LinkButtonProps) {
   return (
-    <Link href={href ?? '#'}>
+    <Link
+      href={href ?? '#'}
+      onClick={
+        onClick
+          ? (e) => {
+              e.preventDefault();
+
+              onClick();
+            }
+          : undefined
+      }
+    >
       <div
         className={classNames(
           'transition-all duration-200 ease-in-out',

@@ -22,8 +22,15 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
   const [activeTocId, setActiveTocId] = useState('');
 
   useEffect(() => {
+    const container = document.querySelector('.blog-main-layout');
+
+    if (!container) {
+      return;
+    }
+
     const scrollHandler = () => {
-      const currentScroll = document.documentElement.scrollTop;
+      const currentScroll = container.scrollTop;
+
       const tocScrolls = toc
         .map((item) => document.getElementById(item.id))
         .filter((v) => v)
@@ -60,10 +67,10 @@ export function PostDetail({ children, series, post, tags, bottomContent, toc }:
     };
 
     scrollHandler();
-    window.addEventListener('scroll', scrollHandler);
+    container.addEventListener('scroll', scrollHandler);
 
     return () => {
-      window.removeEventListener('scroll', scrollHandler);
+      container.removeEventListener('scroll', scrollHandler);
     };
   }, []);
 
