@@ -9,6 +9,9 @@ export interface PostCardProps {
   series: SeriesModel;
 }
 
+/**
+ * 랜딩페이지의 포스트 목록보기에서 사용하는 포스트 카드 컴포넌트
+ */
 export function PostCard({ post, series }: PostCardProps) {
   return (
     <div key={post.route} className="px-3 mb-[42px]">

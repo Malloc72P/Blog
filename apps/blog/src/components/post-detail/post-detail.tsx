@@ -18,7 +18,7 @@ export interface PostDetailProps extends PropsWithChildren {
   bottomContent: ReactNode;
 }
 
-export function PostDetail({ children, series, post, tags, bottomContent, toc }: PostDetailProps) {
+export function PostDetail({ children, series, post, bottomContent, toc }: PostDetailProps) {
   const [activeTocId, setActiveTocId] = useState('');
 
   useEffect(() => {

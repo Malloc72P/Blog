@@ -35,7 +35,7 @@ const format = (
 export const DateUtil = {
   toLocalTime,
   format,
-  Dayjs: (date?: string | Date) => CustomDayJS(date),
+  Dayjs: (date?: string | Date) => CustomDayJS(date).tz(DateUtil.tzString.seoul),
   now: () => DateUtil.Dayjs().tz(DateUtil.tzString.seoul),
   parseWithTimezone: (date?: string | Date, tz?: string) => dayjs.tz(date, tz).locale('ko'),
   tzString: {
