@@ -18,10 +18,6 @@ export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
    * url의 Fragment Identifier를 읽어서 상태로 저장함.
    */
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
     if (window.location.hash) {
       setFragId(window.location.hash);
     }
