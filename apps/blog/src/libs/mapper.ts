@@ -1,5 +1,6 @@
 import { Item } from 'nextra/normalize-pages';
 import { SeriesModel } from './types/commons';
+import { DateUtil } from './date-util';
 
 const toPostModel = ({ item, seriesModels }: { item: Item; seriesModels: SeriesModel[] }) => {
   const series = seriesModels.find((series) => series.id === item.frontMatter.series);
@@ -14,7 +15,7 @@ const toPostModel = ({ item, seriesModels }: { item: Item; seriesModels: SeriesM
     title: item.frontMatter.title,
     series: series,
     tags: item.frontMatter.tags.map((tag: string) => ({ id: tag })),
-    date: new Date(item.frontMatter.date),
+    date: DateUtil.Dayjs(item.frontMatter.date).toDate(),
   };
 };
 
