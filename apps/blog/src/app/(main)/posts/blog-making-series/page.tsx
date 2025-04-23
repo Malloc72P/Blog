@@ -8,6 +8,6 @@ export default async function BlogMakingSeriesPage() {
 export const metadata = {
   id: 'blog-making-series',
   title: '블로그 만들기 프로젝트',
-  date: DateUtil.Dayjs('2025-03-08 21:18'),
+  date: '2025-03-08 21:18',
   isSeriesLanding: true,
 };

@@ -21,7 +21,7 @@ export function PostCard({ post, series }: PostCardProps) {
       </Link>
 
       <div className="text-gray-400 text-xs sm:text-[16px] mt-1 sm:mt-2">
-        {DateUtil.Dayjs(post.date).format('YYYY/MM/DD a hh:mm')}
+        {DateUtil.format(post.date, 'postCard')}
       </div>
 
       {/* === POST SERIES & TAG CONTAINER === */}

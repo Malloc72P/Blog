@@ -8,6 +8,6 @@ export default async function LatestPage() {
 export const metadata = {
   id: 'latest',
   title: '최신글',
-  date: DateUtil.Dayjs('2025-02-08 21:18'),
+  date: '2025-02-08 21:18',
   isSeriesLanding: true,
 };

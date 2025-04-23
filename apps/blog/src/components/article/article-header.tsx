@@ -7,7 +7,7 @@ import classNames from 'classnames';
 export interface ArticleHeaderProps {
   subTitle: string;
   title: string;
-  date?: Date;
+  date?: string;
   tags?: TagModel[];
 }
 

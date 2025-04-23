@@ -12,5 +12,5 @@ export interface PostModel {
   series: SeriesModel;
   title: string;
   tags: TagModel[];
-  date: Date;
+  date: string;
 }
