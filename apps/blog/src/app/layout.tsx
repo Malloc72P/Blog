@@ -1,6 +1,8 @@
 import { PropsWithChildren } from 'react';
 import './global.css';
 import { Noto_Sans_KR } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const font = Noto_Sans_KR({
   subsets: ['latin'],
@@ -26,7 +28,12 @@ export default async function RootLayout({ children }: PropsWithChildren) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
 
-      <body>{children}</body>
+      <body>
+        {children}
+
+        <SpeedInsights />
+        <Analytics />
+      </body>
     </html>
   );
 }
