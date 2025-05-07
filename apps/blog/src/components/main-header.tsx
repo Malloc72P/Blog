@@ -35,7 +35,7 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
           {/* === TAGS DROPDOWN MENU === */}
           <DropdownMenu
             title="Tags"
-            width={100}
+            width={160}
             // leftOffset={-25}
             items={tags.map((tag) => ({
               id: tag.id,
