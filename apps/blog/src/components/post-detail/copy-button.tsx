@@ -1,12 +1,15 @@
 'use client';
 
 import { IconCopy } from '@tabler/icons-react';
+import classes from './post-detail.module.scss';
+import classNames from 'classnames';
 
 export interface CopyButtonProps {
   content: string;
 }
 
 /**
+ * PostCodeblock 컴포넌트와 분리해서 작성해야함.
  * 이렇게 하지 않으면 Event handlers cannot be passed to Client Component props. 에러가 발생한다.
  * MDX를 서버에서 파싱하고 리액트 컴포넌트로 렌더링하기 때문이다.
  * 이 컴포넌트에 이벤트 바인딩 코드가 있는 경우, 직렬화가 불가능하기 때문에, 위와 같은 에러가 터진다.
@@ -23,7 +26,10 @@ export interface CopyButtonProps {
 export function CopyButton({ content }: CopyButtonProps) {
   return (
     <button
-      className="absolute right-5 top-5 p-2 rounded-md opacity-80 hover:opacity-90 active:opacity-100"
+      className={classNames(
+        'absolute right-5 top-5 p-2 rounded-md opacity-80 hover:opacity-90 active:opacity-100',
+        classes.copyBtn
+      )}
       onClick={() => {
         navigator.clipboard.writeText(content);
       }}

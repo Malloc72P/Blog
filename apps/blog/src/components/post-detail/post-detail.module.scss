@@ -25,7 +25,8 @@
     word-break: keep-all;
   }
 
-  ul {
+  ul,
+  ol {
     padding-top: 16px;
     padding-bottom: 24px;
   }
@@ -60,11 +61,7 @@
   }
 
   pre {
-    @apply bg-gray-100;
-    padding: 16px 16px 16px 24px;
-    border-radius: 16px;
-    margin-top: 16px;
-    margin-bottom: 24px;
+    border-radius: 8px;
   }
 
   @media only screen and (max-width: 800px) {
@@ -95,7 +92,8 @@
       word-break: keep-all;
     }
 
-    ul {
+    ul,
+    ol {
       padding-top: 8px;
       padding-bottom: 12px;
       line-height: 20px;
@@ -120,6 +118,7 @@
       text-decoration: underline;
     }
 
+    // `으로 감싸진 코드 블록
     code:not(pre code) {
       @apply bg-gray-100;
       padding: 4px 8px;
@@ -127,16 +126,19 @@
       margin: 0 3px;
       transition: 0.3s;
     }
+
     code:not(pre code):hover {
       @apply shadow-lg;
     }
 
+    // ```로 감싸진 코드 블록
     pre {
-      @apply bg-gray-100;
-      padding: 16px 16px 16px 24px;
-      border-radius: 16px;
-      margin-top: 16px;
-      margin-bottom: 24px;
+      padding: 16px 12px !important;
+      font-size: 12px;
+    }
+
+    .copyBtn {
+      display: none;
     }
   }
 }

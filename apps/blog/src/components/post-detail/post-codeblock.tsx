@@ -1,6 +1,5 @@
 'use-client';
 
-import { IconCopy } from '@tabler/icons-react';
 import { PropsWithChildren, useMemo } from 'react';
 import { Prism } from 'react-syntax-highlighter';
 import { darcula } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -16,10 +15,11 @@ export function PostCodeblock({ children }: PostCodeblockProps) {
   }, [children]);
 
   return (
-    <div className="relative">
-      <Prism language="javascript" style={darcula} showLineNumbers>
+    <div className="blog-code relative">
+      <Prism language="javascript" showLineNumbers style={darcula}>
         {codeString}
       </Prism>
+
       <CopyButton content={codeString} />
     </div>
   );
