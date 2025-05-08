@@ -25,7 +25,7 @@ export default async function RootLayout({ children }: PropsWithChildren) {
     <html lang="ko" className={`${font.variable}`}>
       <head>
         <link rel="icon" type="image/x-icon" href="/favicon.ico"></link>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
 
       <body>

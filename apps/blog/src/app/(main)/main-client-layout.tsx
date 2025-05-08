@@ -31,7 +31,7 @@ export default function MainClientLayout({ tags, seriesList, children }: MainCli
 
   return (
     <MainLayoutContext.Provider value={contextState}>
-      <div className="blog-main-layout w-[100vw] h-full overflow-x-hidden">
+      <div className="blog-main-layout h-full">
         {/* ------------------------------------------------------ */}
         {/* HEADER */}
         {/* ------------------------------------------------------ */}

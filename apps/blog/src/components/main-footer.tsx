@@ -11,7 +11,7 @@ export interface MainFooterProps {
 
 export function MainFooter({ seriesList }: MainFooterProps) {
   return (
-    <footer className="blog-main-footer sticky left-0 bottom-0 px-8 2xl:px-5 pt-8 pb-8 md:pb-16 bg-gray-100">
+    <footer className="blog-main-footer px-8 2xl:px-5 pt-8 pb-8 md:pb-16 bg-gray-100 w-full sticky left-0 bottom-0 z-[-1]">
       {/* === MAIN FOOTER CONTAINER === */}
       <div className="max-w-[1080px] mx-auto min-h-full flex flex-col">
         <div className="flex grow flex-col md:flex-row">
@@ -22,9 +22,7 @@ export function MainFooter({ seriesList }: MainFooterProps) {
               color="primary"
               leftIcon={IconArrowUp}
               onClick={() => {
-                const el = document.querySelector('.blog-main-layout');
-
-                el?.scrollTo({ top: 0, behavior: 'smooth' });
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             >
               <span>Back to top</span>
