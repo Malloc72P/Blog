@@ -6,7 +6,9 @@
   ],
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "files.exclude": {},
+  "files.exclude": {
+    "packages/archived/**/*": true
+  },
   "cssVariables.languages": ["css"],
   "cssVariables.lookupFiles": [
     "**/*.module.css",
