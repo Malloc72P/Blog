@@ -4,7 +4,7 @@ import { prepareParam } from '../param-util';
 import { Constants } from '@libs/constants';
 
 export interface FindPostsProps {
-  orderBy?: 'latest';
+  orderBy?: 'latest' | 'createAtASC';
   limit?: number;
   seriesId?: string;
 }
@@ -40,7 +40,14 @@ export async function findPosts(param: FindPostsProps = GetPostDefaultOption) {
     .filter((post) => !post.frontMatter.isSeriesLanding);
 
   if (orderBy) {
-    posts.sort(sortPostByCreatedAt);
+    switch (orderBy) {
+      case 'latest':
+        posts.sort(sortPostByCreatedAtDesc);
+        break;
+      case 'createAtASC':
+        posts.sort(sortPostByCreatedAtAsc);
+        break;
+    }
   }
 
   if (limit) {
@@ -62,8 +69,11 @@ function collectPost(posts: Item[], current: Item) {
   return posts;
 }
 
-const sortPostByCreatedAt = (a: Item, b: Item): number =>
+const sortPostByCreatedAtDesc = (a: Item, b: Item): number =>
   new Date(b.frontMatter?.date).getTime() - new Date(a.frontMatter?.date).getTime();
+
+const sortPostByCreatedAtAsc = (a: Item, b: Item): number =>
+  new Date(a.frontMatter?.date).getTime() - new Date(b.frontMatter?.date).getTime();
 
 function resolveSeriesQuery(seriesId?: string) {
   if (!seriesId || seriesId === Constants.series.latestId) {

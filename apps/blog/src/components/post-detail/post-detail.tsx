@@ -9,6 +9,8 @@ import { Heading } from 'nextra';
 import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
 import classes from './post-detail.module.scss';
 import { Toc } from './toc';
+import { IconSquareChevronLeft } from '@tabler/icons-react';
+import { PostNavigator, PostNavigatorPlaceholder } from './post-navigator';
 
 export interface PostDetailProps extends PropsWithChildren {
   toc: Heading[];
@@ -18,18 +20,23 @@ export interface PostDetailProps extends PropsWithChildren {
   bottomContent: ReactNode;
 }
 
+/**
+ * 블로그 상세 페이지.
+ *
+ * mdx-components에서 해당 컴포넌트를 사용해서 블로그 상세 페이지를 랜더링한다.
+ */
 export function PostDetail({ children, series, post, bottomContent, toc }: PostDetailProps) {
   const [activeTocId, setActiveTocId] = useState('');
 
   useEffect(() => {
-    const container = document.querySelector('.blog-main-layout');
+    const container = window;
 
     if (!container) {
       return;
     }
 
     const scrollHandler = () => {
-      const currentScroll = container.scrollTop;
+      const currentScroll = container.scrollY;
 
       const tocScrolls = toc
         .map((item) => document.getElementById(item.id))
@@ -47,6 +54,7 @@ export function PostDetail({ children, series, post, bottomContent, toc }: PostD
 
       let min = 0;
       let max = Infinity;
+      const lastItem = tocScrolls[tocScrolls.length - 1];
 
       for (let i = 0; i < tocScrolls.length; i++) {
         const item = tocScrolls[i];
@@ -56,9 +64,18 @@ export function PostDetail({ children, series, post, bottomContent, toc }: PostD
           continue;
         }
 
+        // 해당 문단의 스크롤 범위를 계산
         min = i === 0 ? 0 : item.y;
-        max = nextItem ? nextItem.y : Infinity;
+        // 다음 아이템이 있으면, 그 아이템의 y 좌표 전 까지가 해당 아이템의 스크롤 범위.
+        max = nextItem ? nextItem.y - 1 : Infinity;
 
+        // 스크롤이 맨 아래에 부딫힌 경우
+        if (lastItem && document.body.scrollHeight - document.body.clientHeight === currentScroll) {
+          setActiveTocId(lastItem.el.id);
+          break;
+        }
+
+        // 스크롤이 해당 문단의 범위 안에 있는 경우
         if (min <= currentScroll && currentScroll < max) {
           setActiveTocId(item.el.id);
           break;
@@ -115,7 +132,7 @@ export function PostDetail({ children, series, post, bottomContent, toc }: PostD
         {/* POST DETAIL BODY */}
         {/* ------------------------------------------------------ */}
         <article
-          className={classNames('post-detail-body py-[30px] md:py-[65px]', classes.postDetail)}
+          className={classNames('post-detail-body py-[60px] md:py-[100px]', classes.postDetail)}
         >
           {children}
         </article>
@@ -123,7 +140,20 @@ export function PostDetail({ children, series, post, bottomContent, toc }: PostD
         {/* ------------------------------------------------------ */}
         {/* POST DETAIL BODY */}
         {/* ------------------------------------------------------ */}
-        <footer className="post-detail-footer">{bottomContent}</footer>
+        <footer className="post-detail-footer pb-[60px] md:pb-[100px] w-full">
+          <div className="flex gap-10 flex-col md:flex-row">
+            {post.prevPost ? (
+              <PostNavigator mode="prev" post={post.prevPost} />
+            ) : (
+              <PostNavigatorPlaceholder />
+            )}
+            {post.nextPost ? (
+              <PostNavigator mode="next" post={post.nextPost} />
+            ) : (
+              <PostNavigatorPlaceholder />
+            )}
+          </div>
+        </footer>
       </section>
     </ArticleContainer>
   );

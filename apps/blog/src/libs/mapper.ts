@@ -1,7 +1,14 @@
 import { Item } from 'nextra/normalize-pages';
-import { SeriesModel } from './types/commons';
+import { PostModel, SeriesModel } from './types/commons';
+import { FrontMatter, NextraMetadata } from 'nextra';
 
-const toPostModel = ({ item, seriesModels }: { item: Item; seriesModels: SeriesModel[] }) => {
+const toPostModel = ({
+  item,
+  seriesModels,
+}: {
+  item: Item;
+  seriesModels: SeriesModel[];
+}): PostModel => {
   const series = seriesModels.find((series) => series.id === item.frontMatter.series);
   const date = item.frontMatter.date;
 
