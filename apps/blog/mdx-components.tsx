@@ -40,8 +40,6 @@ const defaultComponents = getNextraComponents({
       nextPost: postIndex < seriesPosts.length - 1 ? seriesPosts[postIndex + 1] : undefined,
     };
 
-    console.log('mdx-components', { postIndex, post });
-
     return (
       <>
         <PostDetail toc={toc} series={series} tags={tags} post={post} bottomContent={bottomContent}>
