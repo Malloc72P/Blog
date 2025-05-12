@@ -138,7 +138,7 @@ export function PostDetail({ children, series, post, bottomContent, toc }: PostD
         </article>
 
         {/* ------------------------------------------------------ */}
-        {/* POST DETAIL BODY */}
+        {/* POST DETAIL Footer */}
         {/* ------------------------------------------------------ */}
         <footer className="post-detail-footer pb-[60px] md:pb-[100px] w-full">
           <div className="flex gap-10 flex-col md:flex-row">

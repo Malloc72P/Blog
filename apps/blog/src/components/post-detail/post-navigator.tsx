@@ -16,7 +16,7 @@ export function PostNavigator({ mode, post }: PostNavigatorProps) {
       href={post.route}
       className={classNames(
         'group/navigator',
-        'flex bg-gray-50 p-3 rounded-md gap-3 items-center grow basis-0 min-w-0 cursor-pointer',
+        'flex bg-gray-50 p-3 rounded-md gap-5 items-center grow basis-0 min-w-0 cursor-pointer',
         mode === 'prev' ? 'flex-row' : 'flex-row-reverse'
       )}
     >
