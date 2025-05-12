@@ -147,6 +147,7 @@ export function PostDetail({ children, series, post, bottomContent, toc }: PostD
             ) : (
               <PostNavigatorPlaceholder />
             )}
+
             {post.nextPost ? (
               <PostNavigator mode="next" post={post.nextPost} />
             ) : (
