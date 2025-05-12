@@ -13,4 +13,6 @@ export interface PostModel {
   title: string;
   tags: TagModel[];
   date: string;
+  prevPost?: PostModel;
+  nextPost?: PostModel;
 }

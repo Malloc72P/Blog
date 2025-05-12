@@ -18,6 +18,11 @@ export interface PostDetailProps extends PropsWithChildren {
   bottomContent: ReactNode;
 }
 
+/**
+ * 블로그 상세 페이지.
+ *
+ * mdx-components에서 해당 컴포넌트를 사용해서 블로그 상세 페이지를 랜더링한다.
+ */
 export function PostDetail({ children, series, post, bottomContent, toc }: PostDetailProps) {
   const [activeTocId, setActiveTocId] = useState('');
 
