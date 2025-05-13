@@ -25,7 +25,10 @@ export default async function RootLayout({ children }: PropsWithChildren) {
     <html lang="ko" className={`${font.variable}`}>
       <head>
         <link rel="icon" type="image/x-icon" href="/favicon.ico"></link>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+          name="google-site-verification"
+          content="mOdpcnnT3rL3phLYQpSNvzcOOGfKppuH-2mgeOs7VIc"
+        />
       </head>
 
       <body>
