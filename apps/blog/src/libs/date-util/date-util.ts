@@ -24,12 +24,10 @@ const toLocalTime = (date: string | Date) => {
  * @returns 포맷 문자열에 맞게 출력된 날짜 문자열
  */
 const format = (date: string | Date | dayjs.Dayjs, formatType: IDateFormat) => {
-  let dayjsObj: dayjs.Dayjs = dayjs.isDayjs(date)
-    ? date
-    : CustomDayJS.tz(date, DateUtil.tzString.seoul);
+  let dayjsObj = dayjs.isDayjs(date) ? date : dayjs.tz(date, DateUtil.tzString.seoul);
 
-  const format = DateFormat[formatType];
-  const result = dayjsObj.format(format);
+  const pattern = DateFormat[formatType];
+  const result = dayjsObj.format(pattern);
 
   return result;
 };
