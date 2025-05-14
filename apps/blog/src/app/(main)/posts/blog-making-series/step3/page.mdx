@@ -69,22 +69,57 @@ Hydration mismatch 에러는 SSR로 받은 HTML과 클라이언트에서 렌더�
 
 ## Vercel 빌드 서버가 미국이라 발생한 문제
 
-Vercel 빌드 서버는 워싱턴 D.C입니다. 이건 바꿀 수 없죠.  
-제 블로그는 SSG로 정적 페이지를 빌드하기 때문에, 빌드 시점에 페이지의 컨텐츠가 고정됩니다.
-문제는, 제 블로그의 날짜 처리 로직에 버그가 있었던 겁니다...!
+결론부터 말씀드리면, DayJs를 잘못 사용했기 때문에 발생한 문제입니다.  
+문제의 코드는 다음과 같습니다
 
-제 블로그에서 날짜를 처리하던 방식은 아래와 같습니다.
+```tsx
+<div className="text-gray-400 text-xs sm:text-[16px] mt-1 sm:mt-2">
+  {DateUtil.Dayjs(post.date).format('YYYY/MM/DD a hh:mm')}
+</div>
+```
 
-1. 서버사이드에서 MDX 문서의 Frontmatter에서 포스트 생성일 조회하고 게시글 컴포넌트에 props로 전달합니다.
-2. 게시글 컴포넌트는 Day.js를 사용해서 지정한 포맷으로 날짜를 렌더링합니다.
+Frontmatter의 시간 정보는 아래와 같이 한국 기준 시간으로 작성합니다.
 
-MDX 문서 Frontmatter의 포스트 생성일은 아래와 같이, 한국 시간으로 적혀있습니다.
+```ts
+export const metadata = {
+  // ...생략
+  date: '2025-03-05 22:42', // 한국 기준 시간
+};
+```
+
+Dayjs는 현재 실행 환경의 Locale Time을 그대로 사용합니다.  
+서버는 미국, 브라우저는 한국 타임존을 사용하게 됩니다.  
+그러므로 서버와 브라우저에서 실행된 `DateUtil.Dayjs(post.date)`의 결과는 달라집니다.  
+이로 인해 서버와 클라이언트가 같은 값을 렌더링하지 못해 Hydration mismatch 오류가 발생한 것 입니다.
+
+이 문제를 해결하기 위해 format이라는 유틸 함수를 만들었습니다.  
+실행 환경의 타임존과 관계 없이, 항상 한국 타임존이 지정되도록 하였습니다.
+
+```ts
+const format = (date: string | Date | dayjs.Dayjs, formatType: IDateFormat) => {
+  // 매개변수 date를 Dayjs 객체로 재생성.
+  // DayJs객체를 생성할 때 서울 타임존을 사용해서 객체를 생성한다.
+  let dayjsObj: dayjs.Dayjs = dayjs.isDayjs(date)
+    ? date
+    : CustomDayJS.tz(date, DateUtil.tzString.seoul);
+
+  // 포맷 문자열을 DateFormat객체에서 꺼내고 적용한다.
+  const format = DateFormat[formatType];
+  const result = dayjsObj.format(format);
+
+  return result;
+};
+```
+
+이렇게 하여 실행 환경의 타임존과 무관하게 항상 같은 타임존이 적용되어,
+서버와 클라이언트의 랜더링 결과가 달라지는 Hydration mismatch 문제를 해결할 수 있었습니다.
+원인을 찾는 것 부터 까다로워서 해결하느라 꽤 애먹었던 이슈였습니다 ㅎㅎ. 🥹
 
 export const metadata = {
   title: 'Nextjs로 블로그 만들기 시리즈 Part 3. 블로그를 구현하면서 겪었던 시행착오 1',
   description:
     '개인 블로그를 직접 구현하기 위해 어떤 프레임워크와 호스팅 업체를 고를지 고민한 내용을 다룬 글 입니다.',
   series: 'blog-making-series',
-  tags: ['Next.js', 'Nextra', 'Vercel', 'Hydration', 'React error #418'],
+  tags: ['Next.js', 'Vercel', 'Hydration', 'React error #418', 'DayJs'],
   date: '2025-03-07 19:53',
 };

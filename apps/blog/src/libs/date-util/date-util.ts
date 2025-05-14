@@ -18,12 +18,10 @@ const toLocalTime = (date: string | Date) => {
 
 /**
  * 날짜에 포맷을 지정해서 문자열을 반환함.
- * 원본 날짜 문자열에 이미 타임존이 적용되어 있다면 applyTimezone을 false로 지정해야함
- * 안그러면 타임존 설정을 또 지정해서
- * @param date
- * @param formatType
- * @param applyTimezone
- * @returns
+ *
+ * @param date 날짜 객체. Date 타입인 경우 내부에서 DayJs객체로 재생성함. 이 때 타임존이 서울로 강제 지정됨.
+ * @param formatType 포맷 문자열
+ * @returns 포맷 문자열에 맞게 출력된 날짜 문자열
  */
 const format = (date: string | Date | dayjs.Dayjs, formatType: IDateFormat) => {
   let dayjsObj: dayjs.Dayjs = dayjs.isDayjs(date)
