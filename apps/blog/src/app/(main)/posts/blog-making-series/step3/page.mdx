@@ -1,0 +1,90 @@
+## 블로그를 구현하면서 겪었던 시행착오들
+
+![블로그는 쉽기만 할 줄 알았는데...](../../../../../../../../images/cafe-1.jpg)
+
+블로그를 직접 구현하면서 겪었던 시행착오를 여러분과 공유하려고 합니다.  
+처음엔 단순한 블로그이니, 무난하게 구현하고 배포해야지~ 라고 생각했습니다.  
+다만, 그렇게 간단하지는 않더라구요. 🥹
+
+기억에 남는 황당한(?) 이슈를 간단하게 요약하면 아래와 같습니다.
+
+- 날짜로 인한 Hydration 에러가 발생하는 이슈
+- z-index값이 낮은 엘리먼트가 높은 엘리먼트 위에 배치되는 이슈
+
+## 날짜로 인한 Hydration 에러가 발생하는 이슈
+
+React의 Hydration 에러는 SSR을 통해 받은 초기 HTML과 브라우저에서 Hydration을 위해 렌더링한 HTML 내용이 다른 경우 발생합니다.  
+제 경우엔 Vercel에 배포한 경우만 Hydration 에러가 발생하는 상황이었습니다.  
+정리하면...
+
+- 로컬 dev 모드에서는 에러 발생 안함.
+- 로컬 production 모드에서도 발생 안함.
+- Vercel에 배포한 경우엔 Hydration 에러 발생.
+
+와... 정말 황당했습니다. 대체 뭐가 문제이길래 배포한 버전에서만 에러가 발생하는걸까요?  
+처음엔 너무 막막했습니다. 로컬에서 상황재현이 안되니, 에러 로그만 보고 해결해야 하는 상황이었습니다.
+
+문제는 에러 로그도 아래와 같이 출력되는 상황이라, 왜 발생하는지 알기 어려웠습니다.
+
+```
+Uncaught Error: Minified React error #418;
+    visit https://react.dev/errors/418?
+    args[]=for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    ...
+```
+
+![아...](../../../../../../../../images/frustrated2.jpg)
+
+## React Error #418
+
+https://react.dev/errors/418
+
+리액트는 전송되는 바이트 크기를 줄이기 위해, 전체 오류 메세지를 전송하지 않습니다.  
+그래서 위와 같은 에러 메세지가 출력된 상황입니다.
+
+418 에러의 원래 내용은 아래와 같습니다.
+
+```
+Hydration failed because the server rendered HTML didn't match the client.
+As a result this tree will be regenerated on the client.
+This can happen if a SSR-ed Client Component used:
+...
+```
+
+즉, Hydration mismatch 에러가 발생한 상황인 것이죠.
+문제는, 왜 Hydration mismatch가 발생했을까요?
+
+## Hydration mismatch 에러의 원인을 찾는 과정
+
+![대체 어디서 Hydration mismatch가 발생하는거야!!!](../../../../../../../../images/finding.jpg)
+
+Hydration mismatch 에러는 SSR로 받은 HTML과 클라이언트에서 렌더링한 HTML이 달라서 하이드레이션에 실패하는 에러입니다.  
+주로 아래와 같은 경우에 발생합니다.
+
+1. window객체와 같이 브라우저 전용 API를 통해 분기(if...else)하는 경우
+2. Date.now()와 같이 현재 시간을 사용하여 mismatch가 발생하는 경우
+3. 서버와 유저 로케일이 달라서 Date Formatting이 다르게 적용된 경우
+
+그 외에도 더 있지만, 제 경우는 3번 때문에 발생한 문제였습니다.
+
+## Vercel 빌드 서버가 미국이라 발생한 문제
+
+Vercel 빌드 서버는 워싱턴 D.C입니다. 이건 바꿀 수 없죠.  
+제 블로그는 SSG로 정적 페이지를 빌드하기 때문에, 빌드 시점에 페이지의 컨텐츠가 고정됩니다.
+문제는, 제 블로그의 날짜 처리 로직에 버그가 있었던 겁니다...!
+
+제 블로그에서 날짜를 처리하던 방식은 아래와 같습니다.
+
+1. 서버사이드에서 MDX 문서의 Frontmatter에서 포스트 생성일 조회하고 게시글 컴포넌트에 props로 전달합니다.
+2. 게시글 컴포넌트는 Day.js를 사용해서 지정한 포맷으로 날짜를 렌더링합니다.
+
+MDX 문서 Frontmatter의 포스트 생성일은 아래와 같이, 한국 시간으로 적혀있습니다.
+
+export const metadata = {
+  title: 'Nextjs로 블로그 만들기 시리즈 Part 3. 블로그를 구현하면서 겪었던 시행착오 1',
+  description:
+    '개인 블로그를 직접 구현하기 위해 어떤 프레임워크와 호스팅 업체를 고를지 고민한 내용을 다룬 글 입니다.',
+  series: 'blog-making-series',
+  tags: ['Next.js', 'Nextra', 'Vercel', 'Hydration', 'React error #418'],
+  date: '2025-03-07 19:53',
+};
