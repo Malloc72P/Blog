@@ -12,9 +12,9 @@ export function PostImage(props: any) {
   const { src, alt, blur } = props as PostImageProps;
 
   return (
-    <span className="block px-5 text-center">
+    <span className="block text-center">
       <Image
-        className="rounded-md mx-auto shadow-xl border border-gray-100 bg-gray-100"
+        className="rounded-md mx-auto shadow-xl"
         src={src}
         alt={alt}
         placeholder={blur}

@@ -1,0 +1,163 @@
+## 블로그를 구현하면서 겪었던 시행착오들
+
+![블로그는 쉽기만 할 줄 알았는데...](../../../../../../../../images/cafe-1.jpg)
+
+블로그를 직접 구현하면서 겪었던 시행착오를 여러분과 공유하려고 합니다.  
+처음엔 단순한 블로그이니, 무난하게 구현하고 배포해야지~ 라고 생각했습니다.  
+다만, 그렇게 간단하지는 않더라고요. 🥹
+
+기억에 남는 황당한(?) 이슈를 간단하게 요약하면 아래와 같습니다.
+
+- 날짜로 인한 Hydration 오류 발생
+- z-index값이 낮은 엘리먼트가 높은 엘리먼트 위에 배치되는 이슈
+
+## 날짜로 인한 Hydration 오류 발생
+
+React의 Hydration 오류는 SSR을 통해 받은 초기 HTML과 브라우저에서 Hydration을 위해 렌더링한 HTML 내용이 다른 경우 발생합니다.  
+제 경우엔 Vercel에 배포한 경우만 Hydration 오류가 발생하는 상황이었습니다.  
+정리하자면...
+
+- 로컬 dev 모드에서는 에러 발생 안함.
+- 로컬 production 모드에서도 발생 안함.
+- Vercel에 배포한 경우엔 Hydration 오류 발생.
+
+와... 정말 황당했습니다. 대체 뭐가 문제이길래 배포한 버전에서만 에러가 발생하는 걸까요?  
+처음엔 너무 막막했습니다. 로컬에서 상황재현이 안되니, 에러 로그만 보고 해결해야 하는 상황이었습니다.
+
+문제는 에러 로그도 아래와 같이 출력되는 상황이라, 왜 발생하는지 알기 어려웠습니다.
+
+```
+Uncaught Error: Minified React error #418;
+    visit https://react.dev/errors/418?
+    args[]=for the full message or use the non-minified dev environment
+    for full errors and additional helpful warnings.
+    ...
+```
+
+![아...](../../../../../../../../images/frustrated2.jpg)
+
+## React Error #418
+
+https://react.dev/errors/418
+
+리액트는 전송되는 바이트 크기를 줄이기 위해, 전체 오류 메시지를 전송하지 않습니다.  
+그래서 위와 같은 에러 메시지가 출력된 상황입니다.
+
+418 에러의 원래 내용은 아래와 같습니다.
+
+```
+Hydration failed because the server rendered HTML didn't match the client.
+As a result this tree will be regenerated on the client.
+This can happen if a SSR-ed Client Component used:
+...
+```
+
+즉, Hydration 오류가 발생한 상황인 것이죠.
+문제는, 왜 Hydration 오류가 발생했을까요?
+
+## Hydration 오류의 원인을 찾는 과정
+
+![대체 어디서 Hydration 오류가 발생하는거야!!!](../../../../../../../../images/finding.jpg)
+
+Hydration 오류는 SSR로 받은 HTML과 클라이언트에서 렌더링한 HTML이 달라서 하이드레이션에 실패하는 에러입니다.  
+주로 아래와 같은 경우에 발생합니다.
+
+1. window 객체와 같이 브라우저 전용 API를 통해 분기(if...else)하는 경우
+2. Date.now()와 같이 현재 시간을 사용하여 mismatch가 발생하는 경우
+3. 서버와 유저 로케일이 달라서 Date Formatting이 다르게 적용된 경우
+
+그 외에도 더 있지만, 제 경우는 3번 때문에 발생한 문제였습니다.
+
+## Vercel 빌드 서버가 미국이라 발생한 문제
+
+결론부터 말씀드리면, Date 내장객체를 잘못 사용했던 것이 원인이었습니다.
+먼저, Hydration Error를 발생시킨 코드를 보시죠.
+
+```tsx
+<div className="text-gray-400 text-xs sm:text-[16px] mt-1 sm:mt-2">
+  {DateUtil.Dayjs(post.date).format('YYYY/MM/DD a hh:mm')}
+</div>
+```
+
+post객체의 date로 Dayjs객체를 만들고 포맷팅을 하는 코드입니다.  
+여기서 post.date의 값은 MDX 문서의 Frontmatter에서 읽어옵니다.
+아래의 코드는 MDX 문서의 Frontmatter입니다.
+
+```ts
+export const metadata = {
+  // ...생략
+  date: '2025-03-05 22:42', // 한국 기준 시간
+};
+```
+
+네, 바로 이 부분이 문제였습니다. 날짜 문자열에 타임존 정보가 없습니다.  
+날짜 문자열에 타임존 정보가 없는 경우, Dayjs는 실행 환경의 Locale Time을 그대로 사용합니다.  
+해당 코드를 실행하는 컴퓨터의 타임존이 한국이라면, 저 시간을 한국 시간으로서 파싱합니다.  
+이 경우 UTC 시간으로 `2025-03-05 13:42`가 됩니다.  
+반면, 타임존이 워싱턴 D.C인 컴퓨터에서 실행한다면 UTC 시간으로 `2025-03-06 03:42`가 됩니다.  
+저 시간을 어떤 타임존에서의 시간으로 파싱하느냐에 따라 결과가 달라지는 것이지요.
+
+![타임존 문제 때문에 Hydration 오류가 날거라고는 상상도 못했습니다...](../../../../../../../../images/timezone.jpg)
+
+제 경우, 워싱턴 D.C 리전의 서버에서 앱을 빌드합니다. 그리고 한국 타임존을 사용하는 브라우저에서 페이지를 조회합니다.
+그렇다보니 서버와 브라우저에서 실행된 `DateUtil.Dayjs(post.date).format()`의 결과가 다릅니다.  
+이로 인해 서버와 클라이언트가 같은 값을 렌더링하지 못해 Hydration 오류가 발생한 상황입니다.
+
+이 문제를 해결하기 위해 format이라는 유틸 함수를 만들었습니다.  
+실행 환경의 타임존과 관계없이, 항상 한국 타임존이 지정하여 문자열을 파싱하고, 출력합니다(format)
+
+```ts
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import 'dayjs/locale/ko';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.locale('ko');
+
+const format = (date: string | Date | dayjs.Dayjs, formatType: IDateFormat) => {
+  // 매개변수 date를 Dayjs 객체로 재생성.
+  // DayJs객체를 생성할 때 서울 타임존을 사용해서 객체를 생성한다.
+  let dayjsObj: dayjs.Dayjs = dayjs.isDayjs(date) ? date : dayjs.tz(date, DateUtil.tzString.seoul);
+
+  // 포맷 문자열을 DateFormat객체에서 꺼내고 적용한다.
+  // dayjs객체에서 timezone 설정을 했으니, format을 하면 한국 시간대로 출력됩니다.
+  const pattern = DateFormat[formatType];
+  const result = dayjsObj.format(pattern);
+
+  return result;
+};
+```
+
+또한, 로컬 환경에서 하이드레이션 오류 상황을 재현하기 위해, dev 실행 명령어를 아래와 같이 수정했습니다.  
+아래와 같이 실행하면 아이슬란드 레이캬비크 시간대로 실행하는데, 이 곳은 그리니치 표준시를 사용하므로 오프셋이 0이라 디버깅하기 편합니다!
+
+```
+"dev": "TZ=\"Atlantic/Reykjavik\" next",
+```
+
+이렇게 하여 타임존 문제로 인한 하이드레이션 오류를 고칠 수 있었습니다.  
+예상하지도 못한 부분에서 하이드레이션 오류가 발생한 상황이라 고치는데 정말 애먹었습니다. 😭  
+그래도 이번 기회를 통해 날짜 처리 관련해서 많이 공부하게 된 점은 좋았습니다.  
+이렇게 조금씩 성장하는거겠죠 ㅎㅎ...
+
+## 정리하면...
+
+- 서버와 브라우저의 타임존이 달라서 하이드레이션 오류가 발생했습니다.
+- 날짜 문자열을 파싱할 때 타임존을 지정했습니다.
+- 실행환경에 상관없이 항상 같은 타임존으로 날짜를 파싱하고 출력하도록 수정하여 문제를 해결했습니다.
+
+다음 포스트에선 블로그를 구현하면서 겪었던 두번째 시행착오에 대해 소개드리겠습니다  
+z-index 값이 낮은 엘리먼트가 높은 엘리먼트 위에 배치되는 이슈에 대해서 다루려고 합니다.
+미리 스포일러하면 [Stacking Context](https://developer.mozilla.org/ko/docs/Web/CSS/CSS_positioned_layout/Stacking_context)로 인한 문제입니다!  
+긴 글 읽어주셔서 갑사합니다!
+
+export const metadata = {
+  title: 'Nextjs로 블로그 만들기 시리즈 Part 3. 블로그를 구현하면서 겪었던 시행착오 1',
+  description:
+    '개인 블로그를 직접 구현하기 위해 어떤 프레임워크와 호스팅 업체를 고를지 고민한 내용을 다룬 글 입니다.',
+  series: 'blog-making-series',
+  tags: ['Next.js', 'Vercel', 'Hydration', 'React error #418', 'DayJs'],
+  date: '2025-03-07 19:53',
+};

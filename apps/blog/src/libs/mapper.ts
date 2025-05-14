@@ -1,6 +1,5 @@
 import { Item } from 'nextra/normalize-pages';
 import { PostModel, SeriesModel } from './types/commons';
-import { FrontMatter, NextraMetadata } from 'nextra';
 
 const toPostModel = ({
   item,
