@@ -2,9 +2,9 @@
   "name": "simple-appserver",
   "private": true,
   "scripts": {
-    "build": "turbo build  --filter !date-test",
-    "dev": "turbo dev --filter !date-test",
-    "start": "turbo start --filter !date-test",
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "start": "turbo start",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },

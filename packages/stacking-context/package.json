@@ -1,13 +1,12 @@
 {
-  "name": "date-test",
+  "name": "stacking-context",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "blocked:dev": "next dev",
-    "blocked:dev2": "TZ=\"Atlantic/Reykjavik\" next dev"
+    "blocked:dev": "next dev"
   },
   "dependencies": {
-    "dayjs": "^1.11.13",
+    "classnames": "^2.5.1",
     "next": "15.3.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
