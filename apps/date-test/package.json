@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "blocked:dev": "next dev",
-    "blocked:dev2": "TZ=\"Atlantic/Reykjavik\" next dev"
+    "isolated:dev": "next dev",
+    "isolated:dev2": "TZ=\"Atlantic/Reykjavik\" next dev"
   },
   "dependencies": {
     "dayjs": "^1.11.13",

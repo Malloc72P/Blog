@@ -1,10 +1,6 @@
-import { MainFooter } from '@components/main-footer';
 import { findSeriesList } from '@libs/api/find-series';
 import { findTags } from '@libs/api/find-tags';
 import { Mapper } from '@libs/mapper';
-import { IconArrowBarToUp, IconArrowUp } from '@tabler/icons-react';
-import classNames from 'classnames';
-import { MenuIcon } from 'nextra/icons';
 import { PropsWithChildren } from 'react';
 import MainClientLayout from './main-client-layout';
 

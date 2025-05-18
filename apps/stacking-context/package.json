@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "blocked:dev": "next dev"
+    "isolated:dev": "next dev"
   },
   "dependencies": {
     "classnames": "^2.5.1",

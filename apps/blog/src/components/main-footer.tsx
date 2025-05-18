@@ -11,7 +11,14 @@ export interface MainFooterProps {
 
 export function MainFooter({ seriesList }: MainFooterProps) {
   return (
-    <footer className="blog-main-footer px-8 2xl:px-5 pt-8 pb-8 md:pb-16 bg-gray-100 w-full sticky left-0 bottom-0 z-[-1]">
+    <footer
+      className={classNames(
+        'blog-main-footer ',
+        'sticky left-0 bottom-0',
+        'w-full px-8 2xl:px-5 pt-8 pb-8 md:pb-16',
+        'bg-gray-100',
+      )}
+    >
       {/* === MAIN FOOTER CONTAINER === */}
       <div className="max-w-[1080px] mx-auto min-h-full flex flex-col">
         <div className="flex grow flex-col md:flex-row">
@@ -123,7 +130,7 @@ function LinkButton({
           'flex items-center gap-1 cursor-pointer',
           color === 'primary'
             ? 'text-gray-400 hover:text-gray-700'
-            : 'text-gray-400 hover:text-gray-500'
+            : 'text-gray-400 hover:text-gray-500',
         )}
       >
         {Icon && <Icon className="w-4 h-4" />}
