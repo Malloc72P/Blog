@@ -7,7 +7,11 @@ import { CopyButton } from './copy-button';
 
 export interface PostCodeblockProps extends PropsWithChildren {}
 
-export function PostCodeblock({ children }: PostCodeblockProps) {
+export function PostCodeblock(props: PostCodeblockProps) {
+  const { children } = props;
+
+  const language = (children as any)?.props?.className;
+
   const codeString = useMemo<string>(() => {
     const obj = children as any;
 
@@ -16,7 +20,11 @@ export function PostCodeblock({ children }: PostCodeblockProps) {
 
   return (
     <div className="blog-code relative">
-      <Prism language="javascript" showLineNumbers style={darcula}>
+      <Prism
+        language={language ? language.replace('language-', '') : 'js'}
+        showLineNumbers
+        style={darcula}
+      >
         {codeString}
       </Prism>
 

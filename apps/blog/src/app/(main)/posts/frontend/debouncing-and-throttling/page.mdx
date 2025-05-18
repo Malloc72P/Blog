@@ -1,0 +1,136 @@
+## 디바운싱(Debouncing)
+
+디바운스란 이벤트 발생 후 일정 시간동안 해당 이벤트가 재 발생하지 않으면 콜백을 호출하는 것을 말합니다.
+
+### 언제 사용하나요?
+
+자동검색기능을 구현하는 경우, Input의 onchange가 발생할 때 마다 검색 요청을 하는 콜백을 호출하면 너무 빈번하게 요청하게 되어 문제가 됩니다.
+이 때, onchange가 발생한 뒤 일정 시간동안 이벤트가 재발생하지 않았다면, 사용자가 해당 키워드로 검색을 원하는 상황으로 간주하고
+검색요청을 전송하도록 디바운스를 적용하여 불필요한 API호출을 막을 수 있습니다.
+
+구현은 setTimeout과 클로저를 통해 쉽게 구현할 수 있습니다.
+
+### 구현
+
+```html
+<div
+  class="card relative shadow-md border border-gray-100 bg-white max-w-[600px] h-[300px] mx-auto top-[40%] translate-y-[-50%] p-5 rounded-md"
+>
+  <div class="wrapper flex flex-col h-full">
+    <div class="flex flex-col gap-1">
+      <label for="search-input">Search</label>
+      <input id="search-input" type="text" class="border border-gray-200 h-8 rounded-md px-3" />
+    </div>
+
+    <div class="grow"></div>
+
+    <div>Search Invocation Result: <span id="display"></span></div>
+  </div>
+</div>
+```
+
+```js
+main();
+
+function main() {
+  const timeout = 500;
+  const searchInput = document.getElementById('search-input');
+  const display = document.getElementById('display');
+
+  // 클로져에서 참조하는 변수. 콜백함수 자신의 스코프 밖에 있지만 클로저는 선언 시점의 스코프 외부 변수를 읽고 쓸 수 있다.
+  let previousTimeoutId = null;
+
+  searchInput.addEventListener('keyup', (e) => {
+    // 타임아웃되지 않았다면 해당 콜백의 호출을 취소한다.
+    if (previousTimeoutId) {
+      clearTimeout(previousTimeoutId);
+    }
+
+    // 클로져에서 참조하는 변수에 새 타임아웃의 아이디를 저장한다.
+    previousTimeoutId = setTimeout(() => {
+      console.log('search!', {
+        keyword: searchInput.value,
+      });
+      display.innerText = searchInput.value;
+    }, timeout);
+  });
+}
+```
+
+이벤트가 발생하면 setTimeout을 통해 일정시간이 지나면 검색요청을 하도록 구현합니다.
+이 때 setTimeout의 반환값을 클로져 변수에 저장합니다.
+이후, 일정시간이 지나기 전 onchange 이벤트가 재발생하면 클로져 변수에 담긴 setTimeout id를 통해
+clearTimeout을 호출한 뒤 setTimeout을 재호출합니다.
+이렇게 하여 일정 시간동안 이벤트가 발생하지 않아야만 콜백이 호출되도록 개선할 수 있습니다.
+
+## 쓰로틀링(Throttling)
+
+쓰로틀링이란 콜백이 과도하게 호출되지 않도록 제한하는 것을 말합니다.
+
+### 언제 사용하나요?
+
+pointermove와 같이 짧은 간격으로 자주 발생하는 이벤트에 리스너를 바인딩하는 경우,
+쓰로틀링을 걸어서 불필요하게 자주 호출되는 콜백 문제를 방지할 수 있습니다.
+
+### 구현
+
+```html
+<div
+  id="box"
+  class="w-[300px] h-[300px] mx-auto mt-[50%] translate-y-[-50%] bg-amber-200 shadow-xl border border-gray-200 flex justify-center items-center"
+>
+  <span class="indicator text-2xl text-gray-700 pointer-events-none">0</span>
+</div>
+
+<div id="pointer" class="w-10 h-10 bg-slate-700 shadow-md fixed hidden pointer-events-none"></div>
+```
+
+```js
+main();
+
+function main() {
+  const box = document.getElementById('box');
+  const pointer = document.getElementById('pointer');
+  const indicator = box.querySelector('span.indicator');
+  let counter = 0;
+  let requesting = false;
+
+  box.addEventListener('pointermove', (e) => {
+    const { x, y } = e;
+
+    if (requesting) {
+      return;
+    }
+
+    requesting = true;
+
+    const animate = () => {
+      requesting = false;
+      counter++;
+
+      if (pointer.classList.contains('hidden')) {
+        pointer.classList.remove('hidden');
+      }
+
+      pointer.style.left = x + 'px';
+      pointer.style.top = y + 'px';
+      indicator.innerHTML = counter;
+    };
+
+    requestAnimationFrame(animate);
+  });
+}
+```
+
+쓰로틀링은 클로져를 통해 구현할 수 있습니다. 리스너를 바인딩하기 전, 클로저 변수를 하나 선언하고,
+여기에 이전 콜백이 호출된 시간을 기록합니다. 콜백이 호출되었을 때, 이전 호출 시간으로부터 일정시간 지났는지 여부를 검사합니다.
+지났다면 콜백을 호출하고, 지나지 않았다면 콜백을 호출하지 않습니다. 이렇게 하여 쓰로틀링을 구현할 수 있습니다.
+
+export const metadata = {
+  title: '디바운싱과 쓰로틀링',
+  description:
+    '웹 프론트엔드에서 디바운싱(Debouncing)과 쓰로틀링(Throttling)을 어떻게 구현하는지에 대해 다루는 포스트입니다.',
+  series: 'frontend',
+  tags: ['Debouncing', 'Throttling'],
+  date: '2025-03-13 22:42',
+};

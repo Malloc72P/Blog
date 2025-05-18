@@ -25,7 +25,7 @@ const defaultComponents = getNextraComponents({
     }
 
     const seriesPosts = (await findPosts({ seriesId, orderBy: 'createAtASC' })).map((item) =>
-      Mapper.toPostModel({ item, seriesModels: [series] })
+      Mapper.toPostModel({ item, seriesModels: [series] }),
     );
 
     const postIndex = seriesPosts.findIndex((currentPost) => currentPost.title === title);
@@ -77,8 +77,9 @@ async function resolveData(metadata: NextraMetadata) {
  */
 function resolvePostId(metadata: NextraMetadata) {
   const regex = new RegExp(
-    'src/app/\\(main\\)/posts/(?<series>[가-힣a-zA-Z0-9-]{1,})/(?<postId>[가-힣a-zA-Z0-9-]{1,})/page.mdx'
+    'src/app/\\(main\\)/posts/(?<series>[가-힣a-zA-Z0-9-]{1,})/(?<postId>[가-힣a-zA-Z0-9-]{1,})/page.mdx',
   );
+
   const postId = regex.exec(metadata.filePath)?.groups?.postId as string;
 
   return postId;
