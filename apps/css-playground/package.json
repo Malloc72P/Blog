@@ -1,0 +1,25 @@
+{
+  "name": "css-playground",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "isolated:dev": "nodemon src/app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.15.18",
+    "express": "^4.21.2",
+    "http-server": "^14.1.1",
+    "livereload-js": "^4.0.2",
+    "nodemon": "^3.1.10"
+  },
+  "devDependencies": {
+    "connect-livereload": "^0.6.1",
+    "livereload": "^0.9.3"
+  }
+}

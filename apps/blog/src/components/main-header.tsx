@@ -13,7 +13,14 @@ export interface MainHeaderProps {
 
 export function MainHeader({ seriesList, tags }: MainHeaderProps) {
   return (
-    <header className="blog-main-header bg-black text-white h-[60px] md:h-[128px] z-10">
+    <header
+      className={classNames(
+        'blog-main-header',
+        'relative z-50',
+        'bg-black text-white',
+        'h-[60px] md:h-[128px]',
+      )}
+    >
       <div className="flex items-center max-w-[1080px] h-full mx-auto px-5 md:px-10">
         <MainHeaderLogo />
 
