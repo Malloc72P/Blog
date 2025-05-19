@@ -13,6 +13,7 @@ const font = Noto_Sans_KR({
 export const metadata = {
   title: 'Malloc72P의 기술블로그',
   description: 'Web Service 개발과 IT 전반에 대해 다루는 Malloc72P의 기술 블로그입니다.',
+  author: 'Malloc72P(나승철)',
 };
 
 /**
