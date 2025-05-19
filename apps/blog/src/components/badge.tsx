@@ -24,8 +24,9 @@ export function Badge({ href, children, onClick, color = 'secondary' }: BadgePro
         'transition-all duration-200 ease-in-out',
         'px-[8px] py-[6px]',
         'md:px-[12px]',
+        'whitespace-nowrap',
         color === 'primary' ? '' : 'opacity-50',
-        'hover:opacity-100'
+        'hover:opacity-100',
       )}
     >
       <Link href={href} className="text-[10px] md:text-[16px]" onClick={onBadgeClick}>

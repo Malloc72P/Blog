@@ -16,14 +16,14 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
     <header
       className={classNames(
         'post-detail-header flex flex-col items-center',
-        'pt-[40px] pb-[30px] md:pt-[98px] md:pb-[42px]'
+        'pt-[40px] pb-[30px] md:pt-[98px] md:pb-[42px]',
       )}
     >
       {/* === ARTICLE TITLE === */}
       <h4
         className={classNames(
           'article-header-title flex items-center gap-1 text-gray-400',
-          'text-xs md:text-[16px]'
+          'text-xs md:text-[16px]',
         )}
       >
         <IconChevronsLeft className="w-4 h-4" />
@@ -37,7 +37,7 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
           'py-[20px] text-[20px] ',
           'md:py-[40px] md:text-[30px]',
           'lg:text-[40px]',
-          'leading-[32px] md:leading-[64px] font-bold'
+          'leading-[32px] md:leading-[64px] font-bold',
         )}
       >
         {title}
@@ -52,7 +52,7 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
 
       {/* === TAGS === */}
       {tags && (
-        <div className="py-[28px] flex gap-5">
+        <div className="py-[28px] flex flex-wrap gap-5">
           {tags.map((tag) => (
             <TagBadge key={tag.id} tagId={tag.id} />
           ))}

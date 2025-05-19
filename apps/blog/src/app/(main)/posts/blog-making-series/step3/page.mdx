@@ -1,132 +1,218 @@
 ## 구현
 
-![구현하면서 사용한 기술에 대해 소개합니다](../../../../../../../../images/cd0565ac24ab81eb258561a11427a37dcf49e46e7023ca782667115e3f5e8ea9.png)
+여러분이 보고 계신 이 블로그를 어떻게 구현했는지에 대해 다루려고 합니다.  
+앞서 소개해드린 것 처럼, 이 블로그는 Next.js를 기반으로 하는 Nextra를 사용해서 구현했습니다.  
+또, 게시글은 MDX 문서로 작성합니다.
 
-개인 블로그를 구현하면서 사용한 기술에 대해 여러분과 공유하려고 합니다.  
-이 포스트에서 소개하려고 하는 기술은 아래와 같습니다
+MDX 문서로 작성한 게시글을 어떻게 웹페이지로 랜더링하는지, 그렇게 만들어진 페이지 목록을 어떻게 조회하고 필터링하는지에 대해 소개해드리려고 합니다.
 
-- Next.js의 Route Group
-- Tailwind
+## MDX 문서를 웹페이지로 랜더링하는 과정
 
-## Route Group
+Nextra는 MDX 문서를 파싱하고 웹페이지로 랜더링합니다.  
+이 때, 웹 페이지를 어떻게 랜더링할지는 `mdx-compoonents.tsx`라는 파일에서 `named export`하는 `useMDXComponents`를 읽고 결정합니다.
 
-![Next.js의 Route를 묶어주기만 하는 Route Group!](../../../../../../../../images/51fcff73f9bb0c6461eb9f0fb472e1975e7a657e894a61c2fa6b0b307253e0ca.png)
+**mdx-components.tsx**
 
-- Route Group은 Route를 묶기만 하고 Route 경로에는 영향을 주지 않는 기술입니다.
-- [공식 문서 링크](https://nextjs.org/docs/app/building-your-application/routing/route-groups)
-
-**언제 사용하나요?**
-
-- url 경로상 서로 다른 경로 밑에 있지만 같은 레이아웃을 적용해야 하는 경우에 유용합니다.
-- 제 경우를 예로 들어 설명해드리겠습니다.
-
-제 블로그의 라우트 경로는 아래와 같습니다.
-
-- `/posts/시리즈 이름/포스트 제목`
-- `/tags/태그 이름`
-
-두 라우트 경로에 대해서 같은 레이아웃을 적용하고 싶었습니다.  
-같은 헤더와 푸터, 그리고 페이지를 감싸는 컨테이너 요소를 레이아웃에 주어, 일치감을 주려는 의도입니다.
-
-그런데 `posts`와 `tags`는 루트(/) 바로 밑의 라우트라서, 같은 레이아웃을 적용하려면 루트 레이아웃을 수정해야 합니다.  
-하지만 앞으로의 확장성을 고려할 때, 루트 레이아웃은 적합하지 않다는 생각이 들었습니다.
-
-예를 들면, `About Me` 페이지를 만든다고 가정하겠습니다.  
-이 경우 다른 헤더를 사용할 수 있고, 페이지를 감싸는 컨테이너 요소도 다른 것을 사용할 수 있습니다.  
-그래서 루트 레이아웃에서 헤더와 푸터 레이아웃을 잡기보다, `posts`와 `tags`에만 영향을 주는 레이아웃을 적용하려는 상황입니다.
-
-이 때, `posts와` `tags의` 공통된 라우트를 주어 해결할 수 있습니다.  
-`/main/posts`, `/main/tags` 이렇게 적용하고, main 폴더에 `layout.tsx`를 만들어서, 두 라우트에만 적용되는 레이아웃을 만들 수 있습니다.  
-하지만 main과 같이 억지로 만든 경로를 url에 주고 싶지 않다면 어떻게 해야 할까요?  
-여기서 라우트 그룹을 사용할 수 있습니다.
-
-폴더 이름을 괄호로 감싸면, 라우트 그룹으로 취급됩니다.  
-이러면 라우트 경로에는 영향을 주지 않지만, 해당 폴더 안의 라우트에만 레이아웃을 적용할 수 있게 됩니다.
-
-```
-/(main) --> route 경로에는 영향을 주지 않는다
-    /posts
-    /tags
-    /layout.tsx
-/aboutme
-    /page.mdx
-/layout.tsx
+```ts
+export const useMDXComponents = (components: ReactElement[]) => ({
+  ...defaultComponents,
+  ...components,
+});
 ```
 
-위와 같이 구성하면, 라우트 경로에는 영향을 주지 않지만, 하위 라우트에 대해 공통된 레이아웃을 적용할 수 있습니다.
+여기서 구조분해할당하는 `defaultComponents`객체를 커스터마이징해야 합니다.
 
-## Tailwind
+## getNextraComponents()로 게시글 컴포넌트를 커스터마이징
 
-![Tailwind](../../../../../../../../images/2ee671e04b2f295ccac06ca805ca5f3043a0743d48b0fe51e5fb41adb331c5cb.png)
+![MDX를 파싱한 페이지를 이렇게 보여주어야 합니다](../../../../../../../../images/13963f71398c89911563effe0c92b2ad33ac0d7daebaf70d68bc7811b2dec2a5.png)
 
-이전 포스트에서 다룬 것 처럼, 이 블로그는 디자인할 때 Tailwind의 Spacing(xm, sm, ...)과 색상을 사용해서 디자인했습니다.
-또한 Tailwind는 아래와 같은 장점이 있어서 사용하게 되었습니다.
+getNextraComponents는 이름처럼 Nextra의 기본 컴포넌트 맵핑 정보를 반환하는 함수입니다.  
+인자를 통해 원하는 컴포넌트를 우리가 만든 컴포넌트로 교체할 수 있습니다.
 
-- 반복되는 CSS 작성 대신, 간단한 클래스 조합으로 즉시 스타일 적용이 가능합니다.
-- JIT 컴파일: 사용한 클래스만 CSS로 생성하여 빌드 속도 및 번들 크기를 최적화합니다.
-- 글자 크기, 여백, 색상 등 미리 정의된 클래스 조합으로 스타일링할 수 있습니다.
-- tailwind.config.js를 통해 간편한 커스터마이징이 가능합니다.
+또, 해당 함수는 서버 사이드에서 호출되는 함수입니다. 따라서 비동기 함수를 사용할 수 있으며 서버 전용 API를 호출할 수 있습니다.
 
-개인적으로 tsx 파일에서 태그 구조도 정의하고 스타일링까지 하는게 매우 편리했습니다.  
-또한 컴포넌트 상태를 통해 Tailwind 클래스를 토글하여, 상태에 따라 스타일을 제어하는것도 매우 간편합니다.
+````tsx
+const defaultComponents = getNextraComponents({
+  // mdx 페이지 컴포넌트.
+  wrapper: async ({ children, toc, metadata, bottomContent }) => {
+    /**
+     * 서버 전용 API를 호출해서 페이지 랜더링에 필요한 series, tags, post등의 정보를 조회.
+     * 해당 코드가 길어서 생략했습니다!
+     */
 
-아래는 Tailwind를 사용한 코드입니다.
+    return (
+      <>
+        <PostDetail toc={toc} series={series} tags={tags} post={post} bottomContent={bottomContent}>
+          {children}
+        </PostDetail>
+      </>
+    );
+  },
+  //  이미지 컴포넌트 오버라이드
+  img: PostImage,
+  //  코드블록(```) 컴포넌트 오버라이드
+  pre: PostCodeblock,
+});
+````
+
+wrapper는 MDX 페이지의 최상위 레이아웃을 감싸는 역할을 합니다.  
+이걸 사용해서 게시글 페이지를 커스터마이징할 계획입니다.
+
+게시글 상세페이지라고 해서 본문만 보여주진 않죠.  
+헤더, 푸터, TOC(Table of contents), 이전, 다음 게시글 버튼도 보여줘야 합니다.
+
+아래의 코드에서 보시는 것 처럼 커스터마이징할 수 있습니다.
 
 ```tsx
-<span
-  className={classNames(
-    'rounded-md flex items-center justify-center bg-[#eee] text-gray-500 font-bold',
-    'transition-all duration-200 ease-in-out',
-    'px-[8px] py-[6px]',
-    'md:px-[12px]',
-    color === 'primary' ? '' : 'opacity-50',
-    'hover:opacity-100',
-  )}
->
-  <Link href={href} className="text-[10px] md:text-[16px]" onClick={onBadgeClick}>
-    {children}
-  </Link>
-</span>
-```
+export function PostDetail({ children, series, post, bottomContent, toc }: PostDetailProps) {
+  // ...생략
 
-tailwind로 스타일링하면 className의 값이 너무 길어지는데, 이는 classNames 유틸함수로 보기 편하게 바꿀 수 있습니다.  
-저는 같은 유형의 클래스를 묶고 줄바꿈하여 작성합니다.  
-또한 앞서 말씀드린 것 처럼 컴포넌트의 상태에 따라 다른 클래스를 적용하는 방법도 매우 간편합니다.
+  return (
+    <ArticleContainer>
+      <section>
+        <ArticleHeader right={<TOC toc={toc} />} />
 
-참고로 classNames 유틸함수는 이 [npm 모듈](https://www.npmjs.com/package/classnames)을 사용합니다
+        <Divider />
 
-## tailwind를 css 파일에서 사용하기
+        {/* MDX를 파싱해서 생성한 DOM 엘리먼트의 스타일은 module.scss로 생성한 클래스로 처리합니다. */}
+        <article className={classes.postDetail}>
+          {/* 여기에 MDX를 파싱해서 생성한 DOM 엘리먼트가 들어갑니다  */}
+          {children}
+        </article>
 
-- 반대로, css에서도 tailwind를 사용할 수 있습니다.
-- `@apply` 지시자를 활용하면 됩니다
-
-```css
-a {
-  display: inline-flex;
-  align-items: center;
-  transition: 0.3s;
-  @apply text-blue-600;
+        <footer>
+          <PostNavigator mode="prev" post={post.prevPost} />
+          <PostNavigator mode="next" post={post.nextPost} />
+        </footer>
+      </section>
+    </ArticleContainer>
+  );
 }
 ```
 
-`@apply`가 뭐지? 하시는 분도 있을 것 같습니다.  
-이건 비 표준 CSS 구문으로, 빌드 과정에서 PostCSS 플러그인이 해석 치환하도록 하는 특별한 지시문 입니다.
+MDX를 파싱하여 생성한 DOM 엘리먼트는 children props에 담겨있습니다.  
+이 엘리먼트에 스타일을 적용하기 위해, `module.css`로 생성한 클래스를 사용했습니다.
 
-Postcss는 빌드 과정에서 CSS 추상 트리를 탐색하고 등록된 Postcss 플러그인이 순서대로 css를 처리합니다.
-이 때 `@apply`를 만나면 Tailwind가 등록한 플러그인이 실행되어, 미리 정의해놓은 Tailwind의 css로 치환됩니다.
+```scss
+.postDetail {
+  h1,
+  h2,
+  h3 {
+    font-weight: 700;
+    padding: 20px 0;
+  }
+
+  p {
+    padding-top: 16px;
+    padding-bottom: 24px;
+    line-height: 28px;
+    word-break: keep-all;
+  }
+
+  ul,
+  ol {
+    padding: 5px 0;
+  }
+  // ...생략
+}
+```
+
+위와 같이 postDetail 클래스는 하위 h1, h2, p, ul등의 엘리먼트의 스타일을 정의합니다.  
+그리고 module.css로 작성했기에 클래스 이름은 고유한 해시로 변환되어 전역 네임스페이스와 충돌하지 않습니다.  
+따라서 게시글 컴포넌트에만 스타일을 적용할 수 있어서 사용했습니다.
+
+## MDX 페이지 목록을 조회하는 방법
+
+![랜딩 페이지는 게시글 목록을 보여줘야 합니다.](../../../../../../../../images/e843491dfae9cbc834518432cfe6aac851f597c9f54b6ac98bde2c24e507e0d5.png)
+
+랜딩 페이지나 시리즈 페이지에선 게시글 목록을 보여주어야 합니다.  
+그런데 게시글은 mdx 문서인데다, 게시글의 제목, 생성일과 같은 메타 정보는 mdx를 파싱해야 알 수 있습니다.  
+이 문제는 Nextra의 getPageMap과 normalizePages을 사용해서 해결할 수 있습니다.
+
+이름에서 알 수 있는 것 처럼, getPageMap은 인자로 지정한 경로의 모든 페이지 맵 정보를 반환합니다.  
+normalizePages는 getPageMap이 반환한 페이지 맵 정보를 가공합니다.  
+Navbar, TOC, Post List등의 컴포넌트 구현에 적합한 형태로 데이터를 가공한다고 보시면 됩니다.  
+기본 테마를 사용한다면, 반환객체를 그대로 사용하면 됩니다만, 커스텀 테마를 직접 구현하는 경우에도, 이걸 활용할 수 있습니다.
+
+아래는 예시 코드입니다.
+
+```ts
+import { getPageMap } from 'nextra/page-map';
+import { Item, normalizePages } from 'nextra/normalize-pages';
+
+export async function findPosts(param: FindPostsProps = GetPostDefaultOption) {
+  const { orderBy, limit, seriesId } = prepareParam<FindPostsProps>(param, GetPostDefaultOption);
+  const fullRoute = resolveSeriesQuery(seriesId);
+
+  // getPageMap으로 지정한 경로의 모든 페이지 정보를 가져온다.
+  const pageMap = await getPageMap(fullRoute);
+
+  // 가져온 페이지 정보를 가공한다.
+  const { directories } = normalizePages({
+    list: pageMap,
+    route: '/posts',
+  });
+
+  // 필요한 만큼 데이터를 추가 가공한다(배열 평탄화, 필터링, 정렬, ...)
+  let posts = directories
+    .reduce((acc, curr) => collectPost(acc, curr), [] as Item[])
+    .flat()
+    .filter((post) => post.frontMatter)
+    .filter((post) => !post.frontMatter.isSeriesLanding);
+
+  if (orderBy) {
+    posts.sort(sortPostByCreatedAt);
+  }
+
+  if (limit) {
+    posts = posts.filter((_, i) => i < limit);
+  }
+
+  // 지정한 경로 밑의 모든 게시글 목록 반환
+  return posts;
+}
+```
+
+서버 컴포넌트에서 위의 findPosts를 호출하고 게시글 목록을 props로 내려줄 수 있습니다.  
+이를 응용하여 랜딩 페이지에서 게시글 목록을 보여주는 기능을 구현할 수 있습니다.  
+아래는 서버 컴포넌트 예시입니다.
+
+```ts
+export default async function LandingPage() {
+  const seriesModels: SeriesModel[] = await getSeries();
+  const seriesPosts: Record<string, PostModel[]> = {};
+
+  for (const series of seriesModels) {
+    if (series.id === Constants.series.latestId) {
+      continue;
+    }
+    // findPosts를 통해 지정한 경로의 모든 게시글 목록을 조회
+    const seriesPost = await findPosts({
+      limit: 20,
+      seriesId: series.id,
+    });
+
+    // 클라이언트 컴포넌트가 의존하는 타입인 PostModel로 변환
+    seriesPosts[series.id] = seriesPost.map((item) => Mapper.toPostModel({ item, seriesModels }));
+  }
+
+  // Props로 게시글 목록 내려주기
+  return <MainClientPage seriesPosts={seriesPosts} />;
+}
+```
+
+클라이언트 컴포넌트는 props를 통해 받은 게시글 목록을 사용해서 랜딩페이지의 게시글 목록을 보여줄 수 있습니다.  
+이러한 페이지는 SSG 방식으로 빌드됩니다.  
+따라서 애플리케이션 빌드 시점에 서버 컴포넌트의 로직을 실행하여 가져온 데이터를 기반으로 정적 웹 페이지를 만들게 됩니다.  
+새로운 포스트를 작성했다면, 새로 커밋하고 푸시해서 앱을 리빌드해야 목록에 새로운 포스트가 추가되는 방식입니다.
 
 ## 정리하면...
 
-- Next.js의 Route Group을 사용하면 url 경로에 영향을 주지 않고도 라우트를 묶어서 공통 레이아웃을 적용할 수 있습니다.
-- tailwind와 같은 유틸리티 퍼스트 방식의 CSS 프레임워크를 사용하여, 미리 정의된 클래스 조합으로 빠르게 스타일을 줄 수 있습니다.
+- Nextra의 API를 사용해서 MDX 문서를 파싱하여 생성한 페이지를 커스터마이징 할 수 있습니다.
+- getNextraComponents를 사용해서 Nextra 기본 컴포넌트 맵핑을 커스터마이징할 수 있습니다.
+- mdx로 생성한 페이지 목록은 getPageMap으로 가져옵니다. 그리고 normalizePage로 사용하기 쉽게 가공합니다.
 
 긴 글 읽어주셔서 감사합니다!
-
-### 레퍼런스
-
-- [route-group](https://nextjs.org/docs/app/building-your-application/routing/route-groups)
-- [tailwind css basic for beginners](https://daily.dev/blog/tailwind-css-basics-for-beginners)
-- [Using with preprocessors](https://v3.tailwindcss.com/docs/using-with-preprocessors)
 
 export const metadata = {
   title: 'Nextjs로 블로그 만들기 시리즈 Part 3. 구현',

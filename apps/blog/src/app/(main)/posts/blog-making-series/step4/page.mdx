@@ -95,7 +95,7 @@ export const metadata = {
 ![타임존 문제 때문에 Hydration 오류가 날거라고는 상상도 못했습니다...](../../../../../../../../images/timezone.jpg)
 
 제 경우, 워싱턴 D.C 리전의 서버에서 앱을 빌드합니다. 그리고 한국 타임존을 사용하는 브라우저에서 페이지를 조회합니다.
-그렇다보니 서버와 브라우저에서 실행된 `DateUtil.Dayjs(post.date).format()`의 결과가 다릅니다.  
+그렇다보니 서버와 브라우저에서 실행된 DateUtil.Dayjs(post.date).format()의 결과가 다릅니다.  
 이로 인해 서버와 클라이언트가 같은 값을 렌더링하지 못해 Hydration 오류가 발생한 상황입니다.
 
 이 문제를 해결하기 위해 format이라는 유틸 함수를 만들었습니다.  
