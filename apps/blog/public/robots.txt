@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://blog.malloc72p.com
+
+# Sitemaps
+Sitemap: https://blog.malloc72p.com/sitemap.xml

@@ -1,6 +1,7 @@
 export interface SeriesModel {
   id: string;
   title: string;
+  date: string;
 }
 
 export interface TagModel {
