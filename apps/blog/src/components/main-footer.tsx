@@ -14,7 +14,7 @@ export function MainFooter({ seriesList }: MainFooterProps) {
     <footer
       className={classNames(
         'blog-main-footer ',
-        'sticky left-0 bottom-0',
+        // 'sticky left-0 bottom-0',
         'w-full px-8 2xl:px-5 pt-8 pb-8 md:pb-16',
         'bg-gray-100',
       )}
