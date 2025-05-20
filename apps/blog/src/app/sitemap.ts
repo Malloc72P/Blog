@@ -11,7 +11,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const { url } = Constants.siteConfig;
 
-  const sitemaps: MetadataRoute.Sitemap = [];
+  const sitemaps: MetadataRoute.Sitemap = [
+    {
+      url: url + '/',
+      priority: 1,
+      changeFrequency: 'weekly',
+      lastModified: new Date(),
+    },
+  ];
 
   for (const post of posts) {
     sitemaps.push({
@@ -25,7 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const series of seriesModels) {
     sitemaps.push({
       url: [url, 'posts', series.id].join('/'),
-      priority: 0.7,
+      priority: 0.8,
       changeFrequency: 'weekly',
       lastModified: DateUtil.Dayjs(series.date).toDate(),
     });
