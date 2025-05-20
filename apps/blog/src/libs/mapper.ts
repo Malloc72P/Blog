@@ -25,10 +25,15 @@ const toPostModel = ({
   };
 };
 
-const toSeriesModel = (series: Item) => ({
-  id: series.frontMatter.id,
-  title: series.title,
-});
+const toSeriesModel = (series: Item) => {
+  const date = series.frontMatter.date;
+
+  return {
+    id: series.frontMatter.id,
+    title: series.title,
+    date,
+  };
+};
 
 const toTagModel = (tag: string) => ({
   id: tag,
