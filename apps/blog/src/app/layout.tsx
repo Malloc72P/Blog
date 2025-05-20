@@ -3,6 +3,7 @@ import './global.css';
 import { Noto_Sans_KR } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Constants } from '@libs/constants';
 
 const font = Noto_Sans_KR({
   subsets: ['latin'],
@@ -10,10 +11,56 @@ const font = Noto_Sans_KR({
   variable: '--font-noto-sans-kr',
 });
 
+const { siteConfig } = Constants;
+
 export const metadata = {
   title: 'Malloc72P의 기술블로그',
   description: 'Web Service 개발과 IT 전반에 대해 다루는 Malloc72P의 기술 블로그입니다.',
-  author: 'Malloc72P(나승철)',
+  keywords: [
+    'web development',
+    'tech blog',
+    'frontend',
+    'backend',
+    'fullstack',
+    'react',
+    'next js',
+    'nextra',
+    'javascript',
+    'typescript',
+  ],
+  creator: 'Malloc72P',
+  author: [
+    {
+      name: 'Malloc72P',
+      url: 'https://github.com/Malloc72P',
+    },
+  ],
+  icons: {
+    icon: '/favicon.ico',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: siteConfig.url,
+    title: siteConfig.name,
+    description: siteConfig.description,
+    siteName: siteConfig.name,
+    images: [
+      {
+        url: siteConfig.ogImage,
+        width: 1200,
+        height: 630,
+        alt: siteConfig.name,
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteConfig.name,
+    description: siteConfig.description,
+    images: [siteConfig.ogImage],
+    creator: '@shadcn',
+  },
 };
 
 /**
