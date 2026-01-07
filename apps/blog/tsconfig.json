@@ -14,15 +14,6 @@
       "@interfaces/*": ["src/interfaces/*"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "next-env.d.ts",
-    "next.config.js",
-    ".next/types/**/*.ts",
-    "src/app/page.tsx",
-    "src/app/algorithm/page.mdx",
-    "src/app/posts/page.tsx"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts", "next.config.js", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

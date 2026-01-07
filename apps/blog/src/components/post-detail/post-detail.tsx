@@ -5,19 +5,17 @@ import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
 import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
 import classNames from 'classnames';
-import { Heading } from 'nextra';
 import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
 import classes from './post-detail.module.scss';
 import { Toc } from './toc';
-import { IconSquareChevronLeft } from '@tabler/icons-react';
 import { PostNavigator, PostNavigatorPlaceholder } from './post-navigator';
 
 export interface PostDetailProps extends PropsWithChildren {
-  toc: Heading[];
   series: SeriesModel;
   tags: TagModel[];
   post: PostModel;
-  bottomContent: ReactNode;
+  toc?: any[];
+  bottomContent?: ReactNode;
 }
 
 /**
@@ -25,7 +23,13 @@ export interface PostDetailProps extends PropsWithChildren {
  *
  * mdx-components에서 해당 컴포넌트를 사용해서 블로그 상세 페이지를 랜더링한다.
  */
-export function PostDetail({ children, series, post, bottomContent, toc }: PostDetailProps) {
+export function PostDetail({
+  children,
+  series,
+  post,
+  bottomContent = null,
+  toc = [],
+}: PostDetailProps) {
   const [activeTocId, setActiveTocId] = useState('');
 
   useEffect(() => {

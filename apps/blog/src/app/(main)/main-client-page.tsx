@@ -40,17 +40,17 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
   // 원본 포스트 목록
   const originalPosts = useMemo(
     () => Object.values(seriesPosts).flat().sort(DateUtil.postSorter),
-    [seriesPosts]
+    [seriesPosts],
   );
 
   // 현재 선택된 시리즈 필터
   const [currentSeriesFilter, setCurrentSeriesFilter] = useState<SeriesFilterModel>(
-    seriesList.find((series) => series.id === Constants.series.latestId) as SeriesFilterModel
+    seriesList.find((series) => series.id === Constants.series.latestId) as SeriesFilterModel,
   );
 
   // 시리즈 필터
   const [seriesFilters, setSeriesFilters] = useState<SeriesFilterModel[]>(
-    seriesList.map((s) => ({ ...s, active: s.id === currentSeriesFilter.id }))
+    seriesList.map((s) => ({ ...s, active: s.id === currentSeriesFilter.id })),
   );
 
   // 현재 포스트 목록
@@ -139,7 +139,7 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
                 className={classNames(
                   'font-bold flex items-center gap-2 cursor-pointer px-3',
                   'opacity-70 hover:opacity-90 active:opacity-100',
-                  'text-xs sm:text-[16px]'
+                  'text-xs sm:text-[16px]',
                 )}
               >
                 <span>포스트 더 보기</span>

@@ -1,12 +1,10 @@
 'use client';
 
 import classNames from 'classnames';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Heading } from 'nextra';
 import { useEffect, useState } from 'react';
 
 export interface TocProps {
-  toc: Heading[];
+  toc: any[];
   activeId: string;
   onFragIdChanged: (param: { fragId: string }) => void;
 }
@@ -42,7 +40,7 @@ export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
             }}
             className={classNames(
               'hover:cursor-pointer hover:underline list-decimal',
-              item.id === activeId ? 'opacity-100' : 'opacity-30 hover:opacity-50'
+              item.id === activeId ? 'opacity-100' : 'opacity-30 hover:opacity-50',
             )}
           >
             {item.value}

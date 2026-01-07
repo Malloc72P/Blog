@@ -1,7 +1,6 @@
 import { PageLinkMap } from '@libs/page-link-map';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { MenuIcon } from 'nextra/icons';
 import { DropdownMenu } from './dropdown-menu';
 import { SeriesModel, TagModel } from '@libs/types/commons';
 import { MobileSidebar } from './mobile-sidebar';
@@ -40,7 +39,7 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
             }))}
           />
           {/* === TAGS DROPDOWN MENU === */}
-          <DropdownMenu
+          {/* <DropdownMenu
             title="Tags"
             width={160}
             // leftOffset={-25}
@@ -49,7 +48,7 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
               label: tag.id,
               href: PageLinkMap.tags.landing(tag.id),
             }))}
-          />
+          /> */}
         </div>
 
         {/* === HEADER < MD: RIGHT SECTION === */}

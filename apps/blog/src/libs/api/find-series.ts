@@ -1,42 +1,15 @@
-import { Item, normalizePages } from 'nextra/normalize-pages';
-import { getPageMap, normalizePageMap } from 'nextra/page-map';
-
 export interface SeriesInfo {
   title: string;
 }
 
-/**
- * 모든 시리즈 정보를 가져오는 함수
- *
- * @returns 모든 시리즈
- */
-export async function findSeriesList() {
-  const series: Item[] = [];
+import { getAllMdxFiles, MdxFileInfo } from './mdx-utils';
 
-  const items = await getPageMap('/posts');
-  const { directories } = normalizePages({
-    list: items,
-    route: '/posts',
-  });
+export async function findSeriesList(): Promise<MdxFileInfo[]> {
+  const allFiles = await getAllMdxFiles();
 
-  directories.forEach((item) => collectSeries(item));
-
-  return series.sort(seriesSorter);
-
-  function collectSeries(item: Item) {
-    if (item.frontMatter?.isSeriesLanding) {
-      series.push(item);
-    }
-
-    if (!item.children) {
-      return;
-    }
-
-    for (const child of item.children) {
-      collectSeries(child);
-    }
-  }
+  return allFiles
+    .filter((file) => file.frontMatter.isSeriesLanding)
+    .sort(
+      (a, b) => new Date(a.frontMatter.date).getTime() - new Date(b.frontMatter.date).getTime(),
+    );
 }
-
-const seriesSorter = (a: Item, b: Item) =>
-  new Date(a.frontMatter?.date).getTime() - new Date(b.frontMatter?.date).getTime();

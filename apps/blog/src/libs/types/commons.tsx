@@ -9,6 +9,7 @@ export interface TagModel {
 }
 
 export interface PostModel {
+  id: string;
   route: string;
   series: SeriesModel;
   title: string;

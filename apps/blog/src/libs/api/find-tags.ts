@@ -1,33 +1,12 @@
-import { Item, normalizePages } from 'nextra/normalize-pages';
-import { getPageMap } from 'nextra/page-map';
+import { getAllMdxFiles } from './mdx-utils';
 
-/**
- * 모든 태그 정보를 가져오는 함수
- *
- * @returns 모든 태그
- */
-export async function findTags() {
+export async function findTags(): Promise<string[]> {
+  const allFiles = await getAllMdxFiles();
   const tags = new Set<string>();
 
-  const items = await getPageMap('/posts');
-  const { directories } = normalizePages({
-    list: items,
-    route: '/posts',
+  allFiles.forEach((file) => {
+    file.frontMatter.tags?.forEach((tag) => tags.add(tag));
   });
 
-  directories.forEach((item) => collectTags(item));
-
-  return Array.from(tags.values());
-
-  function collectTags(item: Item) {
-    if (item.frontMatter?.tags) {
-      item.frontMatter?.tags.forEach((tag: string) => tags.add(tag));
-    }
-
-    if (item.children) {
-      for (const child of item.children) {
-        collectTags(child);
-      }
-    }
-  }
+  return Array.from(tags);
 }

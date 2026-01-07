@@ -1,11 +1,9 @@
-import { PostCard } from 'nextra-theme-blog';
+import { TagDetail } from '@components/tag-detail';
 import { findPosts } from '@libs/api/find-posts';
-import Link from 'next/link';
-import { findTags } from '@libs/api/find-tags';
 import { findSeriesList } from '@libs/api/find-series';
+import { findTags } from '@libs/api/find-tags';
 import { Mapper } from '@libs/mapper';
 import { PostModel, TagModel } from '@libs/types/commons';
-import { TagDetail } from '@components/tag-detail';
 
 export interface GenerateMetadataProps {
   params: any;
@@ -37,7 +35,7 @@ export default async function TagPage(props: TagPageProps) {
   //   포스트 조회
   const { title } = await generateMetadata({ params });
   const posts = await findPosts().then((list) =>
-    list.filter((post) => post.frontMatter.tags?.includes(tagId))
+    list.filter((post) => post.frontMatter.tags?.includes(tagId)),
   );
 
   //   PostModel로 가공
