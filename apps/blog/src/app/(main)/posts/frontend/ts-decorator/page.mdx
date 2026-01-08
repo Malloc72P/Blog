@@ -175,7 +175,7 @@ expect(returnValue).toBe('Name: Ina, Age: 20');
 ## Validator(유효성 검사) 데코레이터 구현하기
 
 이번에는 유효성 검사 데코레이터를 구현해보겠습니다. 이 데코레이터는 클래스 속성에 적용되어, 해당 속성의 값이 특정 조건을 만족하는지 검사합니다.  
-먼저 속성의 데코레이터를 구현해야 합니다.
+속성에 대한 유효성 검사 메타데이터를 저장하는 MinLength 데코레이터를 먼저 구현해보겠습니다.
 
 ```ts
 import 'reflect-metadata';
@@ -256,11 +256,11 @@ class Example {
   }
 }
 
-const example = new Example('Ina');
-validate(example); // 유효성 검사를 통과했습니다.
+const example1 = new Example('Ina');
+validate(example1); // 유효성 검사를 통과했습니다.
 
-const example = new Example('MO');
-validate(example); // ERROR! 이름은 최소 3자 이상이어야 합니다.
+const example2 = new Example('MO');
+validate(example2); // ERROR! 이름은 최소 3자 이상이어야 합니다.
 ```
 
 - Example 클래스의 value 속성에 @MinLength 데코레이터를 적용했습니다.
