@@ -12,7 +12,7 @@ export interface LoggerOptions {
  * - 로깅, 성능 측정, 권한 검사 등에 활용할 수 있다.
  */
 export function Logger({ mode }: LoggerOptions = { mode: 'simple' }) {
-  return function (target, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
     descriptor.value = function (...args: any[]) {

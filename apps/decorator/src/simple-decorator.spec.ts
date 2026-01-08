@@ -4,7 +4,7 @@ import { SimpleDecorator } from './simple-decorator';
 @SimpleDecorator
 class Example {
   @SimpleDecorator
-  private _myProperty01: string;
+  private _myProperty01: string = '';
 
   @SimpleDecorator
   get property() {
