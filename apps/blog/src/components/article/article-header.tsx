@@ -19,7 +19,7 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
         'pt-[40px] pb-[30px] md:pt-[98px] md:pb-[42px]',
       )}
     >
-      {/* === ARTICLE TITLE === */}
+      {/* === SERIES TITLE === */}
       <h4
         className={classNames(
           'article-header-title flex items-center gap-1 text-gray-400',
@@ -36,7 +36,7 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
         className={classNames(
           'py-[20px] text-[20px] ',
           'md:py-[40px] md:text-[30px]',
-          'lg:text-[40px]',
+          'lg:text-[40px] text-center',
           'leading-[32px] md:leading-[64px] font-bold',
         )}
       >

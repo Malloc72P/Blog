@@ -1,3 +1,12 @@
+export const metadata = {
+  title: '디바운싱과 쓰로틀링',
+  description:
+    '웹 프론트엔드에서 디바운싱(Debouncing)과 쓰로틀링(Throttling)을 어떻게 구현하는지에 대해 다루는 포스트입니다.',
+  series: 'frontend',
+  tags: ['Debouncing', 'Throttling'],
+  date: '2025-03-13 22:42',
+};
+
 ## 디바운싱(Debouncing)
 
 디바운스란 이벤트 발생 후 일정 시간동안 해당 이벤트가 재 발생하지 않으면 콜백을 호출하는 것을 말합니다.
@@ -125,12 +134,3 @@ function main() {
 쓰로틀링은 클로져를 통해 구현할 수 있습니다. 리스너를 바인딩하기 전, 클로저 변수를 하나 선언하고,
 여기에 이전 콜백이 호출된 시간을 기록합니다. 콜백이 호출되었을 때, 이전 호출 시간으로부터 일정시간 지났는지 여부를 검사합니다.
 지났다면 콜백을 호출하고, 지나지 않았다면 콜백을 호출하지 않습니다. 이렇게 하여 쓰로틀링을 구현할 수 있습니다.
-
-export const metadata = {
-  title: '디바운싱과 쓰로틀링',
-  description:
-    '웹 프론트엔드에서 디바운싱(Debouncing)과 쓰로틀링(Throttling)을 어떻게 구현하는지에 대해 다루는 포스트입니다.',
-  series: 'frontend',
-  tags: ['Debouncing', 'Throttling'],
-  date: '2025-03-13 22:42',
-};

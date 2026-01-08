@@ -1,0 +1,30 @@
+{
+  "name": "@malloc72p/decorator",
+  "private": true,
+  "version": "0.0.3",
+  "type": "module",
+  "types": "./dist/decorator.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/decorator.js",
+      "require": "./dist/decorator.umd.cjs"
+    }
+  },
+  "scripts": {
+    "DEV": "--------------------------------------------------------------------------------------",
+    "dev": "vite",
+    "BUILD": "------------------------------------------------------------------------------------",
+    "prebuild": "node ./scripts/prepare-build.js",
+    "build": "tsc && vite build",
+    "postbuild": "REGISTRY=github node scripts/copy-bundle.js",
+    "TEST": "-------------------------------------------------------------------------------------",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "terser": "^5.44.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.15"
+  }
+}

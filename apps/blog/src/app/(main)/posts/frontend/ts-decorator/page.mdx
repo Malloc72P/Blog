@@ -1,0 +1,182 @@
+export const metadata = {
+  title: 'Typescript 데코레이터로 NestJS처럼 Logger와 Validator 구현하기',
+  description:
+    'TS 프로젝트에서 데코레이터를 직접 구현하고 사용하는 방법에 대해 다루는 포스트입니다.',
+  series: 'frontend',
+  tags: ['Typescript', 'Decorator'],
+  date: '2026-01-08 08:11',
+};
+
+## 데코레이터(Decorator)란?
+
+데코레이터는 클래스, 메서드, 속성, 또는 매개변수에 메타데이터를 추가하는 메타 프로그래밍 문법입니다.
+기존 코드를 수정하지 않고 기능을 확장하거나 메타데이터를 추가할 수 있습니다.
+
+데코레이터는 주로 다음과 같은 용도로 사용됩니다
+
+- 로깅(logging)
+- 유효성 검사(validation)
+- 의존성 주입(dependency injection)
+- 권한 검사(authorization)
+
+데코레이터를 잘 활용하는 프레임워크로는 Angular, NestJS 등이 있습니다.
+Angular와 NestJS는 데코레이터를 통해 의존성 주입 및 유효성 검사, 권한 검사 등을 처리합니다.
+
+## 직접 데코레이터 구현해보면서 원리 이해하기
+
+먼저, tsconfig.json 파일에서 `experimentalDecorators` 옵션을 활성화해야 합니다.
+
+```json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+데코레이터는 함수로 구현되며, 클래스나 메서드가 정의될 때 데코레이터 함수가 호출되어 메타데이터를 추가합니다.
+
+```ts
+// simple-decorator.ts
+
+export function SimpleDecorator(
+  target: any, // 클래스 프로토타입 또는 생성자 함수
+  propertyKey?: string, // 속성 또는 메서드 이름
+  descriptor?: PropertyDescriptor | number, // 속성 설명자 또는 매개변수 인덱스
+) {
+  console.log('====================================================');
+  console.log('Target', target);
+  console.log('Property Key', propertyKey);
+  console.log('Descriptor', descriptor);
+}
+```
+
+이제 이 데코레이터를 클래스, 메서드, 속성, 매개변수에 적용해보겠습니다.
+
+```ts
+// example.ts
+
+import { SimpleDecorator } from './simple-decorator';
+
+@SimpleDecorator
+class Example {
+  @SimpleDecorator
+  private _myProperty01: string;
+
+  @SimpleDecorator
+  get property() {
+    return this._myProperty01;
+  }
+
+  @SimpleDecorator
+  foo(
+    @SimpleDecorator
+    name: string,
+    @SimpleDecorator
+    age: number,
+  ) {
+    return `Name: ${name}, Age: ${age}`;
+  }
+}
+```
+
+위 코드를 실행하면, 각 데코레이터가 호출될 때마다 콘솔에 출력되는 내용을 확인할 수 있습니다.
+예시로 메서드의 출력결과를 확인해보겠습니다.
+
+```js
+// 메서드 데코레이터 출력결과
+// Target {}
+// Property Key foo
+// Descriptor {
+//   value: [Function: foo],
+//   writable: true,
+//   enumerable: false,
+//   configurable: true
+// }
+```
+
+- target은 빈 객체로 출력되었는데, 실제로는 Example 클래스의 프로토타입을 가리킵니다.
+- propertyKey는 메서드 이름인 'foo'가 출력됩니다.
+- descriptor는 메서드의 속성 설명자로, 메서드의 구현체와 속성들을 포함합니다.
+- 여기서 descriptor.value는 실제 메서드 함수입니다. 만약 데코레이터에서 이 값을 수정하면, 메서드의 동작을 변경할 수도 있습니다.
+
+## 중간 정리
+
+지금까지 데코레이터의 기본 개념과 구현 방법에 대해 알아보았습니다. 데코레이터를 간단하게 정리하면...
+
+- 데코레이터는 함수로 구현되며, 클래스, 메서드, 속성, 매개변수에 메타데이터를 추가하거나 기능을 확장하는 역할을 합니다.
+- 데코레이터는 target, propertyKey, descriptor 등의 인자를 통해 데코레이터가 적용된 대상에 대한 정보를 제공합니다.
+- 데코레이터를 활용하면 로깅, 유효성 검사, 의존성 주입 등 다양한 기능을 구현할 수 있습니다.
+
+## 로거 데코레이터 구현하기
+
+이제 로거 데코레이터를 구현해보겠습니다. 이 데코레이터는 메서드가 호출될 때마다 호출 정보를 로그로 출력합니다.
+
+```ts
+export interface LoggerOptions {
+  mode: 'simple' | 'detailed';
+}
+
+export function Logger({ mode }: LoggerOptions = { mode: 'simple' }) {
+  return function (target, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = function (...args: any[]) {
+      console.log(`${propertyKey}를 호출합니다.`);
+      if (mode === 'detailed') {
+        console.log('매개변수:', args);
+      }
+
+      const result = originalMethod.apply(this, args);
+
+      console.log(`${propertyKey} 호출이 완료되었습니다`);
+      if (mode === 'detailed') {
+        console.log('반환값:', result);
+      }
+
+      return result;
+    };
+
+    return descriptor;
+  };
+}
+```
+
+- 이번에는 데코레이터를 팩토리 함수로 구현했습니다. 이렇게 하면 데코레이터에 옵션을 전달할 수 있습니다.
+- originalMethod 변수에 원본 메서드를 저장한 후, descriptor.value를 새로운 함수로 교체합니다. 이렇게 하면 메서드 호출 시 데코레이터에서 재정의한 함수가 실행됩니다.
+- 새로운 함수에서는 메서드 호출 전후에 로그를 출력하고, 원본 메서드를 호출합니다.
+
+로거를 적용한 예시 코드는 다음과 같습니다.
+
+```ts
+import { Logger } from './logger';
+
+class Example2 {
+  @Logger({ mode: 'detailed' })
+  foo(name: string, age: number) {
+    return `Name: ${name}, Age: ${age}`;
+  }
+}
+
+const example2 = new Example2();
+const returnValue = example2.foo('Ina', 20);
+expect(returnValue).toBe('Name: Ina, Age: 20');
+
+// foo를 호출합니다.
+// 매개변수: [ 'Ina', 20 ]
+// foo 호출이 완료되었습니다
+// 반환값: Name: Ina, Age: 20
+```
+
+- Example2 클래스의 foo 메서드에 @Logger 데코레이터를 적용했습니다.
+- 메서드를 호출하면, 데코레이터에서 정의한 로그가 출력되는 것을 확인할 수 있습니다.
+- mode 옵션에 따라 간단한 로그 또는 상세한 로그가 출력됩니다.
+
+## 마치며
+
+이번 포스트에서는 Typescript 데코레이터의 기본 개념과 구현 방법, 그리고 로거 데코레이터를 직접 구현해보았습니다.
+데코레이터를 활용하면 코드의 가독성과 유지보수성을 높일 수 있으며, 다양한 기능을 손쉽게 추가할 수 있습니다.
+앞으로도 데코레이터를 활용한 다양한 기능 구현에 도전해보시길 바랍니다!
+
+본 포스트에서 다룬 코드는 [GitHub 저장소](https://github.com/Malloc72P/Blog/tree/main/apps/decorator)에서 확인할 수 있습니다.
+pnpm install을 실행한 다음 pnpm test 명령어로 테스트를 실행해보세요.
