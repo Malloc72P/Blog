@@ -5,6 +5,8 @@ import { PropsWithChildren } from 'react';
 import MainClientLayout from './main-client-layout';
 import { findPosts } from '@libs/api/find-posts';
 
+export const dynamic = 'force-static';
+
 /**
  * Main Layout
  *

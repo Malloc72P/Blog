@@ -1,12 +1,12 @@
 {
-  "name": "@malloc72p/decorator",
-  "version": "0.0.1",
-  "type": "module",
-  "types": "./dist/decorator.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/decorator.js",
-      "require": "./dist/decorator.umd.cjs"
+    "name": "@malloc72p/decorator",
+    "version": "0.0.3",
+    "type": "module",
+    "types": "./dist/decorator.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/decorator.js",
+            "require": "./dist/decorator.umd.cjs"
+        }
     }
-  }
 }
