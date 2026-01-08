@@ -14,6 +14,7 @@ const font = Noto_Sans_KR({
 const { siteConfig } = Constants;
 
 export const metadata = {
+  metadataBase: new URL(siteConfig.url),
   title: 'Malloc72P의 기술블로그',
   description: 'Web Service 개발과 IT 전반에 대해 다루는 Malloc72P의 기술 블로그입니다.',
   keywords: [
@@ -46,7 +47,6 @@ export const metadata = {
     siteName: siteConfig.name,
     images: [
       {
-        url: siteConfig.ogImage,
         width: 1200,
         height: 630,
         alt: siteConfig.name,
@@ -57,8 +57,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: siteConfig.name,
     description: siteConfig.description,
-    images: [siteConfig.ogImage],
-    creator: '@shadcn',
+    creator: '@Malloc72P',
   },
 };
 
