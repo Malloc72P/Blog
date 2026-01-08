@@ -1,16 +1,12 @@
 {
-  "name": "@malloc72p/expression",
-  "version": "0.0.3",
+  "name": "@malloc72p/decorator",
+  "version": "0.0.1",
   "type": "module",
-  "types": "./dist/expression.d.ts",
+  "types": "./dist/decorator.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/expression.js",
-      "require": "./dist/expression.umd.cjs"
-    },
-    "./style": "./dist/expression-style.css"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+      "import": "./dist/decorator.js",
+      "require": "./dist/decorator.umd.cjs"
+    }
   }
 }
