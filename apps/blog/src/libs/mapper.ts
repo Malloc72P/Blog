@@ -11,7 +11,7 @@ const toPostModel = ({
   const series = seriesModels.find((s) => s.id === item.frontMatter.series);
 
   if (!series) {
-    throw new Error('Series Not Found!');
+    throw new Error(`Series Not Found! id: ${item.frontMatter.series}`);
   }
 
   return {
