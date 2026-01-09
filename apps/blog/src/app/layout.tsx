@@ -11,7 +11,7 @@ const font = Noto_Sans_KR({
   variable: '--font-noto-sans-kr',
 });
 
-const { siteConfig } = Constants;
+const { siteConfig, openGraph } = Constants;
 
 export const metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -44,7 +44,7 @@ export const metadata = {
     url: siteConfig.url,
     title: siteConfig.name,
     description: siteConfig.description,
-    siteName: siteConfig.name,
+    ...openGraph,
   },
 };
 

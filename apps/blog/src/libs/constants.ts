@@ -12,4 +12,15 @@ export const Constants = {
       github: 'https://github.com/Malloc72P',
     },
   },
+  openGraph: {
+    siteName: 'Malloc72P의 기술 블로그',
+    images: [
+      {
+        url: '/og.jpg',
+        width: 640,
+        height: 426,
+        alt: 'Malloc72P Tech Blog',
+      },
+    ],
+  },
 };
