@@ -48,6 +48,7 @@ export async function getAllMdxFiles(dir: string = POSTS_DIR): Promise<MdxFileIn
   }
 
   await scanDir(dir);
+
   return files;
 }
 
@@ -55,8 +56,6 @@ export async function getAllMdxFiles(dir: string = POSTS_DIR): Promise<MdxFileIn
  * MDX 파일에서 export const metadata 추출 (Nested Object 지원)
  */
 async function extractMetadata(filePath: string): Promise<MdxFileInfo['frontMatter'] | null> {
-  const content = fs.readFileSync(filePath, 'utf-8');
-
   try {
     const pagePath = buildModulePath(filePath);
 
