@@ -157,7 +157,7 @@ apps/blog 폴더의 node_modules를 확인해보면 @repo/ui 패키지가 존재
 import './style.css';
 import { setupCounter } from '@repo/ui';
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!);
+setupCounter(document.querySelector<HTMLButtonElement>('#counter'));
 ```
 
 이 때 `@repo/ui`에서 `import`할 수 있는 파일은 `packages/ui/package.json` 파일에서 설정한 main, types, exports 필드에 따라 결정됩니다.
