@@ -28,7 +28,6 @@
     "sass": "1.85.1"
   },
   "devDependencies": {
-    "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/mdx": "^2.0.13",
     "@types/node": "20",
