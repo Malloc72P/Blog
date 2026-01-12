@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
     "@types/mdx": "^2.0.13",
     "@types/node": "20",
     "@types/react": "^19.2.7",
