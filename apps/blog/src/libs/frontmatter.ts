@@ -60,8 +60,8 @@ export function frontmatter({
     date,
     isSeriesLanding,
     openGraph: {
-      title: title,
-      description: description,
+      title,
+      description,
       type: 'article',
       url: postId ? `/posts/${seriesId}/${postId}` : `/posts/${seriesId}`,
       ...Constants.openGraph,
