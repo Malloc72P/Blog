@@ -1,21 +1,14 @@
-import { Constants } from '@libs/constants';
+import { frontmatter } from '@libs/frontmatter';
 
-export const metadata = {
+export const metadata = frontmatter({
   title: 'Monorepo로 관리하는 프론트엔드 프로젝트 구조 설계',
   description:
     '프론트엔드 프로젝트에서 Monorepo를 활용하여 코드베이스를 효율적으로 관리하는 방법에 대해 다루는 포스트입니다.',
-  openGraph: {
-    title: 'Monorepo로 관리하는 프론트엔드 프로젝트 구조 설계',
-    description:
-      '프론트엔드 프로젝트에서 Monorepo를 활용하여 코드베이스를 효율적으로 관리하는 방법에 대해 다루는 포스트입니다.',
-    type: 'article',
-    url: '/posts/frontend/monorepo',
-    ...Constants.openGraph,
-  },
-  series: 'frontend',
+  seriesId: 'frontend',
+  postId: 'monorepo',
   tags: ['monorepo', 'turbo', 'pnpm', '환경설정'],
   date: '2026-01-12 08:11',
-};
+});
 
 # Monorepo란?
 
