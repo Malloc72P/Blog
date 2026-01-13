@@ -1,21 +1,14 @@
-import { Constants } from '@libs/constants';
+import { frontmatter } from '@libs/frontmatter';
 
-export const metadata = {
+export const metadata = frontmatter({
   title: '디바운싱과 쓰로틀링',
   description:
     '웹 프론트엔드에서 디바운싱(Debouncing)과 쓰로틀링(Throttling)을 어떻게 구현하는지에 대해 다루는 포스트입니다.',
-  openGraph: {
-    title: '디바운싱과 쓰로틀링',
-    description:
-      '웹 프론트엔드에서 디바운싱(Debouncing)과 쓰로틀링(Throttling)을 어떻게 구현하는지에 대해 다루는 포스트입니다.',
-    type: 'article',
-    url: '/posts/frontend/debouncing-and-throttling',
-    ...Constants.openGraph,
-  },
-  series: 'frontend',
+  seriesId: 'frontend',
+  postId: 'debouncing-and-throttling',
   tags: ['Debouncing', 'Throttling'],
   date: '2025-03-13 22:42',
-};
+});
 
 ## 디바운싱(Debouncing)
 
