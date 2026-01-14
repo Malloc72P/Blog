@@ -20,16 +20,16 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
       )}
     >
       {/* === SERIES TITLE === */}
-      <h4
+      <p
         className={classNames(
-          'article-header-title flex items-center gap-1 text-gray-400',
+          'article-header-title flex items-center gap-1 text-gray-600',
           'text-xs md:text-[16px]',
         )}
       >
         <IconChevronsLeft className="w-4 h-4" />
         {subTitle}
         <IconChevronsRight className="w-4 h-4" />
-      </h4>
+      </p>
 
       {/* === ARTICLE TITLE === */}
       <h1
@@ -45,7 +45,7 @@ export function ArticleHeader({ subTitle, title, date, tags }: ArticleHeaderProp
 
       {/* === DATE === */}
       {date && (
-        <p className={classNames('text-gray-400 leading-[24px]', 'text-xs md:text-[16px]')}>
+        <p className={classNames('text-gray-600 leading-[24px]', 'text-xs md:text-[16px]')}>
           {DateUtil.format(date, 'long')}
         </p>
       )}

@@ -17,7 +17,7 @@ export function PostNavigator({ mode, post }: PostNavigatorProps) {
       className={classNames(
         'group/navigator',
         'flex bg-gray-50 p-3 rounded-md gap-5 items-center grow basis-0 min-w-0 cursor-pointer',
-        mode === 'prev' ? 'flex-row' : 'flex-row-reverse'
+        mode === 'prev' ? 'flex-row' : 'flex-row-reverse',
       )}
     >
       {/* ------------------------------------------------------ */}
@@ -25,9 +25,9 @@ export function PostNavigator({ mode, post }: PostNavigatorProps) {
       {/* ------------------------------------------------------ */}
       <div>
         {mode === 'prev' ? (
-          <IconSquareChevronLeft className="w-10 h-10 stroke-1 text-gray-400" />
+          <IconSquareChevronLeft className="w-10 h-10 stroke-1 text-gray-600" />
         ) : (
-          <IconSquareChevronRight className="w-10 h-10 stroke-1 text-gray-400" />
+          <IconSquareChevronRight className="w-10 h-10 stroke-1 text-gray-600" />
         )}
       </div>
 
@@ -39,7 +39,7 @@ export function PostNavigator({ mode, post }: PostNavigatorProps) {
         <span
           className={classNames(
             'font-bold w-full overflow-hidden whitespace-nowrap text-ellipsis',
-            'group-hover/navigator:underline'
+            'group-hover/navigator:underline',
           )}
         >
           {post.title}

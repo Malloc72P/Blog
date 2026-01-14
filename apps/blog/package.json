@@ -22,21 +22,22 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*",
+    "@mdx-js/loader": "^3.0.0",
+    "@mdx-js/react": "^3.0.0",
+    "@next/mdx": "^15.0.0",
     "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
     "@types/mdx": "^2.0.13",
     "@types/node": "20",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/react-syntax-highlighter": "^15.5.13",
     "autoprefixer": "10.4.20",
+    "critters": "^0.0.25",
     "postcss": "8.5.3",
-    "tailwindcss": "3",
-    "typescript": "5.5.4",
     "sass": "1.85.1",
-    "@mdx-js/loader": "^3.0.0",
-    "@mdx-js/react": "^3.0.0",
-    "@next/mdx": "^15.0.0"
+    "tailwindcss": "3",
+    "typescript": "5.5.4"
   },
   "keywords": [],
   "author": "",

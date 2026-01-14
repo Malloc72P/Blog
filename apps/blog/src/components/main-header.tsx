@@ -26,7 +26,7 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
         <span className="grow"></span>
 
         {/* === HEADER >= MD: RIGHT SECTION === */}
-        <div className="gap-5 hidden md:flex">
+        <nav className="gap-5 hidden md:flex">
           {/* <div>About Me</div> */}
           {/* === SERIES DROPDOWN MENU === */}
           <DropdownMenu
@@ -49,7 +49,7 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
               href: PageLinkMap.tags.landing(tag.id),
             }))}
           /> */}
-        </div>
+        </nav>
 
         {/* === HEADER < MD: RIGHT SECTION === */}
         <MobileSidebar seriesList={seriesList} tags={tags} />

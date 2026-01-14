@@ -22,7 +22,7 @@ export function PostImage(props: any) {
         height={400}
         priority
       />
-      <span className="block text-gray-400 text-center leading-[28px] italic py-5 break-words">
+      <span className="block text-gray-600 text-center leading-[28px] italic py-5 break-words">
         "{alt}"
       </span>
     </span>

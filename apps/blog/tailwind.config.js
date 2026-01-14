@@ -9,7 +9,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-noto-sans-kr)'],
+        sans: ['var(--font-noto-sans-kr)', 'system-ui', 'sans-serif'],
       },
     },
   },

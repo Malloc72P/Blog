@@ -20,7 +20,7 @@ export function PostCard({ post, series }: PostCardProps) {
         <span className="text-xs md:text-lg font-bold">{post.title}</span>
       </Link>
 
-      <div className="text-gray-400 text-xs mb:text-[16px] mt-1 sm:mt-2">
+      <div className="text-gray-600 text-xs mb:text-[16px] mt-1 sm:mt-2">
         {DateUtil.format(post.date, 'postCard')}
       </div>
 
