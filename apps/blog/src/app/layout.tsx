@@ -66,8 +66,8 @@ export default async function RootLayout({ children }: PropsWithChildren) {
     <html lang="ko">
       <head>
         <link rel="icon" type="image/x-icon" href="/favicon.ico"></link>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* <link rel="preconnect" href="https://fonts.googleapis.com" /> */}
+        {/* <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" /> */}
         <meta
           name="google-site-verification"
           content="mOdpcnnT3rL3phLYQpSNvzcOOGfKppuH-2mgeOs7VIc"

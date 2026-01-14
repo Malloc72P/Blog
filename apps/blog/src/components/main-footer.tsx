@@ -80,7 +80,7 @@ interface FooterListProps {
 
 function FooterList({ label, items }: FooterListProps) {
   return (
-    <footer className="md:w-[200px] md:ml-10 mt-10 md:mt-0 mb-10">
+    <div className="md:w-[200px] md:ml-10 mt-10 md:mt-0 mb-10">
       {/* === MAIN FOOTER LIST === */}
       <p className="text-gray-600 font-bold">{label}</p>
       {/* === MAIN FOOTER LIST ITEM === */}
@@ -93,7 +93,7 @@ function FooterList({ label, items }: FooterListProps) {
           </li>
         ))}
       </ul>
-    </footer>
+    </div>
   );
 }
 
