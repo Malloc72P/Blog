@@ -56,7 +56,7 @@ export function MainFooter({ seriesList }: MainFooterProps) {
           />
         </div>
         <div>
-          <div className="text-gray-400 pt-5">
+          <div className="text-gray-600 pt-5">
             <div>Malloc72P©</div>
             <div className="text-2xl font-bold md:text-[40px] pt-1">SeungChul Na.</div>
           </div>
@@ -82,7 +82,7 @@ function FooterList({ label, items }: FooterListProps) {
   return (
     <div className="md:w-[200px] md:ml-10 mt-10 md:mt-0 mb-10">
       {/* === MAIN FOOTER LIST === */}
-      <h4 className="text-gray-400 font-bold">{label}</h4>
+      <p className="text-gray-600 font-bold">{label}</p>
       {/* === MAIN FOOTER LIST ITEM === */}
       <ul className="mt-5">
         {items.map((item) => (
@@ -129,8 +129,8 @@ function LinkButton({
           'transition-all duration-200 ease-in-out',
           'flex items-center gap-1 cursor-pointer',
           color === 'primary'
-            ? 'text-gray-400 hover:text-gray-700'
-            : 'text-gray-400 hover:text-gray-500',
+            ? 'text-gray-600 hover:text-gray-900'
+            : 'text-gray-600 hover:text-gray-700',
         )}
       >
         {Icon && <Icon className="w-4 h-4" />}

@@ -23,8 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const post of posts) {
     sitemaps.push({
       url: [url, post.route].join('/'),
-      priority: 0.7,
-      changeFrequency: 'weekly',
+      priority: 0.8,
       lastModified: DateUtil.Dayjs(post.date).toDate(),
     });
   }
@@ -32,8 +31,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const series of seriesModels) {
     sitemaps.push({
       url: [url, 'posts', series.id].join('/'),
-      priority: 0.8,
-      changeFrequency: 'weekly',
+      priority: 0.5,
+      changeFrequency: 'daily',
       lastModified: DateUtil.Dayjs(series.date).toDate(),
     });
   }

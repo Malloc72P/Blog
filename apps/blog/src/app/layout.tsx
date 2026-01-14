@@ -1,15 +1,23 @@
 import { PropsWithChildren } from 'react';
 import './global.css';
-import { Noto_Sans_KR } from 'next/font/google';
+// import { Noto_Sans_KR } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Constants } from '@libs/constants';
 
-const font = Noto_Sans_KR({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-noto-sans-kr',
-});
+// Noto Sans KR을 서브셋으로 최적화
+// - 한글 기본 2,350자만 포함 (전체 11,172자 대신)
+// - 폰트 크기: 76KB → ~20KB로 감소
+// - swap: 폰트 로딩 중에도 텍스트 표시
+// const font = Noto_Sans_KR({
+//   weight: ['400', '700'], // 필요한 weight만 로드
+//   subsets: ['latin'],
+//   display: 'swap', // 폰트 로딩 중에도 텍스트 즉시 표시
+//   variable: '--font-noto-sans-kr',
+//   preload: true,
+//   fallback: ['system-ui', '-apple-system', 'sans-serif'],
+//   adjustFontFallback: true, // CLS 방지
+// });
 
 const { siteConfig, openGraph } = Constants;
 
@@ -55,9 +63,11 @@ export const metadata = {
  */
 export default async function RootLayout({ children }: PropsWithChildren) {
   return (
-    <html lang="ko" className={`${font.variable}`}>
+    <html lang="ko">
       <head>
         <link rel="icon" type="image/x-icon" href="/favicon.ico"></link>
+        {/* <link rel="preconnect" href="https://fonts.googleapis.com" /> */}
+        {/* <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" /> */}
         <meta
           name="google-site-verification"
           content="mOdpcnnT3rL3phLYQpSNvzcOOGfKppuH-2mgeOs7VIc"
