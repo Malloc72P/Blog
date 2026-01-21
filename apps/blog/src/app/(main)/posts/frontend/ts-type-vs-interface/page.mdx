@@ -1,0 +1,243 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'Type vs Interface 그리고 Mapped Type',
+  description:
+    '타입스크립트에서 type과 interface의 차이점, 타입 확장 방법, 그리고 Mapped Type을 활용한 고급 타입 정의 기법에 대해 알아봅니다.',
+  seriesId: 'frontend',
+  postId: 'ts-type-vs-interface',
+  tags: ['Typescript', 'MappedType', 'interface'],
+  date: '2026-01-21 08:47',
+});
+
+# 타입 확장
+
+어떤 타입을 사용하다 보면, 좀 더 구체적인 버전의 타입이 필요한 상황이 자주 발생합니다. 이때, 인터페이스의 `extends`나 type의 `Intersection(&)`을 사용하면, 기존 타입을 재활용해서 새로운 타입을 만들 수 있습니다.
+
+```typescript
+interface EntityDateInfo {
+  createdAt: Date;
+  updatedAt: Date;
+  removedAt: Date;
+}
+
+// interface의 extends 사용
+interface UserV3 extends EntityDateInfo {
+  id: string;
+  name: string;
+  primaryEmail: string;
+  secondaryEmails: string[];
+}
+
+// type의 Intersection 사용
+type UserV3IntersectionType = {
+  id: string;
+  name: string;
+  primaryEmail: string;
+  secondaryEmails: string[];
+} & EntityDateInfo;
+```
+
+인터페이스를 사용한 방법과 인터섹션을 사용한 방법은 두 타입이 같은 속성명을 가질 때 이를 처리하는 방식에서 차이가 있습니다.
+
+---
+
+# Interfaces vs Intersections(Type)
+
+두 방법 다 두 개의 타입을 합치는 방법이지만, 두 타입이 같은 속성명을 가질 때 이를 처리하는 방법이 다릅니다.
+
+## 인터페이스의 경우
+
+이름이 겹치는 파생 인터페이스의 속성은 기반 인터페이스 속성의 타입에 호환되어야 합니다. 파생 인터페이스는 기반 인터페이스의 역할을 대신할 수 있어야 하기 때문입니다. 이는 리스코프 치환 원칙에 해당합니다. OOP의 이야기이긴 하지만, 인터페이스는 OOP의 개념이기도 하니 이런 제약이 적용되는 것으로 보입니다.
+
+```typescript
+type SimpleArmourType = 'HEAVY' | 'LIGHT';
+
+interface Vehicle {
+  armourType: SimpleArmourType;
+  speed: number;
+}
+
+interface MBT extends Vehicle {
+  armourType: 'HEAVY'; // Vehicle의 armourType에 호환됨
+  armourLevel: number;
+}
+
+const mbt: MBT = {
+  armourType: 'HEAVY',
+  armourLevel: 5,
+  speed: 40,
+};
+
+const vehicle: Vehicle = mbt; // OK - MBT는 Vehicle에 호환됨
+```
+
+위 코드에서 `MBT` 인터페이스는 `Vehicle` 인터페이스를 확장합니다. 이때 `armourType` 속성이 충돌하는데, `extends`를 하기 위해서는 `MBT`의 `armourType`은 `Vehicle`의 `armourType`에 호환될 수 있어야 합니다. 이 경우에는 호환이 되기 때문에 `extends`가 가능합니다.
+
+```typescript
+interface AMB extends Vehicle {
+  armourType: SimpleArmourType | 'NONE';
+  // Interface 'AMB' incorrectly extends interface 'Vehicle'.
+  // Types of property 'armourType' are incompatible.
+  // Type 'SimpleArmourType | "NONE"' is not assignable to type 'SimpleArmourType'.
+  // Type '"NONE"' is not assignable to type 'SimpleArmourType'.
+}
+```
+
+하지만 이 경우 `AMB`의 `armourType`이 `Vehicle`의 `armourType`에 호환되지 않습니다. 따라서 extends를 할 수 없습니다.
+
+정리하면, 인터페이스의 extends는 속성명이 겹치는 경우 파생 인터페이스의 속성이 기반 인터페이스의 속성에 호환될 수 있어야 한다는 조건이 있습니다.
+
+## 타입의 인터섹션
+
+`&` 연산자를 사용해서 두 타입을 합치는 인터섹션은, 인터페이스의 extends처럼 호환성 검사를 하지 않습니다. 이 경우, 속성명이 같으면 두 타입을 `&` 연산자로 합친 결과를 파생 타입의 속성 타입으로 사용합니다.
+
+```typescript
+interface I_Vehicle {
+  armourType: SimpleArmourType;
+  speed: number;
+}
+
+type T_AMB = {
+  armourType: SimpleArmourType | 'NONE';
+} & I_Vehicle;
+
+const amb: T_AMB = {
+  armourType: 'LIGHT', // (SimpleArmourType | "NONE") & SimpleArmourType = SimpleArmourType
+  speed: 0,
+};
+
+// 이해를 돕기 위한 타입 A
+type A = (SimpleArmourType | 'NONE') & SimpleArmourType;
+
+const a: A = 'HEAVY'; // OK
+const b: A = 'LIGHT'; // OK
+```
+
+`&` 연산자는 두 타입 간의 교집합을 만들기 때문에, 두 타입의 공통 속성인 `HEAVY`와 `LIGHT`만 지정됩니다.
+
+## 타입 인터섹션의 함정
+
+만약 교집합이 불가능한 속성명이 충돌되면 어떻게 될까요? 이 경우 타입스크립트 컴파일러는 에러 메시지를 출력해주지 않습니다. 대신 파생 타입의 속성은 `never`를 타입으로 가지게 됩니다.
+
+```typescript
+type Alpha = {
+  value: number;
+};
+
+type Beta = {
+  value: string;
+};
+
+type Gamma = Alpha & Beta;
+
+const gamma: Gamma = {
+  value: 'a',
+  // Type 'string' is not assignable to type 'never'.
+};
+```
+
+이러한 타입 인터섹션은 명백한 개발자 실수이고, 이렇게 사용할 일은 없습니다. 단, 이런 실수를 저질러도 타입 인터섹션일 때는 선언 시점에 컴파일 에러가 발생하지 않는다는 점, 파생 타입이 `never`를 가진다는 점을 기억하면 좋겠습니다.
+
+## 어떤 방법을 사용하는 게 좋을까
+
+개인적인 의견으로, 다음과 같이 사용하는 것을 권장합니다.
+
+| 상황                           | 권장 방법           |
+| ------------------------------ | ------------------- |
+| 계층적 타입 (기반-파생 관계)   | interface의 extends |
+| 단순 타입 병합, 속성 충돌 없음 | type의 intersection |
+
+만약 어떤 타입을 새로 만드려는데, 이것이 어떤 기반 타입으로부터 파생되는 상황이라면, 리스코프 치환 원칙을 컴파일 타임에 타입 검사로 지킬 수 있는 `interface-extends` 방법이 좋습니다. 즉, 계층적 타입을 만들 때는 extends를 사용하는 것이 좋습니다.
+
+계층 구조가 아니고, 그냥 단순히 두 타입을 병합해야 하며, 속성이 겹칠 일이 없고, 있더라도 파생 속성이 두 속성 타입의 교집합이어도 괜찮다면, 타입 인터섹션이 좋은 선택이 될 것입니다.
+
+---
+
+# Mapped Type
+
+Mapped Type을 사용하면 기존 타입을 재활용해서 객체 타입을 선언할 수 있습니다.
+
+```typescript
+type IProgramEnv = {
+  [key in IRequiredKeys]: string;
+};
+```
+
+위와 같이 객체 타입의 Key, Value에 대한 타입을 선언할 수 있습니다.
+
+## 예제
+
+```typescript
+const RequiredKeys = ['ROOT_PATH', 'LOG_PATH'] as const;
+type IRequiredKeys = (typeof RequiredKeys)[number];
+
+export type IProgramEnv = {
+  [key in IRequiredKeys]: string;
+};
+
+export const isProgramEnv = (env: object): env is IProgramEnv => {
+  for (const key of RequiredKeys) {
+    if (!Reflect.get(env, key)) {
+      return false;
+    }
+  }
+  return true;
+};
+```
+
+위 예제는 환경변수가 가져야 하는 키 값을 배열로 가지고 있는 상황입니다. 이때, 환경변수 객체 타입을 직접 한 땀 한 땀 재정의하지 않아도, Mapped Type을 사용하면 키 값 배열을 사용해서 타입을 정의할 수 있습니다.
+
+## 값에서 타입 추출하기
+
+먼저, 객체 타입의 키에 대한 타입을 정의해야 하는 상황인데, `RequiredKeys`는 값이라서 타입 선언에 바로 사용할 수 없습니다. 필요한 것은 키의 타입, 즉 string union 타입입니다.
+
+```typescript
+type IRequiredKeys = 'ROOT_PATH' | 'LOG_PATH';
+```
+
+이것도 직접 재정의할 필요가 없습니다.
+
+```typescript
+const RequiredKeys = ['ROOT_PATH', 'LOG_PATH'] as const;
+// typeof RequiredKeys = readonly ["ROOT_PATH", "LOG_PATH"]
+
+type IRequiredKeys = (typeof RequiredKeys)[number];
+// type IRequiredKeys = "ROOT_PATH" | "LOG_PATH"
+```
+
+1. **typeof 연산자**: 값을 타입으로 변환합니다.
+2. **as const**: 값 `RequiredKeys`를 선언할 때 const assertion을 사용해야 합니다. 이렇게 하면 컴파일러가 좀 더 구체적인 타입으로 좁히기(narrow)를 할 수 있습니다.
+3. **[number] 인덱싱**: 배열 타입에서 각각의 값을 꺼냅니다. number 타입으로 참조하게 되면 각각의 값들에 대해 참조할 수 있기에, 그 결과로 string union 타입을 컴파일러가 추론해낼 수 있습니다.
+
+그다음, Mapped Type의 키 값을 선언할 때 `in` 연산자를 사용해서 키 값이 string union의 원소 중 하나가 될 수 있음을 정의하고, 이에 대한 값이 string임을 정의하면 됩니다.
+
+## Record 타입 유틸리티
+
+참고로 위의 Mapped Type 선언은 `Record` 타입 유틸리티를 사용하면 편하게 선언할 수 있습니다.
+
+```typescript
+type IProgramEnv = Record<IRequiredKeys, string>;
+// { ROOT_PATH: string; LOG_PATH: string; }
+```
+
+`Record<K, V>`는 키 타입 K와 값 타입 V를 받아 객체 타입을 생성합니다.
+
+# 정리
+
+이번 포스트에선 타입스크립트에서 interface와 type의 차이점, 확장 방법, 그리고 Mapped Type에 대해 알아보았습니다. 내용을 정리하면 다음과 같습니다.
+
+| 개념              | 설명                                      |
+| ----------------- | ----------------------------------------- |
+| interface extends | 호환성 검사 수행, 리스코프 치환 원칙 보장 |
+| type intersection | 호환성 검사 없음, 교집합으로 타입 병합    |
+| Mapped Type       | 기존 타입을 재활용하여 객체 타입 선언     |
+| as const          | 값을 리터럴 타입으로 좁히기               |
+| typeof            | 값에서 타입 추출                          |
+| Record            | Mapped Type을 간편하게 사용하는 유틸리티  |
+
+- interface의 extends는 계층적 타입을 만들 때 적합하며, 컴파일 타임에 호환성을 검사한다.
+- type의 intersection은 단순 타입 병합에 적합하지만, 속성 충돌 시 never가 될 수 있으므로 주의가 필요하다.
+- Mapped Type을 활용하면 기존 값이나 타입을 재활용하여 새로운 객체 타입을 효율적으로 정의할 수 있다.
+
+긴 글 읽어주셔서 감사합니다!

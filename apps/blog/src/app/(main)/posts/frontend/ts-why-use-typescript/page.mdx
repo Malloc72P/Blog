@@ -1,0 +1,154 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '타입스크립트를 사용하는 이유와 구조적 타입 시스템',
+  description:
+    '자바스크립트의 동적 타입 한계를 극복하는 타입스크립트의 정적 타입 검사와 구조적 타입 시스템에 대해 알아봅니다.',
+  seriesId: 'frontend',
+  postId: 'ts-why-use-typescript',
+  tags: ['Typescript', '타입시스템'],
+  date: '2026-01-18 08:43',
+});
+
+# 타입이 필요한 이유
+
+프로그래밍 언어는 타입 시스템을 통해, 데이터의 형태를 정의하고 제약을 가합니다.
+타입 시스템이 없다면, 개발자는 데이터가 어떤 형태인지 일일이 확인해야 하고, 잘못된 형태의 데이터를 다룰 때 발생하는 오류를 직접 처리해야 합니다.
+
+언어에 따라 타입 시스템의 강도와 검사 시점이 다른데, 타입스크립트에 대해 알아보기 전에 정적 타입 언어와 동적 타입 언어의 차이를 알아보도록 하겠습니다.
+
+## 정적 타입 언어와 타입 체킹
+
+정적 타입 언어는 컴파일 시점에 타입 검사를 수행합니다. 만약 코드에 에러가 있다면, 컴파일이 실패하여 아예 실행 자체가 되지 않습니다. 또한 어떤 코드에 문제가 있는지를 개발자에게 알려주기 때문에, 코드 에러를 사전에 식별하기 쉽다는 장점이 있습니다.
+
+## 동적 타입 언어인 Javascript
+
+반면, Javascript는 동적 타입 언어입니다. 런타임에 변수의 타입이 결정되며, 컴파일 시점이란 것도 없고 정적 타입 검사가 발생하지 않습니다. 코드에 에러가 있더라도 실행할 수 있으며, 런타임에 에러가 있는 코드가 실행되어야 비로소 에러가 발생합니다.
+
+런타임에 에러가 발생하는 것은 바람직한 상황이 아닙니다. 가능하면 실행하기 전에 에러를 찾고 수정해야 합니다.
+
+```javascript
+function dynamicType() {
+  const obj = { width: 10, height: 15 };
+  const area = obj.width * obj.heigth; // heigth 오타
+  console.log(area);
+}
+
+dynamicType(); // NaN 출력
+```
+
+위 코드는 `heigth`라는 존재하지 않는 속성을 참조하고 있습니다. 코드 양이 적기 때문에 금방 문제를 찾아 고칠 수 있지만, 코드 양이 커질수록 이러한 오류는 놓치기 쉬워집니다. 그리고 이러한 사소한 문제로 인해 프로그램이 정상적으로 실행되지 않을 수 있습니다.
+
+## 타입스크립트의 등장
+
+타입스크립트는 Javascript의 모든 기능을 제공하면서, 정적 타입 검사를 추가로 제공합니다. 타입스크립트는 컴파일을 통해 자바스크립트로 변환되며, 컴파일 시점에 정적 타입 검사기가 모든 코드를 검사하고 타입 오류가 있는지를 개발자에게 알려줍니다.
+
+```typescript
+function dynamicType() {
+  const obj = { width: 10, height: 15 };
+  const area = obj.width * obj.heigth;
+  // Property 'heigth' does not exist on type '{ width: number; height: number; }'.
+  // Did you mean 'height'?
+  console.log(area);
+}
+```
+
+덕분에 위와 같은 사소한 문제가 있는지를 코드를 실행하지 않고도 알 수 있게 됩니다.
+
+---
+
+# 타입스크립트의 타입 시스템
+
+타입스크립트는 타입을 통해 데이터를 표현합니다. 컴파일러는 컴파일 시점에 타입을 읽고, 코드에서 데이터를 다루는 데 있어서 문제가 없는지 검사합니다.
+
+그런데, 타입스크립트의 타입 시스템은 Java나 C++과 같은 언어와 다른 특징을 가지고 있습니다.
+
+## 구조적 타입 시스템(Structural Type System)
+
+타입스크립트는 Duck Typing이라고도 불리는 구조적 타입 시스템을 사용합니다. 구조적 타입 시스템에서는 타입 체킹이 값이 가진 형태에 집중합니다. 두 객체가 서로 다른 이름의 타입을 가졌더라도, 그 형태가 같다면 같은 타입으로 여겨집니다.
+
+```typescript
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Position {
+  x: number;
+  y: number;
+}
+
+function logPoint(p: Point) {
+  console.log(`${p.x}, ${p.y}`);
+}
+
+function example1() {
+  const point1 = { x: 12, y: 26 };
+  const point2: Position = { x: 10, y: 20 };
+  const point3 = { shape: 'round' };
+
+  logPoint(point1); // OK - 형태가 같음
+  logPoint(point2); // OK - 형태가 같음
+  logPoint(point3); // Error - 형태가 다름
+  // Argument of type '{ shape: string; }' is not assignable to parameter of type 'Point'.
+  // Type '{ shape: string; }' is missing the following properties from type 'Point': x, y
+}
+```
+
+### 형태가 같다면 같은 타입으로 취급된다
+
+| 변수   | 선언 타입        | Point와 호환 여부 | 이유                        |
+| ------ | ---------------- | ----------------- | --------------------------- |
+| point1 | 없음 (타입 추론) | 호환됨            | Point 타입과 형태가 같음    |
+| point2 | Position         | 호환됨            | 이름은 다르지만 형태가 같음 |
+| point3 | 없음 (타입 추론) | 호환되지 않음     | Point 타입과 형태가 다름    |
+
+## 명목적 타입 시스템(Nominal Type System)과의 차이
+
+반면, 명목적 타입 시스템을 사용하는 언어에서는 선언된 타입 이름이 같아야 같은 타입으로 취급됩니다.
+
+```java
+class Point {
+    public int x;
+    public int y;
+}
+
+class Position {
+    public int x;
+    public int y;
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Point point = new Point();
+        Point point2 = new Point();
+        Position position = new Position();
+
+        point2 = point;      // OK
+        point = position;    // Error: Type mismatch
+        position = point;    // Error: Type mismatch
+    }
+}
+```
+
+Java에서는 Point와 Position이 구조적으로 동일하더라도, 타입 이름이 다르기 때문에 서로 할당할 수 없습니다.
+
+---
+
+# 정리
+
+이번 포스트에서는 정적 타입 언어와 동적 타입 언어의 차이점, 그리고 타입스크립트가 자바스크립트의 한계를 극복하는 방법에 대해 알아보았습니다.
+
+| 구분           | Javascript | Typescript  |
+| -------------- | ---------- | ----------- |
+| 타입 검사 시점 | 런타임     | 컴파일 타임 |
+| 타입 시스템    | 동적 타입  | 정적 타입   |
+| 에러 발견 시점 | 실행 중    | 개발 중     |
+
+- 자바스크립트는 동적 타입 언어라서 코드를 실행해야만 타입 오류가 있음을 알 수 있다.
+- 반면, 정적 타입 언어인 타입스크립트는 자바스크립트의 모든 기능을 제공하면서 정적 타입 검사라는 기능을 제공한다.
+- 정적 타입 검사를 통해, 코드를 실행하지 않고도 에러가 있는지를 알 수 있다.
+- 타입스크립트는 명목적 타입 시스템을 사용하는 C++, Java와 다르게 구조적 타입 시스템을 사용한다.
+- 구조적 타입 시스템은 타입의 구조가 같다면 같은 타입으로 취급되는 특징을 가진다.
+
+긴 글 읽어주셔서 감사합니다. 다음 포스트에서는 타입스크립트의 구조적 타입 시스템에 대해 더 깊이 알아보겠습니다.

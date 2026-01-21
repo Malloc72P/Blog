@@ -1,0 +1,298 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '타입스크립트 타입 호환성 완벽 이해하기',
+  description:
+    '구조적 타입 시스템에서의 타입 호환성 규칙을 객체, 함수, 클래스, 제네릭 등 다양한 케이스와 함께 살펴봅니다.',
+  seriesId: 'frontend',
+  postId: 'ts-type-compatibility',
+  tags: ['Typescript', '타입호환성', '타입시스템'],
+  date: '2026-01-19 08:52',
+});
+
+# 타입 호환성이란?
+
+항상 같은 타입을 사용할 수 있다면 좋겠지만, 상황에 따라서 그러지 않을 수 있습니다. 요구되는 타입과 완전히 동일하지 않은 타입을 사용해야 할 수 있습니다.
+
+타입스크립트에서는 사용하려는 값의 타입이 요구되는 타입과 호환되기만 하면, 같은 타입이 아니어도 사용할 수 있습니다. 같은 타입이 아니어도 사용할 수 있는지, 즉 호환되는지 여부를 나타내는 것을 타입 호환성이라고 합니다.
+
+타입 호환성을 이해하면 개발자들이 사용하기 편한 타입을 설계하는 데 도움이 됩니다.
+
+---
+
+# 타입 호환성을 결정하는 규칙
+
+타입스크립트는 구조적 타입 시스템을 사용하기 때문에, 타입은 이름이 아닌 그 타입이 가진 구조나 형태를 기반으로 합니다. 따라서 두 타입이 따로 선언되었더라도(이름이 다르더라도), 구조적으로 호환되기만 하면 호환되는 것으로 여겨집니다.
+
+```typescript
+interface Animal {
+  name: string;
+}
+
+interface Pet {
+  name: string;
+  owner: string;
+}
+
+let pet: Pet = { name: 'Lassie', owner: 'Russell T. Davies' };
+let animal: Animal = pet; // OK - Pet은 Animal에 호환됨
+
+console.log(animal);
+```
+
+## 구조적으로 호환된다면, 할당할 수 있다
+
+Animal과 Pet 타입은 따로 선언되었고, 이름도 다릅니다. 심지어 Pet 타입에는 Animal 타입에 없는 속성도 있습니다. 하지만 구조적으로 호환되기 때문에, 다른 타입임에도 할당할 수 있습니다.
+
+```typescript
+pet = animal;
+// Property 'owner' is missing in type 'Animal'
+// but required in type 'Pet'.
+```
+
+Pet 타입 객체를 Animal 타입 객체에 할당하는 것은 되지만, 그 반대는 되지 않습니다.
+
+구조적으로 호환되는지를 결정할 때, 컴파일러는 넘기려는 값의 타입이 대상 타입이 요구하는 모든 속성을 가지고 있는지를 확인합니다.
+
+- `pet -> animal`: Animal에서 요구하는 속성이 `name: string`뿐이고, Pet에도 해당 속성이 있기 때문에 호환됩니다.
+- `animal -> pet`: Pet에서 `name`과 `owner: string` 속성을 요구하지만, Animal에는 `owner` 속성이 없습니다. 그래서 호환되지 않습니다.
+
+## 옵셔널 속성에 대한 타입 호환성
+
+대상 타입에서 요구하는 속성이 없으면 호환되지 않습니다. 하지만 해당 속성이 옵셔널인 경우에는 호환되는 것으로 판단됩니다. 옵셔널 속성의 경우 존재하지 않아도 되기 때문입니다.
+
+```typescript
+interface StrayPet {
+  name: string;
+  owner?: string;
+}
+
+let strayPet: StrayPet = animal; // OK - owner가 옵셔널이므로 호환됨
+```
+
+---
+
+# 함수에 대한 타입 호환성
+
+타입스크립트는 함수 타입의 호환성도 체크합니다. 함수 타입이 호환되려면, 매개변수와 리턴 타입 둘 다 호환되어야 합니다.
+
+## 매개변수 호환성
+
+```typescript
+type Adder = (a: number, b: number) => number;
+type Multiplier = (x: number, y: number) => number;
+type Multiplier2 = (x: number, y: number, z: number) => number;
+
+let add: Adder = (a, b) => a + b;
+let multiply: Multiplier = (x, y) => x * y;
+let multiply2: Multiplier2 = (x, y, z) => x * y * z;
+
+add = multiply; // OK
+multiply = add; // OK
+
+multiply2 = add; // OK - 매개변수가 적은 것은 호환됨
+add = multiply2; // Error - 매개변수가 많은 것은 호환되지 않음
+// Type 'Multiplier2' is not assignable to type 'Adder'.
+// Target signature provides too few arguments. Expected 3 or more, but got 2.
+```
+
+대상 함수 타입의 매개변수에서 요구하는 매개변수를 가지고 있어야 합니다. 단, 전부 가지고 있을 필요는 없습니다.
+
+| 조건                                          | 호환 여부     |
+| --------------------------------------------- | ------------- |
+| 대상 함수타입의 매개변수보다 적게 가지고 있음 | 호환됨        |
+| 대상 함수타입의 매개변수보다 많이 가지고 있음 | 호환되지 않음 |
+
+## 리턴 타입 호환성
+
+```typescript
+type Mapper = (value: number) => string;
+type IsBiggerThanZero = (value: number) => boolean;
+
+let map: Mapper = (value) => value.toString();
+let isBiggerThanZero: IsBiggerThanZero = (value) => value > 0;
+
+isBiggerThanZero = map; // Error
+map = isBiggerThanZero; // Error
+// Type 'string' is not assignable to type 'boolean'.
+```
+
+대상 함수 타입의 리턴 타입과 호환되어야 합니다. 위 예제의 경우, string이 boolean에 호환되지 않기 때문에 리턴 타입이 호환되지 않습니다.
+
+```typescript
+type CreateAnimalFn = (name: string) => Animal;
+type CreatePetFn = (name: string) => Pet;
+
+let createAnimal: CreateAnimalFn = (name) => ({ name });
+let createPet: CreatePetFn = (name) => ({ name, owner: 'me' });
+
+createAnimal = createPet; // OK - Pet은 Animal에 호환됨
+createPet = createAnimal; // Error - Animal은 Pet에 호환되지 않음
+// Property 'owner' is missing in type 'Animal' but required in type 'Pet'.
+```
+
+Pet 타입은 Animal 타입의 변수에 할당할 수 있기 때문에, 리턴 타입이 호환되어 createPet을 createAnimal에 할당할 수 있습니다. 반면 Animal은 Pet에서 요구하는 owner 속성이 없어 호환되지 않으므로, createAnimal을 createPet에 할당할 수 없습니다.
+
+---
+
+# Enum의 타입 호환성
+
+타입스크립트의 Enum은 number와 호환됩니다.
+
+```typescript
+enum Color {
+  RED,
+  GREEN,
+  BLUE,
+}
+
+let colorValue: Color = Color.RED;
+let numericValue: number = 0;
+
+numericValue = colorValue; // OK
+colorValue = numericValue; // OK
+```
+
+하지만 다른 타입의 Enum과는 호환되지 않습니다.
+
+```typescript
+enum Food {
+  PIZZA,
+  HAMBURGER,
+  HOTDOG,
+}
+
+let foodValue: Food = Food.HAMBURGER;
+foodValue = colorValue; // Error - 다른 Enum과 호환되지 않음
+```
+
+---
+
+# 클래스의 타입 호환성
+
+클래스는 인터페이스나 객체 리터럴 타입과 유사하게 동작하지만, 한 가지 차이가 있습니다. 클래스는 정적 타입과 인스턴스 타입을 가진다는 점입니다.
+
+## 인스턴스 타입과 타입 호환성
+
+두 인스턴스 간의 호환성을 따지는 경우, 인스턴스의 멤버만 비교하게 됩니다. 생성자나 정적 멤버는 영향을 주지 않습니다.
+
+```typescript
+class Aircraft {
+  public static readonly AIRCRAFT_ACCELERATION: number = 20;
+
+  speed: number;
+  acceleration: number;
+
+  constructor(speed: number) {
+    this.speed = speed;
+    this.acceleration = Aircraft.AIRCRAFT_ACCELERATION;
+  }
+}
+
+class Hovercraft {
+  speed: number;
+  acceleration: number;
+
+  constructor(speed: number, acceleration: number) {
+    this.speed = speed;
+    this.acceleration = 20;
+  }
+}
+
+let aircraft: Aircraft = new Aircraft(100);
+let hovercraft: Hovercraft = new Hovercraft(30, 5);
+
+hovercraft = aircraft; // OK
+aircraft = hovercraft; // OK
+```
+
+Aircraft와 Hovercraft의 인스턴스 타입은 정적 멤버와 생성자를 제외하면 구조적으로 동일합니다. 따라서 두 클래스의 인스턴스 타입은 서로 호환 가능합니다.
+
+## 접근 제어 지시자와 타입 호환성
+
+타입 호환성은 속성의 이름과 타입 뿐만 아니라, 접근 제어 지시자도 검사합니다.
+
+```typescript
+class JetFighter {
+  public static readonly AIRCRAFT_ACCELERATION: number = 26;
+
+  private speed: number; // private으로 변경
+  acceleration: number;
+
+  constructor(speed: number) {
+    this.speed = speed;
+    this.acceleration = Aircraft.AIRCRAFT_ACCELERATION;
+  }
+}
+
+let jetFighter: JetFighter = new JetFighter(120);
+
+aircraft = jetFighter; // Error
+// Type 'JetFighter' is not assignable to type 'Aircraft'.
+// Property 'speed' is private in type 'JetFighter' but not in type 'Aircraft'.
+```
+
+speed를 private이나 protected로 변경하면 타입 에러가 발생합니다. 접근 제어 지시자가 다르면 호환되지 않기 때문입니다.
+
+---
+
+# 제네릭의 타입 호환성
+
+타입스크립트는 구조적 타입 시스템을 사용하기 때문에, 타입 파라미터는 멤버 타입의 일부분으로 사용되었을 때에만 결과 타입에 영향을 줍니다. 다시 말해, 타입 호환성은 타입 파라미터의 영향을 받은 결과 타입만 가지고 판단합니다.
+
+## 타입 파라미터가 사용되지 않는 경우
+
+```typescript
+interface EmptyGenerics<T> {}
+
+let emptyEx1: EmptyGenerics<number> = {};
+let emptyEx2: EmptyGenerics<string> = {};
+
+emptyEx1 = emptyEx2; // OK
+emptyEx2 = emptyEx1; // OK
+```
+
+타입 파라미터로 사용된 number와 string은 서로 호환되지 않지만, EmptyGenerics에서는 타입 파라미터를 받겠다고 선언만 하고 실제로는 사용하지 않았습니다. 따라서 결과 타입은 타입 파라미터를 무엇을 사용하든 똑같고, 타입스크립트는 결과 타입만 보고 구조적으로 두 타입이 차이가 없다고 판단합니다.
+
+## 타입 파라미터가 사용되는 경우
+
+```typescript
+interface NotEmptyGenerics<T> {
+  value: T;
+}
+
+let notEmptyEx1: NotEmptyGenerics<number> = { value: 42 };
+let notEmptyEx2: NotEmptyGenerics<string> = { value: 'AH' };
+
+notEmptyEx1 = notEmptyEx2; // Error
+// Type 'NotEmptyGenerics<string>' is not assignable to type 'NotEmptyGenerics<number>'.
+// Type 'string' is not assignable to type 'number'.
+
+notEmptyEx2 = notEmptyEx1; // Error
+// Type 'NotEmptyGenerics<number>' is not assignable to type 'NotEmptyGenerics<string>'.
+// Type 'number' is not assignable to type 'string'.
+```
+
+반면, 타입 파라미터를 사용하여 결과 타입이 구조적으로 달라지면 타입이 호환되지 않는다고 판단됩니다.
+
+---
+
+# 정리
+
+이번 포스트에선 타입스크립트의 타입 호환성에 대해 알아보았습니다. 주요 내용을 정리하면 다음과 같습니다.
+
+| 대상           | 호환 규칙                                                    |
+| -------------- | ------------------------------------------------------------ |
+| 객체 타입      | 대상 타입이 요구하는 모든 속성을 가지면 호환됨               |
+| 옵셔널 속성    | 옵셔널 속성은 없어도 호환됨                                  |
+| 함수 매개변수  | 대상보다 적은 매개변수는 호환, 많은 매개변수는 호환되지 않음 |
+| 함수 리턴 타입 | 리턴 타입이 대상 타입에 호환되어야 함                        |
+| Enum           | number와 호환, 다른 Enum과는 호환되지 않음                   |
+| 클래스         | 인스턴스 멤버만 비교, 접근 제어 지시자도 검사                |
+| 제네릭         | 타입 파라미터가 실제로 사용된 경우에만 결과 타입에 영향      |
+
+- 타입이 구조적으로 완전히 같지 않더라도, 대상 타입과 구조적으로 호환되는 경우에는 사용할 수 있다.
+- 제네릭, 클래스, Enum, 함수 등에 대한 타입 호환성 규칙이 존재한다.
+- 타입 호환성 규칙을 이해하면 더 유연하고 사용하기 편한 타입을 설계할 수 있다.
+
+다음 포스트에서는 타입스크립트의 구조적 타입 시스템에 대해 더 깊이 알아보겠습니다. 긴 글 읽어주셔서 감사합니다!
