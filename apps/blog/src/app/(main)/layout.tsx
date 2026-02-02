@@ -15,10 +15,23 @@ export const dynamic = 'force-static';
 export default async function MainLayout({ children }: PropsWithChildren) {
   const seriesModels = (await findSeriesList()).map(Mapper.toSeriesModel);
   const tags = (await findTags()).map(Mapper.toTagModel);
-  const posts = (await findPosts()).map((item) => Mapper.toPostModel({ item, seriesModels }));
+  const posts = (await findPosts())
+    .map((item) => Mapper.toPostModel({ item, seriesModels }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const postDesc = posts.slice().reverse();
+
+  const preparedPosts = posts.map((currentPost) => ({
+    ...currentPost,
+    prevPost: postDesc.find(
+      (post) => post.series.id === currentPost.series.id && post.date < currentPost.date,
+    ),
+    nextPost: posts.find(
+      (post) => post.series.id === currentPost.series.id && post.date > currentPost.date,
+    ),
+  }));
 
   return (
-    <MainClientLayout seriesList={seriesModels} tags={tags} posts={posts}>
+    <MainClientLayout seriesList={seriesModels} tags={tags} posts={preparedPosts}>
       {children}
     </MainClientLayout>
   );
