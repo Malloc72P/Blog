@@ -22,6 +22,8 @@ interface SeriesFilterModel extends SeriesModel {
   active: boolean;
 }
 
+const limit = (limit: number) => (_: PostModel, i: number) => i < limit;
+
 /**
  * 블로그 랜딩 페이지.
  *
@@ -54,7 +56,7 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
   );
 
   // 현재 포스트 목록
-  const [posts, setPosts] = useState<PostModel[]>(originalPosts);
+  const [posts, setPosts] = useState<PostModel[]>(originalPosts.filter(limit(5)));
 
   /* ------------------------------------------------------ */
   /* FUNCTIONS */
@@ -82,8 +84,8 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
     // 현재 포스트 목록을 필터링한다.
     const nextPosts =
       targetSeries.id === Constants.series.latestId
-        ? [...originalPosts]
-        : originalPosts.filter((post) => post.series.id === targetSeries.id);
+        ? [...originalPosts].filter(limit(5))
+        : originalPosts.filter((post) => post.series.id === targetSeries.id).filter(limit(5));
 
     setPosts(nextPosts);
   };

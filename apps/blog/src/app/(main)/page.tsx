@@ -21,7 +21,6 @@ export default async function LandingPage() {
     }
 
     const seriesPost = await findPosts({
-      limit: 20,
       seriesId: series.id,
     });
 
