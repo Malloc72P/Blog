@@ -366,11 +366,33 @@ export async function deleteOrderAction(orderId: number) {
 }
 ```
 
+### 확인해보기
+
+- order-grid.tsx 파일을 열면, createOrderAction을 호출하는 코드에서 오류가 발생하는 것을 알 수 있습니다.
+- 더 이상 해당 함수가 id를 인자로 받지 않기 때문입니다. 아래와 같이 수정해줍니다.
+
+```ts
+const newOrder = await createOrderAction({
+  price: 5000,
+  qty: 3,
+});
+```
+
+- `pnpm dev`를 실행하여 next 앱을 켜면 아무것도 나오지 않습니다. 아직 데이터가 없어서 그렇습니다.
+- Create Order 버튼을 세번 누르고, 페이지를 새로고침해보면, Order 데이터가 세건 조회되는 것을 확인할 수 있습니다.
+- prisma studio에서 확인해보면 실제 DB에 데이터가 추가된 것을 알 수 있습니다.
+
 ## 마치며...
 
 여기까지 하여, PrismaORM을 활용한 CRUD를 전부 구현해보았습니다.  
 이번 포스트에선 Prisma ORM에 대한 간단한 소개와 설치 및 구성방법, 그리고 간단한 CRUD 코드 작성을 알아보았습니다.  
 개인적으로 타입 스크립트 진영의 DB 라이브러리 중에선 Prisma가 가장 문서화가 잘 되어 있고, 커뮤니티 규모도 크며 타입 안정성이나 성능, 사용성이 제일 좋지 않나 라고 생각합니다.  
 또한 마이그레이션 방법도 쉽고 직관적이어서, 유지보수할 때 큰 어려움 없이 작업할 수 있었습니다.
-다음 포스트에선 Mantine Data Table을 사용해서 지금 구현한 서버액션을 호출해서 애플리케이션을 완성해보려고 합니다.
+
+이번 포스트까지 작업된 전체 코드는 아래의 링크에서 확인하실 수 있습니다.
+
+- https://github.com/Malloc72P/next-grid-app/tree/stage-2
+- stage-2 브랜치를 확인해주세요
+
+다음 포스트에선 Mantine Data Table을 사용해서 화면을 구현해보려고 합니다.  
 긴 글 읽어주셔서 감사합니다.
