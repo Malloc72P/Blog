@@ -26,11 +26,24 @@ export interface FrontmatterOpenGraph {
   }[];
 }
 
+export interface FrontmatterTwitter {
+  card: 'summary_large_image';
+  title: string;
+  description: string;
+  images: string[];
+}
+
+export interface FrontmatterAlternates {
+  canonical: string;
+}
+
 export interface FrontmatterOutput {
   id: string;
   title: string;
   description: string;
   openGraph: FrontmatterOpenGraph;
+  twitter: FrontmatterTwitter;
+  alternates: FrontmatterAlternates;
   series: string;
   tags: string[];
   date: string;
@@ -52,6 +65,9 @@ export function frontmatter({
   isSeriesLanding = false,
   tags = [],
 }: FrontmatterInput): FrontmatterOutput {
+  const path = postId ? `/posts/${seriesId}/${postId}` : `/posts/${seriesId}`;
+  const ogImages = Constants.openGraph.images;
+
   return {
     id: postId ?? seriesId,
     title,
@@ -63,8 +79,17 @@ export function frontmatter({
       title,
       description,
       type: 'article',
-      url: postId ? `/posts/${seriesId}/${postId}` : `/posts/${seriesId}`,
+      url: path,
       ...Constants.openGraph,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ogImages.map((img) => img.url),
+    },
+    alternates: {
+      canonical: path,
     },
     series: seriesId,
   };

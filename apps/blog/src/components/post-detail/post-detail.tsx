@@ -3,6 +3,7 @@
 import { ArticleHeader } from '@components/article';
 import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
+import { PostJsonLd } from '@components/post-json-ld';
 import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
 import classNames from 'classnames';
 import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
@@ -97,6 +98,7 @@ export function PostDetail({
 
   return (
     <ArticleContainer
+      jsonLd={<PostJsonLd post={post} series={series} />}
       right={
         <div className="post-detail-toc-container justify-center sticky top-0 left-0 hidden 2xl:flex">
           <Toc

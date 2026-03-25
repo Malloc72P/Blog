@@ -23,7 +23,10 @@ const { siteConfig, openGraph } = Constants;
 
 export const metadata = {
   metadataBase: new URL(siteConfig.url),
-  title: 'Malloc72P의 기술블로그',
+  title: {
+    default: 'Malloc72P의 기술블로그',
+    template: '%s | Malloc72P',
+  },
   description: 'Web Service 개발과 IT 전반에 대해 다루는 Malloc72P의 기술 블로그입니다.',
   keywords: [
     'web development',
@@ -38,7 +41,7 @@ export const metadata = {
     'typescript',
   ],
   creator: 'Malloc72P',
-  author: [
+  authors: [
     {
       name: 'Malloc72P',
       url: 'https://github.com/Malloc72P',
@@ -47,12 +50,22 @@ export const metadata = {
   icons: {
     icon: '/favicon.ico',
   },
+  alternates: {
+    canonical: siteConfig.url,
+  },
   openGraph: {
     type: 'website',
     url: siteConfig.url,
     title: siteConfig.name,
     description: siteConfig.description,
+    locale: 'ko_KR',
     ...openGraph,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: openGraph.images,
   },
 };
 

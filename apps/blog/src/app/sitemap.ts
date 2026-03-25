@@ -1,5 +1,6 @@
 import { findPosts } from '@libs/api/find-posts';
 import { findSeriesList } from '@libs/api/find-series';
+import { findTags } from '@libs/api/find-tags';
 import { Constants } from '@libs/constants';
 import { DateUtil } from '@libs/date-util';
 import { Mapper } from '@libs/mapper';
@@ -8,6 +9,8 @@ import { MetadataRoute } from 'next';
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const seriesModels = (await findSeriesList()).map((item) => Mapper.toSeriesModel(item));
   const posts = (await findPosts()).map((item) => Mapper.toPostModel({ item, seriesModels }));
+  const tags = await findTags();
+  const uniqueTags = [...new Set(tags)];
 
   const { url } = Constants.siteConfig;
 
@@ -34,6 +37,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
       changeFrequency: 'daily',
       lastModified: DateUtil.Dayjs(series.date).toDate(),
+    });
+  }
+
+  for (const tag of uniqueTags) {
+    sitemaps.push({
+      url: [url, 'tags', encodeURIComponent(tag)].join('/'),
+      priority: 0.3,
+      changeFrequency: 'weekly',
     });
   }
 

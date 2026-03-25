@@ -96,7 +96,7 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
 
   return (
     <ArticleContainer>
-      <div className="blog-landing-page pb-[10rem]">
+      <div className="blog-landing-page pb-[10rem] max-w-[700px] mx-auto">
         {/* ------------------------------------------------------ */}
         {/* INTRODUCE CARD */}
         {/* ------------------------------------------------------ */}
