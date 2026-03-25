@@ -1,0 +1,328 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'Next.js와 PrismaORM, 그리고 AG Grid로 풀스택 데이터 그리드 앱 만들기 3편',
+  description:
+    'Next.js와 PrismaORM, 그리고 AG Grid를 사용해서 풀스택 데이터 그리드 앱을 만드는 방법에 대해 설명합니다. 이번 편에서는 AG Grid를 설치하고 낙관적 업데이트를 활용한 CRUD를 구현합니다.',
+  seriesId: 'fullstack',
+  postId: 'nextjs-grid-app-3',
+  tags: ['Next.js', 'JavaScript', 'PrismaORM', 'AG Grid'],
+  date: '2026-03-25 22:00',
+});
+
+## 들어가기 앞서...
+
+지난 포스트에선 PrismaORM을 설치하고 DB 연동 및 CRUD 비즈니스 로직을 구현했습니다.
+이번 포스트에선 드디어 AG Grid를 사용해서 화면을 구현해보겠습니다.
+시리즈의 마지막 편이며, 이번 편까지 마치면 셀 편집, 행 추가/삭제가 가능한 풀스택 데이터 그리드 앱이 완성됩니다.
+
+이전 편을 스킵하신 분은 아래의 저장소에서 stage-2 브랜치를 클론해서 시작해주세요.
+
+- [Github 저장소](https://github.com/Malloc72P/next-grid-app/tree/stage-2)
+- 클론한 다음 stage-2 브랜치로 이동하신 다음 작업해주세요!
+
+## AG Grid 소개
+
+AG Grid는 JavaScript 생태계에서 널리 사용되는 데이터 그리드 라이브러리입니다.
+React, Angular, Vue 등 주요 프레임워크를 모두 지원하고, 무료 Community 버전과 유료 Enterprise 버전으로 나뉩니다.
+이번 실습에서는 Community 버전만 사용할 예정인데, 무료 버전만으로도 꽤 많은 기능을 쓸 수 있습니다.
+
+주요 특징을 정리하면 아래와 같습니다.
+
+- 인라인 셀 편집 지원
+- 정렬, 필터링 기능
+- 대용량 데이터에서도 빠른 랜더링 (가상 스크롤)
+- 풍부한 API와 이벤트 시스템
+
+## 설치
+
+프로젝트 루트 경로에서 아래의 명령어를 실행합니다.
+
+```shell
+pnpm add ag-grid-react ag-grid-community
+```
+
+- `ag-grid-react`는 AG Grid의 React 바인딩 패키지입니다.
+- `ag-grid-community`는 코어 모듈 패키지입니다. 무료 버전에서 사용 가능한 모든 기능이 포함되어 있습니다.
+
+## 그리드 컴포넌트 구현하기
+
+### 기본 세팅
+
+기존 order-grid.tsx를 AG Grid를 사용하도록 수정하겠습니다. 먼저 기본적인 그리드부터 화면에 띄워보겠습니다.
+
+```tsx
+'use client';
+
+import { useRef, useMemo } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import {
+    AllCommunityModule,
+    ModuleRegistry,
+    type ColDef,
+} from 'ag-grid-community';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
+
+import { Order } from './generated/prisma/browser';
+
+// AG Grid Community 모듈 등록
+ModuleRegistry.registerModules([AllCommunityModule]);
+
+export interface OrderGridProps {
+    orders: Order[];
+}
+
+export function OrderGrid({ orders }: OrderGridProps) {
+    const gridRef = useRef<AgGridReact<Order>>(null);
+
+    const colDefs: ColDef<Order>[] = useMemo(() => [
+        { field: 'id', editable: false, sort: 'asc' },
+        { field: 'price', editable: true },
+        { field: 'qty', editable: true },
+    ], []);
+
+    return (
+        <div style={{ width: '100%', maxWidth: 600 }}>
+            <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
+                <AgGridReact
+                    ref={gridRef}
+                    rowData={orders}
+                    columnDefs={colDefs}
+                    defaultColDef={{ flex: 1 }}
+                    getRowId={(p) => String(p.data.id)}
+                />
+            </div>
+        </div>
+    );
+}
+```
+
+코드가 좀 길어보이는데, 하나씩 살펴보겠습니다.
+
+- `AllCommunityModule`은 AG Grid Community 버전의 모든 기능을 하나로 묶어놓은 모듈입니다. `ModuleRegistry.registerModules`로 등록해야 그리드가 동작합니다.
+- `ag-theme-alpine.css`는 AG Grid에서 제공하는 테마 CSS입니다. 여러 테마가 있는데, 개인적으로 alpine이 깔끔해서 자주 씁니다.
+- `Order` 타입은 2편에서 Prisma가 생성해준 타입입니다. `browser` 경로에서 불러오면 클라이언트 컴포넌트에서도 안전하게 사용할 수 있습니다.
+  이전 편에서는 `Awaited<ReturnType<typeof getOrders>>`로 서비스 함수의 반환 타입을 추론해서 사용했는데, 이제는 Prisma가 생성해준 타입을 직접 사용할 수 있으니 훨씬 깔끔해졌습니다.
+- `gridRef`는 그리드 인스턴스에 접근하기 위한 ref입니다. 나중에 데이터를 추가하거나 삭제할 때 사용합니다.
+- `colDefs`는 컬럼 정의 배열입니다. `field`에 Order 타입의 필드명을 지정하면, 해당 필드의 데이터가 컬럼에 표시됩니다.
+- `editable: true`로 설정하면 셀을 더블클릭해서 값을 직접 편집할 수 있게 됩니다.
+- `getRowId`는 각 행의 고유 식별자를 지정하는 함수입니다. 이걸 설정해야 나중에 `applyTransaction`으로 특정 행을 정확히 찾아서 추가/수정/삭제할 수 있습니다.
+
+> `useMemo`로 `colDefs`를 감싸는 이유는, 컴포넌트가 리랜더링 될 때 마다 컬럼 정의 배열이 새로 생성되는 걸 방지하기 위해서입니다.
+> 매번 새 배열이 전달되면 AG Grid가 컬럼을 다시 그리게 되므로 성능에 안 좋습니다.
+
+여기까지 작성하고 `pnpm dev`를 실행해보면, 기본적인 데이터 그리드가 화면에 표시되는 것을 확인할 수 있습니다. 셀을 더블클릭하면 편집까지 됩니다.
+
+### 삭제 버튼 컬럼 추가하기
+
+각 행마다 삭제 버튼을 넣고 싶은 경우, AG Grid의 `cellRenderer`를 활용하면 됩니다.
+`colDefs` 배열에 아래의 컬럼 정의를 추가해주세요.
+
+```tsx
+import {
+    // ... 기존 import에 아래 타입 추가
+    type ICellRendererParams,
+} from 'ag-grid-community';
+
+// colDefs 배열에 추가
+{
+    headerName: '',
+    width: 100,
+    flex: 0,
+    editable: false,
+    sortable: false,
+    resizable: false,
+    cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    cellRenderer: (p: ICellRendererParams<Order>) => (
+        <button
+            onClick={() => handleDelete(p.data!)}
+            className='flex items-center h-6 py-0 px-3 border border-[#babfc7] rounded-sm bg-white cursor-pointer text-xs text-[#6b7280]'
+        >
+            Delete
+        </button>
+    ),
+}
+```
+
+- `cellRenderer`를 사용하면 셀 안에 커스텀 컴포넌트를 랜더링할 수 있습니다. 여기서는 삭제 버튼을 넣었습니다.
+- `ICellRendererParams`는 AG Grid가 제공하는 타입으로, `p.data`를 통해 해당 행의 데이터에 접근할 수 있습니다.
+- `flex: 0`으로 설정한 이유는, 이 컬럼은 남은 공간을 차지하지 않고 `width: 100`의 고정 너비를 유지하기 위해서입니다. 나머지 컬럼들은 `defaultColDef`에 `flex: 1`을 지정했으므로 남은 공간을 균등하게 나눠 갖습니다.
+
+`handleDelete`는 아직 구현하지 않았으니, 바로 이어서 구현해보겠습니다.
+
+## 낙관적 업데이트로 CRUD 구현하기
+
+### 낙관적 업데이트란?
+
+본격적인 구현에 앞서, 낙관적 업데이트에 대해 간단히 설명하겠습니다.
+
+일반적으로 데이터를 수정하려면 서버에 요청을 보내고, 응답이 돌아온 뒤에 화면을 갱신합니다.
+이렇게 하면 서버 응답이 올때까지 화면이 멈춰있는 것 처럼 보일 수 있습니다.
+네트워크가 느린 환경이라면 사용자 경험이 상당히 나빠지겠죠.
+
+낙관적 업데이트는 서버 요청이 성공할 것이라 가정하고, 응답을 기다리지 않고 화면을 먼저 업데이트 하는 패턴입니다.
+만약 서버 요청이 실패하면, 반영했던 변경을 되돌립니다. 이렇게 하면 사용자는 버튼을 누르자마자 화면이 바로 바뀌니까 반응이 빠르다고 느끼게 됩니다.
+
+AG Grid는 `applyTransaction`이라는 API를 제공하는데, 이 API를 통해 그리드의 데이터를 직접 추가, 수정, 삭제할 수 있습니다.
+이걸 활용하면 낙관적 업데이트를 깔끔하게 구현할 수 있습니다.
+
+### 행 추가 (Create)
+
+먼저 행 추가부터 구현해보겠습니다. OrderGrid 컴포넌트 안에 아래의 함수를 작성합니다.
+
+```tsx
+import { createOrderAction } from '@/server/action/create-order-action';
+
+// OrderGrid 컴포넌트 내부
+async function handleCreate() {
+    const tempId = -Date.now();
+    const tempRow: Order = { id: tempId, price: 0, qty: 0 };
+
+    // 임시 행을 먼저 그리드에 추가
+    gridRef.current?.api.applyTransaction({ add: [tempRow] });
+
+    try {
+        const created = await createOrderAction({ price: 0, qty: 0 });
+
+        // 성공하면 임시 행을 제거하고 서버에서 반환된 실제 데이터로 교체
+        gridRef.current?.api.applyTransaction({ remove: [tempRow], add: [created] });
+    } catch {
+        // 실패하면 임시 행 제거
+        gridRef.current?.api.applyTransaction({ remove: [tempRow] });
+    }
+}
+```
+
+- 서버에 요청을 보내기 전에, 임시 ID를 부여한 행을 먼저 그리드에 추가합니다. 사용자는 즉시 새 행이 추가된 것을 볼 수 있습니다.
+- 임시 ID에 `-Date.now()`를 사용하는데, 음수로 만들어서 DB에서 자동 생성되는 ID(양수)와 겹치지 않도록 한 것입니다.
+- 서버 요청이 성공하면, 임시 행을 제거하고 서버에서 반환된 실제 데이터(실제 ID 포함)로 교체합니다.
+- 서버 요청이 실패하면, 임시 행을 제거해서 원래 상태로 되돌립니다.
+
+`applyTransaction`은 하나의 호출에서 `add`, `remove`, `update`를 동시에 수행할 수 있습니다. 그래서 임시 행 제거와 실제 행 추가를 한번에 처리할 수 있습니다.
+
+### 셀 편집 (Update)
+
+```tsx
+import { updateOrderAction } from '@/server/action/update-order-action';
+import { type CellValueChangedEvent } from 'ag-grid-community';
+
+// OrderGrid 컴포넌트 내부
+async function handleCellValueChanged(e: CellValueChangedEvent<Order>) {
+    const { data, oldValue, colDef } = e;
+    const field = colDef.field as 'price' | 'qty';
+
+    try {
+        await updateOrderAction({ id: data.id, [field]: Number(data[field]) });
+    } catch {
+        gridRef.current?.api.applyTransaction({ update: [{ ...data, [field]: oldValue }] });
+    }
+}
+```
+
+- AG Grid에서 셀 값이 변경되면 `onCellValueChanged` 이벤트가 발생합니다.
+- 이벤트 객체에서 `data`(현재 행 데이터), `oldValue`(변경 전 값), `colDef`(변경된 컬럼 정보)를 꺼낼 수 있습니다.
+- 셀 편집의 경우 사용자가 값을 입력하는 시점에 이미 화면에는 새 값이 반영된 상태입니다. AG Grid가 자체적으로 처리해주기 때문입니다.
+  그래서 성공 시에는 별도 처리가 필요 없고, 실패했을 때만 `applyTransaction({ update })`로 이전 값을 복원하면 됩니다.
+
+### 행 삭제 (Delete)
+
+```tsx
+import { deleteOrderAction } from '@/server/action/delete-order-action';
+
+// OrderGrid 컴포넌트 내부
+async function handleDelete(order: Order) {
+    gridRef.current?.api.applyTransaction({ remove: [order] });
+
+    try {
+        await deleteOrderAction(order.id);
+    } catch {
+        gridRef.current?.api.applyTransaction({ add: [order] });
+    }
+}
+```
+
+- 삭제 버튼을 누르면 먼저 그리드에서 해당 행을 제거합니다.
+- 서버 요청이 실패하면, 제거했던 행을 다시 추가해서 복원합니다.
+- Create, Update, Delete 모두 같은 패턴이라서 한번 익숙해지면 다른 곳에도 쉽게 적용할 수 있습니다.
+
+### 이벤트 핸들러 연결하기
+
+위에서 구현한 `handleCellValueChanged`를 `AgGridReact`에 연결합니다.
+
+```tsx
+<AgGridReact
+    ref={gridRef}
+    rowData={orders}
+    columnDefs={colDefs}
+    defaultColDef={{ flex: 1 }}
+    getRowId={(p) => String(p.data.id)}
+    onCellValueChanged={handleCellValueChanged}
+/>
+```
+
+그리고 그리드 아래에 행 추가 버튼을 넣어줍니다.
+
+```tsx
+<button
+    className='block w-full text-left py-2 px-3 border border-[#babfc7] border-t-0 bg-white cursor-pointer text-[#6b7280]'
+    onClick={handleCreate}
+>
+    New Row +
+</button>
+```
+
+- 그리드 바로 아래에 붙어있는 버튼이라 `border-t-0`으로 상단 테두리를 제거해서 그리드와 자연스럽게 이어지도록 했습니다.
+
+## 서버 컴포넌트와 연결하기
+
+마지막으로 page.tsx를 확인해보겠습니다. 이전 편에서 이미 작성해둔 서버 컴포넌트 코드와 동일한 구조입니다.
+
+```tsx
+// app/page.tsx
+import { getOrders } from '@/server/service/get-orders';
+import { OrderGrid } from './order-grid';
+
+export default async function Home() {
+    const orders = await getOrders();
+
+    return (
+        <div>
+            <OrderGrid orders={orders} />
+        </div>
+    );
+}
+```
+
+- 서버 컴포넌트에서 `getOrders`를 호출해 DB에서 데이터를 조회하고, `OrderGrid`에 props로 내려줍니다.
+- OrderGrid는 클라이언트 컴포넌트이므로, 사용자 인터랙션(셀 편집, 버튼 클릭 등)을 처리하고, 서버 액션을 통해 변경사항을 서버에 반영합니다.
+
+## 확인해보기
+
+`pnpm dev`를 실행하고 브라우저를 열어보면, AG Grid가 적용된 데이터 그리드가 표시됩니다.
+
+- 셀을 더블클릭하면 값을 편집할 수 있고, 편집을 완료하면 서버에 수정 요청이 전송됩니다.
+- New Row + 버튼을 누르면 새 행이 추가되면서 서버에 생성 요청이 전송됩니다.
+- Delete 버튼을 누르면 행이 삭제되고, 서버에 삭제 요청이 전송됩니다.
+- 페이지를 새로고침 해보면 DB에 반영된 데이터가 다시 조회되는 것을 확인할 수 있습니다.
+
+모든 동작이 낙관적 업데이트로 처리되기 때문에, 서버 응답을 기다리지 않고 화면이 즉시 반영되는 걸 느끼실 수 있을 겁니다.
+
+## 마치며...
+
+여기까지 해서, 3편에 걸쳐 Next.js, PrismaORM, AG Grid를 활용한 풀스택 데이터 그리드 앱을 완성했습니다.
+
+- 1편에선 Next.js의 라우팅 구조와 서버 컴포넌트, 서버 액션에 대해 알아보았습니다.
+- 2편에선 PrismaORM을 설치하고 DB 연동 및 CRUD 비즈니스 로직을 구현했습니다.
+- 3편에선 AG Grid를 설치하고, 낙관적 업데이트 패턴으로 화면의 CRUD를 구현했습니다.
+
+개인적으로 이 스택이 마음에 드는 이유는, 프론트엔드와 백엔드 사이의 경계가 거의 없다는 점입니다.
+서버 액션 덕분에 API를 따로 정의할 필요 없이 함수 호출하듯 서버 로직을 실행할 수 있고,
+Prisma 덕분에 타입 안정성이 보장된 상태로 DB까지 접근할 수 있습니다.
+여기에 AG Grid의 풍부한 기능까지 더하면, 적은 코드로도 꽤 쓸만한 데이터 관리 화면을 만들 수 있습니다.
+
+이번 포스트까지 작업된 전체 코드는 아래의 링크에서 확인하실 수 있습니다.
+
+- https://github.com/Malloc72P/next-grid-app/tree/stage-3
+- stage-3 브랜치를 확인해주세요
+
+긴 시리즈 끝까지 읽어주셔서 감사합니다.
