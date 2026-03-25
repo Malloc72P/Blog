@@ -95,6 +95,8 @@ services:
 
 ### Prisma 설정
 
+#### DB 접속 URL 설정
+
 데이터베이스 접속을 위해, 필요한 설정을 등록해야 합니다.  
 먼저 prisma.config.ts를 열면, defineConfig 안에 아래와 같은 설정을 확인할 수 있습니다.
 참고로 해당 파일은 아까 prisma init할 때 생성되었습니다.(아래에서 추가로 언급할 .env도요)
@@ -109,5 +111,96 @@ datasource: {
 - 이번엔 .env를 열어보겠습니다. DATABASE_URL가 있는 것을 확인할 수 있습니다.
 - 이미 DB URL이 적혀있는데, 테스트용 DB의 URL로 바꿔보겠습니다.
 
-그리고 편한 개발을 위해, 아래의 Extension을 설치하겠습니다.
-[Prisma 공식 VS Code Extension](https://marketplace.visualstudio.com/items?itemName=Prisma.prisma)
+```
+DATABASE_URL="postgresql://dev:dev@localhost:5432/grid-app"
+```
+
+- 앞서 생성한 DB의 주소입니다. 이것만 입력하면 설정이 끝났습니다.
+
+#### Prisma Studio로 접속 확인하기
+
+- 이제 접속이 잘 되었는지 확인해보겠습니다. 아래의 명령어를 실행합니다.
+
+```shell
+pnpm prisma studio
+```
+
+- prisma는 데이터를 관리할 수 있는 studio라는 도구를 제공합니다.
+- 실행하면 http://localhost:51212/ 주소로 웹페이지가 하나 열릴텐데, 에러 메시지가 표시되지 않는다면, 정상적으로 연결된 것을 의미합니다.
+- 만약 실패했다면, DB 컨테이너가 켜져 있는지, 접속 URL에 문제가 없는지 확인해주세요.
+
+#### 엔티티 추가하기
+
+이제 엔티티를 추가해보겠습니다. schema.prisma 파일을 열고 아래의 내용을 추가합니다.
+
+```
+model Order {
+    id Int @id @default(autoincrement())
+    price Int
+    qty Int
+}
+```
+
+- prisma는 자체 언어를 통해 엔티티를 정의합니다. 위의 경우, 자동 증가하는 id필드와 price, qty 필드를 정의했습니다.
+- 이걸 DB와 동기화 시켜야 합니다. 아래의 명령어를 실행합니다.
+
+```shell
+pnpm dlx prisma migrate dev --name init
+```
+
+- 해당 명령어를 실행하면, init 이라는 이름의 마이그레이션이 생성되고, 현 상태의 스키마를 DB에 반영하기 위한 DDL문이 생성됩니다.
+- 추후에 스키마가 변경되면, 마찬가지로 prisma migrate dev 명령을 통해 새로운 마이그레이션 파일을 생성하면 됩니다. 그럼 해당 변경을 DB와 동기화 하기 위한 DDL문이 자동생성됩니다.
+- 아래의 코드는 init 마이그레이션을 통해 생성된 ddl문입니다. 보시다시피 Order 테이블을 생성하고 id, price, qty등의 컬럼을 생성하는것을 알 수 있습니다.
+
+```sql
+-- CreateTable
+CREATE TABLE "Order" (
+    "id" SERIAL NOT NULL,
+    "price" INTEGER NOT NULL,
+    "qty" INTEGER NOT NULL,
+
+    CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
+);
+```
+
+- 다시 studio로 돌아와보면, 두개의 테이블이 생성된 것을 알 수 있습니다.(`_prisma_migrations`, `Order`)
+- Order는 우리가 앞서 만든 Order 모델에 대응하는 테이블입니다.
+- `_prisma_migrations`는 prisma에 의해 관리되는 테이블입니다. prisma는 해당 테이블을 통해 어떤 마이그레이션까지 이 DB에 적용되었는지를 나타냅니다.
+
+#### Prisma Client 생성하기
+
+스키마 파일을 기반으로 PrismaClient를 생성합니다. 앞서 Prisma Client는 DB에 쿼리를 전송할 때 사용하는 것이라고 했는데, generate 명령어를 통해 생성하게 됩니다.
+
+```
+pnpm dlx prisma generate
+```
+
+- 생성된 Prisma Client 코드는 schema.prisma 파일에서 지정한 경로에 생성됩니다.
+- schema.prisma 파일을 확인해보겠습니다.
+
+```
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+```
+
+- `../app/generated/prisma`라고 되어 있으니, 프로젝트 루트 기준으로 app 폴더 밑에 generated라는 폴더가 생성됩니다.
+- 해당 폴더 안의 코드를 살펴보면, 다양한 코드가 생성되었는데, 그 중에서 `../app/generated/prisma/models/Order.ts`를 살펴보면 아래와 같은 코드를 찾을 수 있습니다.
+
+```ts
+export type OrderCreateInput = {
+  price: number;
+  qty: number;
+};
+```
+
+- 해당 타입은 PrismaClient를 통해 Order를 생성할 때 사용하는 인자의 타입인데, 앞서 schema 파일에서 정의한 것 처럼 필수 필드가 지정되어 있습니다.
+- 그 외에도 where, select등의 다양한 쿼리에서 사용되는 타입을 제공하여, 강력한 타입 체킹으로 보호받으면서 DB 접근 코드를 작성할 수 있게 됩니다.
+
+## 중간 정리
+
+여기까지 해서 prisma를 설치하고 개발용으로 설정한 DB 컨테이너와 연결하는 방법, 그리고 엔티티를 추가하고 DB와 동기화 시키는 방법에 대해 알아보았습니다.
+이어서 PrismaClient를 통해 CRUD를 하는 방법에 대해 알아보겠습니다.
+
+## PrismaClient를 통해 CRUD 구현하기
