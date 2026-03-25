@@ -1,0 +1,113 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'Next.js와 PrismaORM, 그리고 Mantine Data Table로 풀스택 데이터 그리드 앱 만들기 2편',
+  description:
+    'Next.js와 PrismaORM, 그리고 Mantine Data Table을 사용해서 풀스택 데이터 그리드 앱을 만드는 방법에 대해 설명합니다. 초보자도 따라할 수 있도록 가이드를 제공합니다. 해당 편에선 Prisma ORM에 대한 간단한 소개와 실습을 진행합니다.',
+  seriesId: 'fullstack',
+  postId: 'nextjs-grid-app',
+  tags: ['Next.js', 'JavaScript', 'PrismaORM', 'MantineDataTable'],
+  date: '2026-03-25 21:24',
+});
+
+## 들어가기 앞서...
+
+지난 포스트에선 Next.js에 대한 간단한 소개와 클라이언트에서 서버의 비즈니스 로직을 호출하는 방법에 대해 배웠습니다.
+이번 포스트에선 Prisma ORM을 통해 DB에 접근해서 데이터를 관리하는 비즈니스 로직을 구현해보겠습니다.
+
+> 실습에선 Postgresql DB를 사용합니다.
+> DB는 docker를 통해 실행합니다. Docker Desktop을 준비해주세요.
+
+## Prisma ORM이란?
+
+Prisma ORM은 TypeScript 생태계에서 DB 스키마를 정의하고 타입 안정성이 보장된 쿼리를 작성할 수 있도록 돕는 라이브러리 입니다.
+주요 특징을 정리하면 아래와 같습니다.
+
+- 직관적이고 간단한 스키마 정의
+- 작성된 스키마를 바탕으로 TypeScript 타입 자동 생성
+- 간편하고 안전한 마이그레이션
+- 서버리스 환경 최적화
+
+자세한 내용은 포스트를 진행하면서 설명하겠습니다.
+
+## 설치 및 구성
+
+### grid-app 프로젝트 준비 및 Prisma 설치
+
+먼저, 1편에서 만든 앱에 Prisma를 설치하겠습니다. 만약 이전 포스트를 스킵하신 경우, 아래의 저장소의 브랜치를 클론해서 시작해주세요.
+
+- [Github 저장소](https://github.com/Malloc72P/next-grid-app/tree/stage-1)
+- 클론한 다음 stage-1 브랜치로 이동하신 다음 작업해주세요!
+
+준비되셨다면, 아래의 명령어를 프로젝트 루트 경로에서 실행해주세요.
+
+```shell
+pnpm dlx prisma init
+```
+
+실행하고 나면, prisma 폴더와 schema.prisma 파일이 생성된 것을 확인하실 수 있습니다.
+
+### Prisma 구성
+
+아래의 명령어를 실행해서 필요한 패키지를 설치합니다.
+
+```shell
+pnpm add prisma @types/node --save-dev
+pnpm add @prisma/client @prisma/adapter-pg dotenv
+```
+
+- `prisma`는 CLI 도구로, 초기화(init), 마이그레이션(migrate), 타입 생성(generate) 등의 명령어를 실행할 때 사용하는 패키지입니다.
+- `@prisma/client`는 DB에 쿼리를 요청하는데 사용하는 패키지입니다. 비즈니스 로직은 해당 패키지를 통해 DB에 접근합니다.
+- `@prisma/adapter-pg`는 `node-postgres` 드라이버 어댑터로, PrismaClient가 DB에 접속하는데 필요한 패키지입니다.
+- `dotenv` 환경변수를 로드하는데 필요한 패키지 입니다.
+
+### 프로젝트 구성
+
+package.json파일을 열고, 아래의 한 줄을 추가합니다.
+
+```js
+"type": "module",
+```
+
+- Prisma는 ESM을 활성화 해야 동작하므로, 위와 같이 package.json을 설정해주어야 합니다.
+
+### 개발용 DB 준비하기
+
+프로젝트 루트 경로에 docker-compose.yml 파일을 생성하고, 아래 코드를 붙여넣습니다.
+
+```yaml
+services:
+  # Postgres 설정
+  # - https://hub.docker.com/_/postgres
+  grid-app-db:
+    image: postgres:14.5-alpine
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: grid-app
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+```
+
+그리고 도커 데스크톱 앱이 실행중인지 확인하고, docker compose up 명령어를 실행합니다.  
+그러면 Postgres 컨테이너가 실행되면서 DB를 이용할 수 있게 됩니다.  
+사용하지 않을땐 docker compose down 명령어를 실행하면 됩니다.
+
+### Prisma 설정
+
+데이터베이스 접속을 위해, 필요한 설정을 등록해야 합니다.  
+먼저 prisma.config.ts를 열면, defineConfig 안에 아래와 같은 설정을 확인할 수 있습니다.
+참고로 해당 파일은 아까 prisma init할 때 생성되었습니다.(아래에서 추가로 언급할 .env도요)
+
+```js
+datasource: {
+    url: process.env["DATABASE_URL"],
+},
+```
+
+- 환경변수를 통해 DB주소를 불러오고 있습니다. 키 이름은 DATABASE_URL여야 하는걸 확인할 수 있네요.
+- 이번엔 .env를 열어보겠습니다. DATABASE_URL가 있는 것을 확인할 수 있습니다.
+- 이미 DB URL이 적혀있는데, 테스트용 DB의 URL로 바꿔보겠습니다.
+
+그리고 편한 개발을 위해, 아래의 Extension을 설치하겠습니다.
+[Prisma 공식 VS Code Extension](https://marketplace.visualstudio.com/items?itemName=Prisma.prisma)
