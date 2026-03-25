@@ -5,5 +5,5 @@ export const DateFormat: Record<IDateFormat, string> = {
   short: 'YYYY-MM-DD',
   file: 'YYMMDD_HHmmss',
   iso: 'YYYY-MM-DDTHH:mm',
-  postCard: 'YYYY/MM/DD a hh:mm',
+  postCard: 'YYYY/MM/DD a h:mm',
 };

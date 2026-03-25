@@ -8,7 +8,7 @@ export function ArticleContainer({ children, right }: ArticleContainerProps) {
   return (
     <main className="article-container relative z-10 min-h-[100vh] bg-white flex">
       <div className="grow basis-0 relative"></div>
-      <div className="max-w-[1080px] w-full px-5 sm:px-10">{children}</div>
+      <div className="max-w-[720px] w-full px-5 sm:px-10">{children}</div>
       <div className="grow basis-0 relative">{right}</div>
     </main>
   );
