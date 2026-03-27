@@ -1,4 +1,4 @@
-'use-client';
+'use client';
 
 import { PropsWithChildren, useMemo } from 'react';
 import { Prism } from 'react-syntax-highlighter';

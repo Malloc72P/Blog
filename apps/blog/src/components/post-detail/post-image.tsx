@@ -1,4 +1,3 @@
-import classNames from 'classnames';
 import { PlaceholderValue } from 'next/dist/shared/lib/get-img-props';
 import Image from 'next/image';
 
