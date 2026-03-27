@@ -1,34 +1,14 @@
-'use client';
-
-import { PropsWithChildren, useMemo } from 'react';
-import { Prism } from 'react-syntax-highlighter';
-import { darcula } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { CopyButton } from './copy-button';
+import React, { PropsWithChildren } from 'react';
+import { PostCodeblockClient } from './post-codeblock-client';
 
 export interface PostCodeblockProps extends PropsWithChildren {}
 
 export function PostCodeblock(props: PostCodeblockProps) {
   const { children } = props;
+  const codeProps = (children as React.ReactElement<{ className?: string; children?: string }>)?.props;
 
-  const language = (children as any)?.props?.className;
+  const language = codeProps?.className?.replace('language-', '') ?? '';
+  const code = codeProps?.children ?? '';
 
-  const codeString = useMemo<string>(() => {
-    const obj = children as any;
-
-    return obj?.props?.children || 'CodeBlock Error!';
-  }, [children]);
-
-  return (
-    <div className="blog-code relative">
-      <Prism
-        language={language ? language.replace('language-', '') : 'js'}
-        showLineNumbers
-        style={darcula}
-      >
-        {codeString}
-      </Prism>
-
-      <CopyButton content={codeString} />
-    </div>
-  );
+  return <PostCodeblockClient language={language} code={code} />;
 }
