@@ -22,6 +22,7 @@ const POSTS_DIR = path.join(process.cwd(), 'src/app/(main)/posts');
  * 모든 MDX/TSX 파일을 재귀적으로 스캔하여 메타데이터를 수집
  */
 export async function getAllMdxFiles(dir: string = POSTS_DIR): Promise<MdxFileInfo[]> {
+  return [];
   const files: MdxFileInfo[] = [];
 
   async function scanDir(currentDir: string) {

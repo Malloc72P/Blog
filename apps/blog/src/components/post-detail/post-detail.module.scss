@@ -1,5 +1,3 @@
-@reference "tailwindcss";
-
 .postDetail {
   h1,
   h2,
@@ -42,23 +40,23 @@
     display: inline-flex;
     align-items: center;
     transition: 0.3s;
-    @apply text-blue-600;
+    color: var(--color-blue-600);
   }
 
   a:hover {
-    @apply text-blue-800;
+    color: var(--color-blue-800);
     text-decoration: underline;
   }
 
   code:not(pre code) {
-    @apply bg-gray-100;
+    background-color: var(--color-gray-100);
     padding: 4px 8px;
     border-radius: 6px;
     margin: 0 3px;
     transition: 0.3s;
   }
   code:not(pre code):hover {
-    @apply shadow-lg;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 
   pre {
@@ -73,13 +71,13 @@
 
   th,
   td {
-    @apply border border-gray-300;
+    border: 1px solid var(--color-gray-300);
     padding: 8px 12px;
     text-align: left;
   }
 
   th {
-    @apply bg-gray-100;
+    background-color: var(--color-gray-100);
     font-weight: 600;
   }
 
@@ -127,17 +125,17 @@
       display: inline-flex;
       align-items: center;
       transition: 0.3s;
-      @apply text-blue-600;
+      color: var(--color-blue-600);
     }
 
     a:hover {
-      @apply text-blue-800;
+      color: var(--color-blue-800);
       text-decoration: underline;
     }
 
     // `으로 감싸진 코드 블록
     code:not(pre code) {
-      @apply bg-gray-100;
+      background-color: var(--color-gray-100);
       padding: 4px 8px;
       border-radius: 6px;
       margin: 0 3px;
@@ -145,7 +143,7 @@
     }
 
     code:not(pre code):hover {
-      @apply shadow-lg;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     }
 
     // ```로 감싸진 코드 블록
