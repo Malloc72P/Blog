@@ -1,5 +1,5 @@
 import type { MDXComponents } from 'mdx/types';
-import { PostImage } from '@components/post-detail';
+import { PostImage } from '@components/post-detail/post-image';
 import { PostCodeblock } from '@components/post-detail/post-codeblock';
 import { MdxWrapper } from '@components/mdx-wrapper';
 

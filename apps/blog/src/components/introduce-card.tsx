@@ -2,18 +2,12 @@ import classNames from 'classnames';
 
 export function IntroduceCard() {
   return (
-    <div className="rounded-md border flex relative shadow-md mt-[30px] md:mt-[120px] break-keep">
+    <div className="rounded-md border border-gray-100 flex relative shadow-md mt-7.5 md:mt-30 break-keep">
       {/* === INTRODUCE CARD LEFT Bar === */}
-      <div className="w-[8px] md:w-[17px] h-full bg-gray-700  absolute left-0 top-0"></div>
+      <div className="w-2 md:w-4.25 h-full bg-gray-700  absolute left-0 top-0"></div>
 
       {/* === INTRODUCE CARD Right SECTION === */}
-      <div
-        className={classNames(
-          'flex flex-col',
-          'pl-[20px] py-4 pr-[24px]',
-          'md:pl-[46px] md:py-5 md:pr-[24px]',
-        )}
-      >
+      <div className={classNames('flex flex-col', 'pl-5 py-4 pr-6', 'md:pl-11.5 md:py-5 md:pr-6')}>
         {/* === INTRODUCE CARD NAME AND ROLE === */}
         <div className="font-bold">
           <div className="text-[14px] md:text-[24px]">SeungChul Na. (Malloc72P)</div>
