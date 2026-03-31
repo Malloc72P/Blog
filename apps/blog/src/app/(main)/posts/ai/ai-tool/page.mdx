@@ -1,0 +1,129 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'AI를 통해 사용자 화면을 제어하는 방법(Feat: AI Tool)',
+  description:
+    'LLM Service의 AI Tool 기능을 통해, 웹페이지의 화면을 제어하는 방법에 대해 소개하고 실습을 진행하는 포스트입니다.',
+  seriesId: 'ai',
+  postId: 'ai-tool',
+  tags: ['LLM', 'AI Chatting', 'AI Tool'],
+  date: '2026-03-26 21:37',
+});
+
+## ChatGPT나 Gemini를 통해 웹페이지를 제어하려면?
+
+GPT나 Gemini같은 AI서비스를 사용하는 경우, 대부분 체팅을 통해 AI의 답변을 받고 이를 그대로 사용자에게 보여주는 경우가 대부분입니다.
+그런데 만약, 체팅 메시지를 보여주는게 아니라 화면을 제어해야 한다면 어떻게 해야 할까요?
+예를 들어, 사용자가 체팅메시지로 최근 1주일간 방문자 수 추이를 라인 차트로 그려줘 라고 요청한다고 가정하겠습니다.
+
+### 방법 1: AI에게 코드를 작성해달라고 요청하기
+
+당장 떠오르는 쉬운 방법은, AI에게 코드를 작성해달라고 요청한 다음, 이를 eval 함수로 실행하는 것 입니다.
+다만 이 방법은 여러 문제점이 있습니다.
+
+1. AI가 아주 조금만 실수해도 코드 실행이 안됨
+2. eval 자체의 위험성
+
+먼저, AI가 작성한 코드가 완벽하다는 보장이 없습니다. 대부분의 경우 잘 실행되겠지만, 가끔가다가 따옴표를 이상하게 붙인다거나 하면 기능이 오동작하게 됩니다.
+그렇다고 예외처리를 하자니, 어떤 예외가 있을지도 모르고, 발생 가능한 예외도 너무 다양하니 어렵습니다.
+그리고 eval을 사용해야 한다는것도 큰 문제입니다.
+eval은 사용자 브라우저에서 외부 코드를 실행하는 함수인 만큼, 만약 AI가 이상한 코드를 작성해서 준다면 에상치 못한 문제를 만날 수 있게 됩니다.
+따라서 이 방법은 그다지 선택하고 싶은 방법이 아니네요.
+
+### 방법 2: AI의 AI Tool
+
+ChatGPT, Gemini, Claude와 같은 AI 서비스는 AI를 통해 함수를 호출하는 기능을 제공합니다. 흔히 이를 AI Tool, AI Tool이라고 부르는데, 좀 더 자세히 설명하면,
+사전에 정의된 함수를 AI에게 알려주면, AI가 상황에 맞는 함수를 어떤 매개변수로 호출할지를 알려주는 기능이라고 할 수 있습니다.
+AI Tool을 사용하면, AI가 전체 코드를 작성하고 이를 실행하는 방법이 아니기에, 실수할 확률도 현저하게 줄어들며, 의도하지 않은 코드가 실행될 가능성도 차단할 수 있습니다.  
+또한 여러 AI Tool을 조합한다면, AI가 서비스에서 복잡한 기능을 보다 더 안전하게 실행할 수 있게 됩니다.
+
+백문이 불여일타라고, 직접 실습하면서 사용 방법을 알아보겠습니다.
+
+## AI Tool 실습
+
+### 프로젝트 구성
+
+먼저 Next.js 프로젝트를 설치하고 간단하게 세팅하겠습니다. 아래의 명령어를 실행해주세요.
+
+```sh
+pnpm create next-app@16.2.1 ai-tool-exam --yes
+```
+
+실행하고 나면, 현재 경로 밑에 ai-tool-exam이라는 폴더가 생성되고, 그 안에 next.js 앱이 생성됩니다.  
+필요한 차트 라이브러리를 추가로 설치하겠습니다.
+
+```sh
+pnpm install chart.js react-chartjs-2
+```
+
+### 차트 컴포넌트 만들기
+
+실습에서 사용할 차트 컴포넌트입니다. app 폴더 밑에 chart.tsx라는 파일을 생성하고, 아래와 같이 작성합니다.
+
+```tsx
+'use client';
+
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// 3. ChartJS에 사용할 요소들을 등록
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+export default function ChartComponent() {
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: '최근 1주일 방문자 수 추이',
+      },
+    },
+  };
+
+  // 5. 차트에 들어갈 데이터를 정의
+  const data = {
+    labels: ['월', '화', '수', '목', '금', '토', '일'],
+    datasets: [
+      {
+        label: '방문자 수',
+        data: [120, 190, 300, 500, 200, 300, 450],
+        borderColor: 'rgb(53, 162, 235)',
+        backgroundColor: 'rgba(53, 162, 235, 0.5)',
+      },
+    ],
+  };
+
+  // 6. 설정한 옵션과 데이터를 Line 컴포넌트에 전달하여 렌더링
+  return <Line options={options} data={data} />;
+}
+```
+
+그리고 app/page.tsx를 아래와 같이 수정합니다.
+
+```tsx
+import ChartComponent from './chart';
+
+export default function Home() {
+  return (
+    <div className="mx-auto mt-40 border border-gray-200 shadow-md rounded-md w-160 p-5">
+      <ChartComponent />
+    </div>
+  );
+}
+```
+
+아래의 명령어를 실행해서 next.js 앱을 실행하고, localhost:3000으로 접속 후, 차트 화면이 잘 나오는지 확인합니다.
+
+### AI 호출 코드 작성하기
