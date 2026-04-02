@@ -1,20 +1,20 @@
 import { frontmatter } from '@libs/frontmatter';
 
 export const metadata = frontmatter({
-  title: 'AI를 통해 사용자 화면을 제어하는 방법(Feat: AI Tool)',
+  title: '내 애플리케이션에서 AI가 코드를 실행하게 하는 방법에 대하여(AI Tool)',
   description:
-    'LLM Service의 AI Tool 기능을 통해, 웹페이지의 화면을 제어하는 방법에 대해 소개하고 실습을 진행하는 포스트입니다.',
+    'LLM Service의 AI Tool 기능을 통해, 내 애플리케이션에서 AI가 코드를 실행하는 방법에 대해 다룹니다.',
   seriesId: 'ai',
   postId: 'ai-tool',
   tags: ['LLM', 'AI Chatting', 'AI Tool'],
   date: '2026-03-26 21:37',
 });
 
-## ChatGPT나 Gemini를 통해 웹페이지를 제어하려면?
+## ChatGPT나 Gemini가 내 애플리케이션의 코드를 실행하게 하려면?
 
-GPT나 Gemini같은 AI서비스를 사용하는 경우, 대부분 체팅을 통해 AI의 답변을 받고 이를 그대로 사용자에게 보여주는 경우가 대부분입니다.
-그런데 만약, 체팅 메시지를 보여주는게 아니라 화면을 제어해야 한다면 어떻게 해야 할까요?
-예를 들어, 사용자가 체팅메시지로 최근 1주일간 방문자 수 추이를 라인 차트로 그려줘 라고 요청한다고 가정하겠습니다.
+ChatGPT나 Gemini같은 LLM 서비스를 이용하는 경우 AI의 답변 내용을 사용자에게 그대로 보여주는 것을 넘어서, AI가 직접 코드를 실행하게 하려면 어떻게 해야 할까요?
+예를 들면 어드민 페이지의 AI 채팅 패널에서 관리자가 "최근 1주일간 방문자 수 추이를 라인 차트로 그려줘"라고 요청했을 때, 차트를 그리는 코드를 실행해서 화면에 보여주는 기능을 구현한다고 가정해보겠습니다.
+이러한 기능을 구현하는데는 어떤 방법이 있을까요?
 
 ### 방법 1: AI에게 코드를 작성해달라고 요청하기
 
@@ -41,7 +41,9 @@ AI Tool을 사용하면, AI가 전체 코드를 작성하고 이를 실행하는
 
 ## AI Tool 실습
 
-### 프로젝트 구성
+### 애플리케이션 구성하기
+
+#### 프로젝트 초기화
 
 먼저 Next.js 프로젝트를 설치하고 간단하게 세팅하겠습니다. 아래의 명령어를 실행해주세요.
 
@@ -56,9 +58,9 @@ pnpm create next-app@16.2.1 ai-tool-exam --yes
 pnpm install chart.js react-chartjs-2
 ```
 
-### 차트 컴포넌트 만들기
+#### 실습에서 사용할 차트 컴포넌트 만들기
 
-실습에서 사용할 차트 컴포넌트입니다. app 폴더 밑에 chart.tsx라는 파일을 생성하고, 아래와 같이 작성합니다.
+실습에서 사용할 차트 컴포넌트입니다. app 폴더 밑에 line-chart.tsx라는 파일을 생성하고, 아래와 같이 작성합니다.
 
 ```tsx
 'use client';
@@ -72,40 +74,23 @@ import {
   Title,
   Tooltip,
   Legend,
+  ChartData,
+  ChartOptions,
 } from 'chart.js';
+
+// 2. React용 Line 차트 컴포넌트를 불러옵니다.
 import { Line } from 'react-chartjs-2';
 
 // 3. ChartJS에 사용할 요소들을 등록
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-export default function ChartComponent() {
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: '최근 1주일 방문자 수 추이',
-      },
-    },
-  };
+export interface LineChartProps {
+  options: ChartOptions<'line'>;
+  data: ChartData<'line'>;
+}
 
-  // 5. 차트에 들어갈 데이터를 정의
-  const data = {
-    labels: ['월', '화', '수', '목', '금', '토', '일'],
-    datasets: [
-      {
-        label: '방문자 수',
-        data: [120, 190, 300, 500, 200, 300, 450],
-        borderColor: 'rgb(53, 162, 235)',
-        backgroundColor: 'rgba(53, 162, 235, 0.5)',
-      },
-    ],
-  };
-
-  // 6. 설정한 옵션과 데이터를 Line 컴포넌트에 전달하여 렌더링
+export function LineChart({ options, data }: LineChartProps) {
+  // 4. 설정한 옵션과 데이터를 Line 컴포넌트에 전달하여 렌더링
   return <Line options={options} data={data} />;
 }
 ```
@@ -113,17 +98,51 @@ export default function ChartComponent() {
 그리고 app/page.tsx를 아래와 같이 수정합니다.
 
 ```tsx
-import ChartComponent from './chart';
+'use client';
+
+import { useState } from 'react';
+import { LineChart, LineChartProps } from './line-chart';
 
 export default function Home() {
+  const [options, setOptions] = useState<LineChartProps['options']>({});
+  const [data, setData] = useState<LineChartProps['data']>({
+    datasets: [{ label: 'Unknown', data: [] }],
+  });
+
   return (
     <div className="mx-auto mt-40 border border-gray-200 shadow-md rounded-md w-160 p-5">
-      <ChartComponent />
+      <LineChart options={options} data={data} />
     </div>
   );
 }
 ```
 
+- options와 data는 이름처럼 차트의 옵션과 데이터를 설정하는 state입니다.
+
 아래의 명령어를 실행해서 next.js 앱을 실행하고, localhost:3000으로 접속 후, 차트 화면이 잘 나오는지 확인합니다.
 
 ### AI 호출 코드 작성하기
+
+#### 환경변수 설정
+
+Gemini API를 호출하는 코드를 작성하기 전에, API Key를 관리할 수 있도록 dotenv를 사용하겠습니다.
+dotenv란 환경변수를 관리하는 라이브러리입니다. 아래 명령어를 실행하여 설치합니다.
+
+```sh
+pnpm add dotenv
+```
+
+그리고 프로젝트 루트 경로에 .env 파일을 생성하고 아래와 같이 작성합니다.
+Gemini API Key를 발급받는 방법은 [Gemini API 가이드](https://ai.google.dev/gemini-api/docs/quickstart?hl=ko#install-gemini-library)를 참고해주세요.
+
+```
+GEMINI_API_KEY="GEMINI API키를 여기에 입력"
+```
+
+#### Google GenAI SDK 설치
+
+아래 명령어를 실행하여 GenAI SDK를 설치합니다. 해당 라이브러리는 Gemini API를 호출할 수 있도록 도와주는 라이브러리 입니다.
+
+```sh
+pnpm install @google/genai
+```
