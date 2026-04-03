@@ -1,0 +1,885 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'LLM Tool Calling으로 AI가 내 애플리케이션의 함수를 직접 호출하게 하기',
+  description:
+    'LLM의 Tool Calling 기능을 통해, 내 애플리케이션에서 AI가 코드를 실행하는 방법에 대해 다룹니다.',
+  seriesId: 'ai',
+  postId: 'ai-tool',
+  tags: ['LLM', 'AI Chatting', 'Tool Calling'],
+  date: '2026-03-26 21:37',
+});
+
+# 들어가며
+
+## LLM이 내 애플리케이션의 코드를 실행하게 하려면?
+
+ChatGPT나 Gemini, Claude와 같은 LLM은 학습된 데이터 내에서만 답변을 생성할 수 있어 외부 시스템을 제어하는 작업에 약합니다.
+이러한 한계를 극복하게 해주는 기능이 Tool Calling이라고 부르는 기능입니다.
+
+Tool Calling이란 사용자가 자신의 애플리케이션 내에 있는 함수의 이름, 설명, 매개변수 구조를 JSON 형태로 사전에 정의하여 모델에게 제공하는 방식으로 동작합니다.
+LLM은 프롬프트를 분석한 뒤 상황에 맞는 Tool이 있는 경우 이를 호출해 달라는 요청(Tool Call)을 반환합니다.
+그러면 사용자의 애플리케이션에서 이 요청대로 실제 함수를 실행하고, 그 결과를 모델에게 다시 전달하는 방식으로 동작합니다.
+
+이러한 방식을 통해 LLM은 보다 더 상황에 맞는 문맥을 기반으로 더 나은 품질의 답변을 해주거나, 외부 시스템을 제어할 수 있게 됩니다.
+
+이번 포스트에선 관리자 페이지의 AI 채팅패널을 통해, 사용자가 원하는 기간의 방문자 수 추이를 라인차트로 그리는 기능을 구현해보도록 하겠습니다.
+
+### 방법 1: AI에게 코드를 작성해달라고 요청하기
+
+당장 떠오르는 쉬운 방법은, AI에게 코드를 작성해달라고 요청한 다음, 이를 eval 함수로 실행하는 것입니다.
+다만 이 방법은 여러 문제점이 있습니다.
+
+1. AI가 아주 조금만 실수해도 코드 실행이 안됨
+2. eval 자체의 위험성
+
+먼저, AI가 작성한 코드가 완벽하다는 보장이 없습니다. 대부분의 경우 잘 실행되겠지만, 가끔가다가 따옴표를 이상하게 붙인다거나 하면 기능이 오동작하게 됩니다.
+그렇다고 예외처리를 하자니, 어떤 예외가 있을지도 모르고, 발생 가능한 예외도 너무 다양하니 어렵습니다.
+그리고 eval을 사용해야 한다는 것도 큰 문제입니다.
+eval은 사용자 브라우저에서 외부 코드를 실행하는 함수인 만큼, 만약 AI가 이상한 코드를 작성해서 준다면 예상치 못한 문제를 만날 수 있게 됩니다.
+따라서 이 방법은 그다지 선택하고 싶은 방법이 아니네요.
+
+### 방법 2: AI의 Tool Calling
+
+ChatGPT, Gemini, Claude와 같은 AI 서비스는 AI를 통해 함수를 호출하는 기능을 제공합니다. 흔히 이를 Tool Calling이라고 부르는데, 좀 더 자세히 설명하면,
+사전에 정의된 함수를 AI에게 알려주면, AI가 상황에 맞는 함수를 어떤 매개변수로 호출할지를 알려주는 기능이라고 할 수 있습니다.
+Tool Calling을 사용하면, AI가 전체 코드를 작성하고 이를 실행하는 방법이 아니기에, 실수할 확률도 현저하게 줄어들며, 의도하지 않은 코드가 실행될 가능성도 차단할 수 있습니다.  
+또한 여러 Tool Calling을 조합한다면, AI가 서비스에서 복잡한 기능을 보다 더 안전하게 실행할 수 있게 됩니다.
+
+백문이 불여일타라고, 직접 실습하면서 사용 방법을 알아보겠습니다.
+
+# Tool Calling 실습, Next.js에서 Tool Calling을 구현하여 채팅메시지로 차트 생성 및 수정하기
+
+## 애플리케이션 구성
+
+### 프로젝트 초기화
+
+먼저 Next.js 프로젝트를 설치하고 간단하게 세팅하겠습니다. 아래의 명령어를 실행해주세요.
+
+```sh
+pnpm create next-app@16.2.1 ai-tool-exam --yes
+```
+
+실행하고 나면, 현재 경로 밑에 ai-tool-exam이라는 폴더가 생성되고, 그 안에 next.js 앱이 생성됩니다.  
+필요한 차트 라이브러리를 추가로 설치하겠습니다.
+
+```sh
+pnpm install chart.js react-chartjs-2
+```
+
+### 실습에서 사용할 차트 컴포넌트 만들기
+
+실습에서 사용할 차트 컴포넌트입니다. 아래와 같은 상황을 가정하겠습니다.
+
+- API를 통해 지정한 기간의 날짜별 방문자 수 정보를 구할 수 있는 상황.
+- 관리자는 AI 채팅을 통해 원하는 기간의 방문자 수 정보를 라인 차트로 보고 싶은 상황.
+
+app 폴더 밑에 line-chart.tsx라는 파일을 생성하고, 아래와 같이 작성합니다.
+
+```tsx
+'use client';
+
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartData,
+  ChartOptions,
+} from 'chart.js';
+
+// React용 Line 차트 컴포넌트를 불러옵니다.
+import { Line } from 'react-chartjs-2';
+
+// ChartJS에 사용할 요소들을 등록
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+export interface LineChartProps {
+  options: ChartOptions<'line'>;
+  data: ChartData<'line'>;
+}
+
+export function LineChart({ options, data }: LineChartProps) {
+  // 설정한 옵션과 데이터를 Line 컴포넌트에 전달하여 렌더링
+  return <Line options={options} data={data} />;
+}
+```
+
+그 다음, app/use-query-data.ts 파일을 생성하고 아래와 같이 작성합니다.
+
+```tsx
+import { ChartData } from 'chart.js';
+
+export interface QueryDataType {
+  label: string;
+  date: Date;
+  value: number;
+}
+
+export interface QueryDataOptions {
+  startDate: Date;
+  endDate: Date;
+}
+
+export interface ToChartDataOptions {
+  data: QueryDataType[];
+  label: string;
+  borderColor: string;
+  backgroundColor: string;
+}
+
+// 일년치 더미데이터 생성
+const dummyData = Array(365)
+  .fill(null)
+  .map((_, i) => {
+    const date = new Date(2025, 0, i + 1);
+    const year = date.getFullYear().toString().substring(2, 4);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const label = `${year}/${month}/${day}`;
+
+    return {
+      label,
+      date,
+      value: Math.floor(Math.random() * 201) + 100,
+    };
+  });
+
+export function useQueryData() {
+  /**
+   * 데이터를 쿼리하는 함수를 Mocking하는 함수.
+   * startDate, endDate 사이의 데이터를 반환함.
+   *
+   * @param startDate 범위의 시작
+   * @param endDate 범위의 끝
+   * @returns 날짜 범위 내의 데이터
+   */
+  const queryData = ({ startDate, endDate }: QueryDataOptions): QueryDataType[] => {
+    const start = startDate.getTime();
+    const end = endDate.getTime();
+
+    // 매개변수로 받은 날짜 범위 안의 데이터
+    return dummyData.filter((v) => {
+      const time = v.date.getTime();
+
+      return start <= time && time <= end;
+    });
+  };
+
+  /**
+   * QueryData에서 반환한 데이터를 라인차트를 생성하는데 필요한 데이터로 변환하는 함수
+   * @param 맵핑 옵션
+   * @returns ChartData
+   */
+  const toChartData = ({ data, ...options }: ToChartDataOptions): ChartData<'line'> => {
+    return {
+      labels: data.map((v) => v.label),
+      datasets: [
+        {
+          data: data.map((v) => v.value),
+          ...options,
+        },
+      ],
+    };
+  };
+
+  return {
+    queryData,
+    toChartData,
+  };
+}
+```
+
+그리고 app/page.tsx를 아래와 같이 수정합니다.
+
+```tsx
+'use client';
+
+import { useState } from 'react';
+import { LineChart, LineChartProps } from './line-chart';
+import { QueryDataOptions, ToChartDataOptions, useQueryData } from './use-query-data';
+
+export default function Home() {
+  const [options, setOptions] = useState<LineChartProps['options']>({});
+  const [data, setData] = useState<LineChartProps['data']>({
+    datasets: [{ label: 'Unknown', data: [] }],
+  });
+  const { queryData, toChartData } = useQueryData();
+
+  /**
+   * LineChart를 생성하는 함수. AI도 해당 함수를 사용해서 차트를 생성할 수 있어야 함.
+   *
+   * @param queryOption 쿼리 옵션. 이걸로 데이터의 범위를 제어함.
+   * @param toChartDataOptions 차트를 그리는데 필요한 포인트, 색상등의 정보.
+   * @param chartOptions 차트 옵션. 제목, 범례등의 옵션을 제어함.
+   */
+  const createLineChart = (
+    queryOption: QueryDataOptions,
+    toChartDataOptions: Omit<ToChartDataOptions, 'data'>,
+    chartOptions: LineChartProps['options'] = {},
+  ) => {
+    const data = queryData(queryOption);
+    const chartData = toChartData({
+      data,
+      ...toChartDataOptions,
+    });
+
+    setData(chartData);
+    setOptions(chartOptions);
+  };
+
+  const onClick = () => {
+    createLineChart(
+      { startDate: new Date(2025, 0, 1), endDate: new Date(2025, 5, 7) },
+      {
+        label: 'Testing',
+        borderColor: 'rgb(53, 162, 235)',
+        backgroundColor: 'rgba(53, 162, 235, 0.5)',
+      },
+      {},
+    );
+  };
+
+  return (
+    <div className="mx-auto flex gap-5 w-full h-screen p-10">
+      <div className="w-[60%] border border-gray-200 shadow-md rounded-md p-5">
+        <LineChart options={options} data={data} />
+      </div>
+
+      <div className="border border-gray-200 shadow-md rounded-md p-5 flex-1">
+        <button
+          className="border border-gray-200 px-5 py-2 rounded-md cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-all duration-200"
+          onClick={onClick}
+        >
+          Test
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+지금은 Test 버튼을 누르면 차트를 그리도록 구현되어 있습니다. 이제 AI를 사용해서 사용자가 말한 범위 내의 데이터로 차트를 그리도록 구현해보겠습니다.
+
+아래의 명령어를 실행해서 next.js 앱을 실행하고, localhost:3000으로 접속 후, 차트 화면이 잘 나오는지 확인합니다.
+
+```sh
+pnpm dev
+```
+
+## AI 호출 코드 작성하기
+
+### 환경변수 설정
+
+프로젝트 루트 경로에 .env 파일을 생성하고 아래와 같이 작성합니다.
+Gemini API Key를 발급받는 방법은 [Gemini API 가이드](https://ai.google.dev/gemini-api/docs/quickstart?hl=ko#install-gemini-library)를 참고해주세요.
+
+```
+GEMINI_API_KEY="GEMINI API키를 여기에 입력"
+```
+
+### Google GenAI SDK 설치
+
+아래 명령어를 실행하여 GenAI SDK를 설치합니다. 해당 라이브러리는 Gemini API를 호출할 수 있도록 도와주는 라이브러리입니다.
+
+```sh
+pnpm install @google/genai
+```
+
+### 채팅 요청을 처리하는 서버액션 구현하기
+
+앞서 설치한 genai 라이브러리를 통해 채팅 요청을 처리하는 서버액션을 구현하겠습니다.
+서버액션에 대해 잘 모르시는 분들은 [서버액션에 대한 포스트](https://blog.malloc72p.com/posts/fullstack/nextjs-grid-app-1)를 참고해주세요.
+
+먼저 프로젝트 루트 경로에 server/request-ai.ts 파일을 생성하고 아래와 같이 작성해주세요.
+
+```ts
+'use server';
+
+import { GoogleGenAI, FunctionDeclaration, Type, FunctionCall } from '@google/genai';
+import { QueryDataOptions, ToChartDataOptions } from '../app/use-query-data';
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+// AI가 호출할 수 있는 createLineChart 툴 선언
+const createLineChartDeclaration: FunctionDeclaration = {
+  name: 'createLineChart',
+  description: '지정한 날짜 범위와 스타일 옵션으로 라인 차트를 생성합니다.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      startDate: {
+        type: Type.STRING,
+        description: '데이터 조회 시작일 (ISO 8601 형식, 예: 2025-01-01)',
+      },
+      endDate: {
+        type: Type.STRING,
+        description: '데이터 조회 종료일 (ISO 8601 형식, 예: 2025-03-31)',
+      },
+      label: {
+        type: Type.STRING,
+        description: '차트 데이터셋 레이블',
+      },
+      borderColor: {
+        type: Type.STRING,
+        description: '선 색상 (CSS 색상값, 예: rgb(75, 192, 192))',
+      },
+      backgroundColor: {
+        type: Type.STRING,
+        description: '배경 색상 (CSS 색상값, 예: rgba(75, 192, 192, 0.2))',
+      },
+      title: {
+        type: Type.STRING,
+        description: '차트 제목 (선택 사항)',
+      },
+    },
+    required: ['startDate', 'endDate', 'label', 'borderColor', 'backgroundColor'],
+  },
+};
+
+export interface CreateLineChartArgs {
+  queryOption: QueryDataOptions;
+  toChartDataOptions: Omit<ToChartDataOptions, 'data'>;
+  chartOptions: { plugins?: { title?: { display: boolean; text: string } } };
+}
+
+export interface AiResponse {
+  text: string;
+  functionCall?: {
+    name: 'createLineChart';
+    args: CreateLineChartArgs;
+  };
+}
+
+/**
+ * 사용자의 메시지를 받고 LLM을 호출하여 답변을 반환하는 서버액션.
+ */
+export async function requestAi(userMessage: string): Promise<AiResponse> {
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-lite',
+    contents: userMessage,
+    config: {
+      systemInstruction:
+        '당신은 데이터 시각화 도우미입니다. 사용자가 차트 생성을 요청하면 createLineChart 툴을 호출하세요. ' +
+        '라인 차트 외 다른 종류의 차트(바 차트, 파이 차트 등)는 지원하지 않으므로, ' +
+        '다른 차트를 요청받으면 현재는 라인 차트만 지원한다고 안내하세요. ' +
+        'n월의 차트를 그려달라고 요청하면 해당 월의 시작일과 마지막 일자를 사용할 수 있도록 유연하게 대응하세요. ' +
+        '사용자가 색상을 따로 지정하지 않으면, 적당한 색상을 알아서 선정한다. ' +
+        '데이터는 2025년도만 있다고 가정한다. ' +
+        '위의 지시사항을 준수하여 사용자가 명시하지 않은 param을 채워넣는다.',
+      // 아래와 같이 LLM에게 사용가능한 Tool 정보를 제공한다.
+      tools: [{ functionDeclarations: [createLineChartDeclaration] }],
+    },
+  });
+
+  const functionCall = response.functionCalls?.[0] as FunctionCall | undefined;
+
+  if (functionCall?.name === 'createLineChart') {
+    const raw = functionCall.args as Record<string, string>;
+    return {
+      text: '라인 차트를 생성했습니다.',
+      functionCall: {
+        name: 'createLineChart',
+        args: {
+          queryOption: {
+            startDate: new Date(raw.startDate),
+            endDate: new Date(raw.endDate),
+          },
+          toChartDataOptions: {
+            label: raw.label,
+            borderColor: raw.borderColor,
+            backgroundColor: raw.backgroundColor,
+          },
+          chartOptions: raw.title ? { plugins: { title: { display: true, text: raw.title } } } : {},
+        },
+      },
+    };
+  }
+
+  return { text: response.text ?? '응답을 생성하지 못했습니다.' };
+}
+```
+
+코드가 좀 긴데 핵심 코드는 generateContent와 createLineChartDeclaration입니다.
+먼저 generateContent부터 보겠습니다.
+
+```ts
+const response = await ai.models.generateContent({
+  model: 'gemini-2.5-flash-lite',
+  contents: userMessage,
+  config: {
+    systemInstruction:
+      '당신은 데이터 시각화 도우미입니다. 사용자가 차트 생성을 요청하면 createLineChart 툴을 호출하세요. ' +
+      '라인 차트 외 다른 종류의 차트(바 차트, 파이 차트 등)는 지원하지 않으므로, ' +
+      '다른 차트를 요청받으면 현재는 라인 차트만 지원한다고 안내하세요. ' +
+      'n월의 차트를 그려달라고 요청하면 해당 월의 시작일과 마지막 일자를 사용할 수 있도록 유연하게 대응하세요. ' +
+      '사용자가 색상을 따로 지정하지 않으면, 적당한 색상을 알아서 선정한다. ' +
+      '데이터는 2025년도만 있다고 가정한다. ' +
+      '위의 지시사항을 준수하여 사용자가 명시하지 않은 param을 채워넣는다.',
+    // 아래와 같이 LLM에게 사용가능한 Tool 정보를 제공한다.
+    tools: [{ functionDeclarations: [createLineChartDeclaration] }],
+  },
+});
+```
+
+- 모델은 Gemini 2.5 Flash Lite를 사용합니다. 해당 포스트를 작성하는 시점에 이 모델이 제일 저렴해서 골랐습니다.
+- config를 보면 systemInstruction과 tools가 있습니다.
+  - systemInstruction은 시스템 프롬프트입니다. LLM은 해당 프롬프트에서 정한 규칙을 최우선으로 따릅니다. 주로 AI가 사용자의 요청을 어떻게 처리할지를 이곳에서 작성합니다.
+  - tools는 LLM이 실행할 수 있는 Tool 정보입니다. LLM은 적절한 상황에 Tool Calling을 사용하게 됩니다.
+
+LLM의 응답에서 response.functionCalls를 통해, 지금 Tool Calling을 호출해야 하는 상황인지를 우리가 만든 애플리케이션에서 판단할 수 있습니다.
+호출해야 하는 경우, LLM은 functionCall의 name으로 어떤 툴을 실행해야 하고 매개변수는 뭔지 args에 담아서 응답하니, 이를 활용하면 됩니다.
+
+그럼 Tool Calling을 어떻게 선언했는지 보겠습니다.
+
+```ts
+import { GoogleGenAI, FunctionDeclaration, Type, FunctionCall } from '@google/genai';
+
+const createLineChartDeclaration: FunctionDeclaration = {
+  name: 'createLineChart',
+  description: '지정한 날짜 범위와 스타일 옵션으로 라인 차트를 생성합니다.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      startDate: {
+        type: Type.STRING,
+        description: '데이터 조회 시작일 (ISO 8601 형식, 예: 2025-01-01)',
+      },
+      endDate: {
+        type: Type.STRING,
+        description: '데이터 조회 종료일 (ISO 8601 형식, 예: 2025-03-31)',
+      },
+      // ... 생략
+    },
+    required: ['startDate', 'endDate', 'label', 'borderColor', 'backgroundColor'],
+  },
+};
+```
+
+- genai는 Tool Calling의 타입을 선언하는데 사용할 수 있도록, FunctionDeclaration, Type 등의 타입과 Enum을 제공합니다.
+- 해당 타입을 통해 툴에 대한 설명과 매개변수 정보를 설정할 수 있습니다.
+- 이를 간결하고 정확하게 적어주어야 LLM이 실수하지 않고 해당 함수의 파라미터를 작성해주니, 꼼꼼하게 적어주어야 합니다.
+- 또한 필수 파라미터는 required 배열에 명시해주어, LLM이 빠뜨리지 않고 args를 작성할 수 있도록 해야 합니다.
+- 이걸 언제 다 작성하지... 라고 걱정하실 수 있는데, Tool에서 호출할 함수를 Copilot이나 Claude Code한테 알려주고 Tool 선언을 만들어달라고 하면 잘 만들어주니, 이를 활용하면 좋습니다.
+
+### Tool Calling 실행하기
+
+이어서, Tool Calling을 실행하는 코드를 작성하겠습니다. "앞서 한거가 Tool Calling을 실행한게 아니냐?" 라고 하실 수 있는데 아직입니다.
+앞서 했던 코드에선 LLM에게 이러이러한 도구가 있다고 알려주었고(createLineChartDeclaration),
+LLM이 어떤 도구를 사용하겠다(response.functionCalls) 라고 응답한 것 까지 다루었습니다.
+
+이제 response.functionCalls를 가지고 실제 함수를 호출하는 코드를 작성하려고 합니다. 그 전에, AI와의 대화를 할 수 있도록 채팅패널을 구현해보겠습니다.
+
+app/chat-panel.tsx파일을 생성하고 아래와 같이 작성해줍니다.
+
+```tsx
+'use client';
+
+import { useState } from 'react';
+
+export type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: number;
+};
+
+type ChatPanelProps = {
+  messages: ChatMessage[];
+  onSend: (content: string) => void;
+};
+
+export function ChatPanel({ messages, onSend }: ChatPanelProps) {
+  const [input, setInput] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    onSend(trimmed);
+    setInput('');
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto flex flex-col gap-2 mb-4">
+        {messages.length === 0 && (
+          <p className="text-gray-400 text-sm text-center mt-4">메시지가 없습니다.</p>
+        )}
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
+              msg.role === 'user'
+                ? 'self-end bg-blue-500 text-white'
+                : 'self-start bg-gray-100 text-gray-800'
+            }`}
+          >
+            {msg.content}
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-400"
+          placeholder="메시지를 입력하세요..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <button
+          type="submit"
+          className="border border-gray-200 px-4 py-2 rounded-md text-sm cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-all duration-200"
+        >
+          전송
+        </button>
+      </form>
+    </div>
+  );
+}
+```
+
+### 페이지에서 채팅패널 적용 & requestAi 서버액션 호출하기
+
+그리고 app/page.tsx를 아래와 같이 수정해줍니다.
+
+```tsx
+'use client';
+
+import { useState } from 'react';
+import { LineChart, LineChartProps } from './line-chart';
+import { QueryDataOptions, ToChartDataOptions, useQueryData } from './use-query-data';
+import { ChatMessage, ChatPanel } from './chat-panel';
+import { requestAi } from '../server/request-ai';
+
+function newMessage(role: ChatMessage['role'], content: string): ChatMessage {
+  return { id: crypto.randomUUID(), role, content, createdAt: Date.now() };
+}
+
+export default function Home() {
+  const [options, setOptions] = useState<LineChartProps['options']>({});
+  const [data, setData] = useState<LineChartProps['data']>({
+    datasets: [{ label: 'Unknown', data: [] }],
+  });
+  const { queryData, toChartData } = useQueryData();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // 채팅 메시지 전송을 처리하는 핸들러
+  const handleSend = async (content: string) => {
+    setMessages((prev) => [...prev, newMessage('user', content)]);
+    const result = await requestAi(content);
+
+    // functionCall이 있다면, 해당하는 함수를 찾아서 호출한다.
+    if (result.functionCall?.name === 'createLineChart') {
+      const { queryOption, toChartDataOptions, chartOptions } = result.functionCall.args;
+      createLineChart(queryOption, toChartDataOptions, chartOptions);
+    }
+
+    const assistantMessage = newMessage('assistant', result.text);
+    setMessages((prev) => [...prev, assistantMessage]);
+  };
+
+  /**
+   * LineChart를 생성하는 함수. AI도 해당 함수를 사용해서 차트를 생성할 수 있어야 함.
+   *
+   * @param queryOption 쿼리 옵션. 이걸로 데이터의 범위를 제어함.
+   * @param toChartDataOptions 차트를 그리는데 필요한 포인트, 색상등의 정보.
+   * @param chartOptions 차트 옵션. 제목, 범례등의 옵션을 제어함.
+   */
+  const createLineChart = (
+    queryOption: QueryDataOptions,
+    toChartDataOptions: Omit<ToChartDataOptions, 'data'>,
+    chartOptions: LineChartProps['options'] = {},
+  ) => {
+    const data = queryData(queryOption);
+    const chartData = toChartData({
+      data,
+      ...toChartDataOptions,
+    });
+
+    setData(chartData);
+    setOptions(chartOptions);
+  };
+
+  return (
+    <div className="mx-auto flex gap-5 w-full h-screen p-10">
+      <div className="w-[60%] border border-gray-200 shadow-md rounded-md p-5">
+        <LineChart options={options} data={data} />
+      </div>
+
+      <div className="border border-gray-200 shadow-md rounded-md p-5 flex-1">
+        <ChatPanel messages={messages} onSend={handleSend} />
+      </div>
+    </div>
+  );
+}
+```
+
+ChatPanel 컴포넌트를 사용해서 사용자에게 채팅 메시지를 보여주도록 구현해보았습니다. 코드가 좀 길었는데, 주요 코드를 따로 보도록 하겠습니다.
+
+```ts
+// 채팅 메시지 전송을 처리하는 핸들러
+const handleSend = async (content: string) => {
+  setMessages((prev) => [...prev, newMessage('user', content)]);
+
+  const result = await requestAi(content);
+
+  // functionCall이 있다면, 해당하는 함수를 찾아서 호출한다.
+  if (result.functionCall?.name === 'createLineChart') {
+    const { queryOption, toChartDataOptions, chartOptions } = result.functionCall.args;
+    createLineChart(queryOption, toChartDataOptions, chartOptions);
+  }
+
+  const assistantMessage = newMessage('assistant', result.text);
+  setMessages((prev) => [...prev, assistantMessage]);
+};
+```
+
+앞서 만든 서버액션인 requestAi를 호출하는 것을 볼 수 있는데요,
+이 때 결과인 result에서 functionCall에 따라 해당하는 함수를 호출하는 것을 볼 수 있습니다. 함수를 호출하는데 까지 성공했다면, 아래와 같이 사용자 채팅메시지를 통해 차트를 생성하는 기능까지 완성입니다.
+
+![사용자 채팅메시지를 기반으로 차트 생성](/create-chart.gif)
+
+> Gemini API는 사용량이 워낙 많아서 간헐적으로 실패할 수 있습니다. 또, 저희는 Free Tier라서 사용량 초과 문제도 발생할 수 있습니다.
+> 그러니 오류가 발생하는 경우, VS Code의 터미널에서 어떤 오류 메시지가 발생하는지 확인해주셔야 합니다.
+> 만약 사용량 초과인 경우, 다른 모델로 변경하시거나 아니면 그냥 기존 Google AI Studio로 가셔서 기존 프로젝트를 지운 뒤 새로 만드셔도 됩니다.(이러면 할당량 초기화 되거든요)
+
+## 중간 정리
+
+여기까지 해서 LLM이 텍스트 생성 외에도 외부 시스템에 개입해서 함수를 호출하는 방법에 대해 알아보았습니다. 또한 실습을 통해 직접 Next.js에서 Gemini로 이를 구현해보았구요.
+
+핵심은 아래와 같습니다.
+
+- AI에게 사용 가능한 Tool 정보를 제공한다(Gemini의 경우 tools의 functionDeclarations)
+- 시스템 프롬프트를 통해 어떤 상황에서 어떤 툴을 사용할지를 명시한다.
+- AI의 응답에서 실행해야 하는 Tool 정보를 추출하고, 이를 토대로 필요한 함수를 호출한다.(response.functionCalls)
+
+## 차트를 수정하는 Tool Calling 추가하기
+
+이번엔 차트를 수정하는 Tool Calling도 구현해보겠습니다. 다만 수정 기능을 구현하기 위해선 히스토리 기능을 구현해야 합니다.
+LLM은 기본적으로 상태를 유지하지 않는 stateless 모델입니다. 따라서 LLM에게 차트를 수정해줘 라고 요청해도,
+LLM 입장에선 생성한 차트가 없으니 정상적으로 작업을 처리할 수 없게 됩니다.
+
+이를 위해, 이전 대화 내용을 첨부해서 요청할 수 있도록 기능을 개선해야 합니다.
+
+### 차트 수정을 위한 함수 작성하기(page.tsx)
+
+app/page.tsx를 수정합니다.
+
+import에 UpdateChartOptionsArgs를 추가합니다.
+
+```ts
+import { requestAi, UpdateChartOptionsArgs } from '../server/request-ai';
+```
+
+handleSend를 아래와 같이 수정하여, AI 응답결과에 따라 updateChartOptions 함수를 호출할 수 있도록 합니다.  
+또한, requestAi 함수를 호출할 때, 이전 메시지 기록도 인자로 전달하여 LLM이 문맥을 이해하고 답변할 수 있도록 합니다.
+
+```ts
+const handleSend = async (content: string) => {
+  setMessages((prev) => [...prev, newMessage('user', content)]);
+
+  const result = await requestAi(content, messages);
+
+  if (result.functionCall?.name === 'createLineChart') {
+    const { queryOption, toChartDataOptions, chartOptions } = result.functionCall.args;
+    createLineChart(queryOption, toChartDataOptions, chartOptions);
+  } else if (result.functionCall?.name === 'updateChartOptions') {
+    updateChartOptions(result.functionCall.args);
+  }
+
+  const assistantMessage = newMessage('assistant', result.text);
+  setMessages((prev) => [...prev, assistantMessage]);
+};
+```
+
+마지막으로 updateChartOptions를 구현합니다.
+
+```ts
+const updateChartOptions = (args: UpdateChartOptionsArgs) => {
+  if (args.borderColor !== undefined || args.backgroundColor !== undefined) {
+    setData((prev) => ({
+      ...prev,
+      datasets: prev.datasets.map((ds) => ({
+        ...ds,
+        ...(args.borderColor !== undefined && { borderColor: args.borderColor }),
+        ...(args.backgroundColor !== undefined && { backgroundColor: args.backgroundColor }),
+      })),
+    }));
+  }
+
+  setOptions((prev) => ({
+    ...prev,
+    plugins: {
+      ...prev?.plugins,
+      ...(args.title !== undefined && {
+        title: { display: args.title !== '', text: args.title },
+      }),
+      ...(args.showLegend !== undefined && {
+        legend: { display: args.showLegend },
+      }),
+    },
+    scales: {
+      ...prev?.scales,
+      x: {
+        ...prev?.scales?.x,
+        grid: {
+          ...prev?.scales?.x?.grid,
+          ...(args.showGrid !== undefined && { display: args.showGrid }),
+          ...(args.gridColor !== undefined && { color: args.gridColor }),
+        },
+      },
+      y: {
+        ...prev?.scales?.y,
+        grid: {
+          ...prev?.scales?.y?.grid,
+          ...(args.showGrid !== undefined && { display: args.showGrid }),
+          ...(args.gridColor !== undefined && { color: args.gridColor }),
+        },
+      },
+    },
+  }));
+};
+```
+
+### 차트 수정 Tool에 대한 Tool Calling 선언 작성하기(request-ai)
+
+새로 추가한 updateChartOptions에 대한 선언을 작성해주어야 합니다. server/request-ai.ts를 연 다음...
+updateChartOptions에 대한 Tool 선언인 updateChartOptionsDeclaration을 추가합니다.
+
+```ts
+const updateChartOptionsDeclaration: FunctionDeclaration = {
+  name: 'updateChartOptions',
+  description:
+    '현재 표시된 차트의 시각적 옵션(색상, 그리드, 제목, 범례 등)을 수정합니다. 데이터나 날짜 범위는 변경하지 않습니다.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      borderColor: {
+        type: Type.STRING,
+        description: '데이터셋 선 색상 (CSS 색상값, 예: rgb(255, 99, 132))',
+      },
+      backgroundColor: {
+        type: Type.STRING,
+        description: '데이터셋 배경 색상 (CSS 색상값, 예: rgba(255, 99, 132, 0.2))',
+      },
+      showGrid: {
+        type: Type.BOOLEAN,
+        description: 'x/y 축 그리드 표시 여부',
+      },
+      gridColor: {
+        type: Type.STRING,
+        description: '그리드 선 색상 (CSS 색상값, 예: rgba(0, 0, 0, 0.1))',
+      },
+      title: {
+        type: Type.STRING,
+        description: '차트 제목. 빈 문자열("")이면 제목을 숨깁니다.',
+      },
+      showLegend: {
+        type: Type.BOOLEAN,
+        description: '범례 표시 여부',
+      },
+    },
+  },
+};
+```
+
+그 다음 서버액션의 리턴타입을 아래와 같이 수정합니다.
+
+```ts
+export interface UpdateChartOptionsArgs {
+  borderColor?: string;
+  backgroundColor?: string;
+  showGrid?: boolean;
+  gridColor?: string;
+  title?: string;
+  showLegend?: boolean;
+}
+
+export interface AiResponse {
+  text: string;
+  functionCall?:
+    | { name: 'createLineChart'; args: CreateLineChartArgs }
+    | { name: 'updateChartOptions'; args: UpdateChartOptionsArgs };
+}
+```
+
+그리고 히스토리 기능 구현을 위해 아래와 같이 타입을 추가합니다.
+
+```ts
+type HistoryItem = { role: 'user' | 'assistant'; content: string };
+```
+
+requestAi 함수는 아래와 같이 수정합니다.
+
+```ts
+export async function requestAi(
+  userMessage: string,
+  history: HistoryItem[] = [],
+): Promise<AiResponse> {
+  // 아래와 같이 히스토리 메시지를 추가하여 LLM이 문맥을 이해할 수 있도록 개선
+  const contents = [
+    ...history.map((msg) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }],
+    })),
+    { role: 'user', parts: [{ text: userMessage }] },
+  ];
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-lite',
+    contents,
+    config: {
+      // ...생략
+      tools: [
+        { functionDeclarations: [createLineChartDeclaration, updateChartOptionsDeclaration] },
+      ],
+    },
+  });
+
+  const functionCall = response.functionCalls?.[0] as FunctionCall | undefined;
+
+  // ... 생략
+
+  // updateChartOptions에 대한 처리 추가
+  if (functionCall?.name === 'updateChartOptions') {
+    const raw = functionCall.args as Record<string, string | boolean>;
+    return {
+      text: '차트 옵션을 수정했습니다.',
+      functionCall: {
+        name: 'updateChartOptions',
+        args: {
+          ...(raw.borderColor !== undefined && { borderColor: raw.borderColor as string }),
+          ...(raw.backgroundColor !== undefined && {
+            backgroundColor: raw.backgroundColor as string,
+          }),
+          ...(raw.showGrid !== undefined && { showGrid: raw.showGrid as boolean }),
+          ...(raw.gridColor !== undefined && { gridColor: raw.gridColor as string }),
+          ...(raw.title !== undefined && { title: raw.title as string }),
+          ...(raw.showLegend !== undefined && { showLegend: raw.showLegend as boolean }),
+        },
+      },
+    };
+  }
+
+  return { text: response.text ?? '응답을 생성하지 못했습니다.' };
+}
+```
+
+이제 채팅패널에서 차트의 색을 바꾸거나 그리드를 없애달라고 요청하면 마법같이 반영되는 것을 확인할 수 있습니다.
+
+![채팅메시지를 통해 차트를 수정하는 화면](/update-chart.gif)
+
+## 마치며
+
+이번 포스트에선 LLM을 통해 외부 시스템을 제어하는 방법인 Tool Calling에 대해 알아보았습니다.
+구현하기 어려운 기능이 아닐까 싶었지만 생각보다 간단했습니다. 어떤 Tool인지 설명과 파라미터에 대한 명세를 적어주고,
+응답 결과를 통해 Tool Calling을 호출해야 하는지 확인하고 호출하는 방식이었는데요, 이를 통해 사용자를 보다 더 편하게 하는 애플리케이션을 개발할 수 있을거라고 생각합니다.
+
+실습에서는 Gemini만 사용했지만, ChatGPT나 Claude API도 Tool Calling 기능을 제공합니다. 다만 함수 선언 방식이나 옵션등이 다소 차이가 날 수 있으니, 이 점만 유념해서 개발하면 됩니다.
+이번 실습의 코드는 [ai-tool-exam](https://github.com/Malloc72P/ai-tool-exam) 저장소에서 확인하실 수 있습니다.  
+긴 글 읽어주셔서 감사합니다!
