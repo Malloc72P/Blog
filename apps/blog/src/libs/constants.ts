@@ -2,6 +2,9 @@ export const Constants = {
   series: {
     latestId: 'latest',
   },
+  recommendation: {
+    postIds: ['ai-tool', 'sse-exam', 'next-grid-app-1', 'closure', 'execution-context'] as string[],
+  },
   siteConfig: {
     name: 'Malloc72p.TechBlog',
     title: 'Malloc72P의 기술블로그',

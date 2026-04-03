@@ -10,6 +10,7 @@ import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
 import classes from './post-detail.module.scss';
 import { Toc } from './toc';
 import { PostNavigator, PostNavigatorPlaceholder } from './post-navigator';
+import { PostRecommendation } from './post-recommendation';
 
 export interface PostDetailProps extends PropsWithChildren {
   series: SeriesModel;
@@ -160,6 +161,8 @@ export function PostDetail({
               <PostNavigatorPlaceholder />
             )}
           </div>
+
+          <PostRecommendation />
         </footer>
       </section>
     </ArticleContainer>
