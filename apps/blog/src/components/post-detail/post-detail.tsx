@@ -147,7 +147,7 @@ export function PostDetail({
         {/* ------------------------------------------------------ */}
         {/* POST DETAIL Footer */}
         {/* ------------------------------------------------------ */}
-        <footer className="post-detail-footer pb-[60px] md:pb-[100px] w-full">
+        <footer className="post-detail-footer pb-15 md:pb-25 w-full">
           <div className="flex gap-10 flex-col md:flex-row">
             {post.prevPost ? (
               <PostNavigator mode="prev" post={post.prevPost} />
