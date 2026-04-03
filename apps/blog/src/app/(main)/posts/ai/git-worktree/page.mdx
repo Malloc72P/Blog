@@ -75,7 +75,7 @@ cd temp
 git init
 
 # 커밋 생성
-touch somthing
+touch something
 git add *
 git commit -m "init"
 
@@ -96,9 +96,11 @@ temp-a라는 브랜치에 대한 워크트리 경로가 /workspace/temp-a임을 
 
 ```
 출력 결과
-/workspace/temp    0000000 [main]
-/workspace/temp-a  0000000 [temp-a]
+/workspace/temp    7dd1e8a [main]
+/workspace/temp-a  7dd1e8a [temp-a]
 ```
+
+- 7dd1e8a는 커밋의 해시코드입니다. 해당 워크트리가 어떤 커밋에 있는지를 보여줍니다.
 
 #### 워크트리 삭제하기
 
@@ -111,10 +113,10 @@ git worktree list
 
 ```
 출력 결과
-/workspace/temp  0000000 [main]
+/workspace/temp  7dd1e8a [main]
 ```
 
-이렇게 워크트리를 삭제하면 해당 폴더도 같이 삭제됩니다.
+이렇게 워크트리를 삭제하면 해당 폴더도 같이 삭제됩니다. 단, 해당 워크트리에서 아직 커밋되지 않은 내용이 있는 경우 삭제가 실패할 수 있으니 주의해주세요.
 
 ### VS Code Extension으로 편하게 관리하기
 
@@ -128,7 +130,13 @@ git worktree list
 ![제 블로그 프로젝트의 워크트리 현황입니다.](/worktree-list.png)
 
 귀찮게 터미널에서 명령어를 치지 않아도 해당 프로젝트의 모든 워크트리 현황을 보여주며, GUI를 통해 워크트리를 추가하거나 삭제하는 기능도 제공하니 매우 편리합니다.  
+다른 워크트리로 전환하고 싶다면, 목록에서 원하는 워크트리를 클릭하기만 하면 바로 해당 워크트리로 VS Code가 열립니다.
 앞의 실습에서 했던 것 처럼 매번 터미널 명령어를 입력하지 않아도 됩니다.
+
+위와 같이 워크트리를 관리하면 원하는 브랜치를 클릭 몇번으로 전부 열고, 해당 폴더에서 Claude Code CLI나 VS Code의 Claude Code Extension으로 작업을 지시할 수 있어서 편합니다.  
+또한 전체 워크트리의 커밋 상황도 한눈에 볼 수 있는데요, VS Code의 기본 기능인 Source Control은 해당 저장소의 모든 워크트리를 인식하여 변경 사항을 표시해줍니다.
+
+![VS Code의 Source Control 기능으로 워크트리의 모든 변경사항을 한눈에 보여주는 모습](/worktree-src-ctrl.png)
 
 ## 마치며
 
