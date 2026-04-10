@@ -1,4 +1,4 @@
-# dev.to 영문 요약 포스트 생성 스킬
+# dev.to 영문 포스트 생성 스킬
 
 블로그 포스트(MDX)를 읽고, dev.to에 게시할 영문 번역 글을 생성한다.
 생성된 마크다운은 임시 파일(.md)을 생성하고 그 안에 작성한다.
@@ -69,6 +69,8 @@ Note: This post is a translated version of an article originally published on my
 - [ ] tags가 소문자인가?
 - [ ] published가 false인가?
 - [ ] 자연스러운 영문인가? (직역체 아닌지 확인)
+- [ ] `/`를 사용하는 블로그 내부링크가 제대로 처리되어 있는가?
+  - 블로그 내부 링크의 경우 `/`를 사용하고 있다. 해당 링크의 `/`는 `https://blog.malloc72p.com/`로 치환되어, dev.to와 같은 외부 사이트에서도 정상적으로 링크를 타고 이동할 수 있도록 되어 있는가?
 
 ---
 
