@@ -1,0 +1,178 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'Promise 객체와 자바스크립트의 비동기 처리에 대하여',
+  description: '자바스크립트에서 Promise를 통해 비동기를 처리하는 방법에 대해 다룹니다.',
+  seriesId: 'frontend',
+  postId: 'async-promise',
+  tags: ['Promise', 'JavaScript', 'async', 'await'],
+  date: '2026-04-14 21:12',
+});
+
+### Promise 객체
+
+- 프로미스 객체는 비동기 작업의 완료 또는 실패를 처리하는데 사용되는 객체이다.
+- 자바스크립트의 비동기 함수는 동기함수처럼 어떤 값을 즉시 리턴하는데, 그 값은 함수의 최종 결과값이 아닌, 미래에 값을 제공하게 될 `Promise객체`이다.
+- Promise객체는 최종결과값 뿐만 아니라 비동기함수에서 잡지 않은 예외(uncaught error)도 제공한다.
+- 프로미스 객체에 붙인 핸들러를 통해 성공 및 실패 결과를 받아서 처리할 수 있다.
+  핸들러는 프로미스 객체의 메서드인 then으로 붙일 수 있다.
+
+### Promise 객체와 상태
+
+![Promise 객체의 상태 전이도](/promise-state.png)
+
+- 프로미스 객체는 3가지 상태를 가질 수 있다. pending, fulfilled, rejected 상태이다.
+  - pending은 초기상태로, 아직 비동기 함수가 완료되지 않았음을 나타낸다.
+  - fulfilled는 비동기함수가 성공적으로 완료된 상태를 나타낸다.
+  - rejected는 비동기함수가 실패했다는 상태를 나타낸다.
+- pending 상태의 프로미스가 fulfilled나 rejected상태가 되면, promise의 then 메서드로 추가한 핸들러가 호출된다.
+- 이미 fulfilled나 rejected가 된 프로미스에 핸들러를 추가하더라도 핸들러는 호출되기 때문에 비동기 작업의 완료와 핸들러 등록 사이의 레이스 컨디션은 걱정하지 않아도 된다.
+- 참고로 프로미스가 fulfilled이나 rejected 상태가 된 경우, 이를 settled(해결됨)라고 표현한다
+
+### Then
+
+- Promise객체의 메서드로, 인자로 받은 두 함수를 비동기 작업이 성공(fulfilled)했을 때와 실패(rejected)했을 때를 위한 핸들러로 추가할 수 있게 해준다. 즉 인자로 넘긴 함수로 완료처리, 실패처리 핸들러를 등록한다는 것.
+- 또한 then 메서드는 새로운 Promise 객체를 반환한다. 반환된 Promise 객체는 현재 Promise객체가 어떤 상태이건 상관없이 pending 상태를 가진체 반환된다.
+- 현재 Promise객체를 반환한 비동기 함수가 settled되면, 상태에 맞게 onFulfilled 또는 onRejected가 호출된다. 이렇게 호출된 함수는 언제나 비동기 함수로서 호출된다.
+
+### Then의 리턴
+
+- 반환된 Promise는 then으로 등록한 핸들러(onFulfilled, onRejected)의 결과에 영향받는다.
+- 참고로 두 핸들러 중 어떤 핸들러가 호출되었는지는 중요하지 않다.
+  어차피 두 핸들러 중 하나만 호출될거고, 호출된 핸들러의 결과(반환한 값)에 따라 then이 반환하는 Promise객체의 동작이 달라진다는 점만 알면 된다.
+  표현의 편의를 위해, then이 반환하는 프로미스 객체를 P라고 표현한다. 1. 핸들러가 값 a를 반환함. → P는 a를 값으로 하여 fulfilled 상태가 될 것이다. 2. 핸들러가 값을 반환하지 않음 → P는 undefined를 값으로 하여 fulfilled 상태가 될 것이다. 3. 핸들러가 에러 e를 발생시킴(throw error) → P는 e를 값으로 하여 rejected 상태가 될 것이다. 4. 새로운 pending 상태의 프로미스 객체 p2를 반환함 → p는 pending상태가 되고, p2가 처리된 결과값이 p의 처리 결과값으로 설정된다.
+  다시말해서, p2가 어떤 값으로 fulfilled/reject 되면, p도 그 값으로 fulfilled/reject된다는 뜻이다.
+
+### Thenables
+
+- Promise가 JS언어의 일부분이 되기 전까진 여러 Promise 구현체가 만들어졌다.
+  내부 구현은 다를지라도, 적어도 fulfilled, rejected상태를 처리하는 콜백을 인자로 받는 then 메서드를 가진 `Thenable` 인터페이스만큼은 구현했다.
+- 물론 JS언어의 일부분이 된 Promise객체도 Thenable 인터페이스를 구현한다
+- JS는 기존 Promise구현체와의 `상호운용성`을 위해 Thenable 인터페이스를 구현한 객체를 Promise가 사용되는 위치에서 사용하는것을 허용한다.
+
+### Promise 이전의 비동기 함수
+
+- 콜백을 어떤 함수에 전달하는 방식으로 작성되었다.
+
+  ```tsx
+  function successCallback(result) {
+    console.log(`Audio file ready at URL: ${result}`);
+  }
+
+  function failureCallback(error) {
+    console.error(`Error generating audio file: ${error}`);
+  }
+
+  createAudioFileAsync(audioSettings, successCallback, failureCallback);
+  ```
+
+- 이를 Promise객체를 사용하는 방식으로 고치면 아래와 같다.
+  ```tsx
+  createAudioFileAsync(audioSettings).then(successCallback, failureCallback);
+  ```
+  - 함수에 전달하는 방식과는 다르게, `createAudioFileAsync(audioSettings)`로 부터 리턴된 Promise 객체를 통해 완료 및 실패 상황에 대한 처리를 하는것을 알 수 있다.
+
+### Channing
+
+비동기 함수에 콜백을 넘기던 시절
+
+- 비동기 작업에 대한 흔한 요구사항은 두개 이상의 비동기 작업을 이어서 실행할 수 있어야 한다는 것이다.
+  이 때, 후속 비동기 작업은 이전 비동기 작업이 성공했을 때 그 결과값을 사용하게 된다.
+- 문제는, 콜백을 매개변수로 받는 비동기함수를 연속으로 호출하게 되면 아래와 같이 콜백 지옥이 발생하게 된다는 것이다.
+
+```ts
+function doSomethingCB(callback) {
+  callback([1]);
+}
+
+function doSomethingElseCB(param, callback) {
+  callback([...param, 2]);
+}
+
+function doThirdThingCB(param, callback) {
+  callback([...param, 3]);
+}
+
+function failureCallbackCB(e) {
+  console.error(e);
+}
+
+doSomethingCB(function (result) {
+  doSomethingElseCB(
+    result,
+    function (newResult) {
+      doThirdThingCB(
+        newResult,
+        function (finalResult) {
+          console.log(`Got the final result: ${finalResult}`);
+        },
+        failureCallbackCB,
+      );
+    },
+    failureCallbackCB,
+  );
+}, failureCallbackCB);
+
+// Got the final result: 1,2,3
+```
+
+- 보면 비동기 함수를 호출할 때, 완료에 대한 처리를 하는 콜백을 매개변수로 넘기고 있다.
+  콜백 안에 콜백이 중첩되어 코드를 읽기 매우 어렵게 된다.
+
+Promise는 콜백지옥 문제를 해결할 수 있다
+
+- Promise 객체를 반환하는 비동기 함수는 콜백지옥 문제를 해결할 수 있다.
+  Promise객체를 반환하게 되면, 콜백을 비동기 함수에 넘기는게 아니라
+  반환된 Promise객체에 부착하게 된다.
+
+```ts
+function doSomething() {
+  return new Promise((resolve) => {
+    resolve([1]);
+  });
+}
+
+function doSomethingElse(param) {
+  return new Promise((resolve) => {
+    resolve([...param, 2]);
+  });
+}
+
+function doThirdThing(param) {
+  return new Promise((resolve) => {
+    resolve([...param, 3]);
+  });
+}
+
+function failureCallback(e) {
+  console.error(e);
+}
+
+const promise1 = doSomething()
+  .then(doSomethingElse, failureCallback)
+  .then(doThirdThing, failureCallback)
+  .then((finalResult) => console.log(`Got the final result: ${finalResult}`));
+
+// Got the final result: 1,2,3
+```
+
+- 위의 코드를 보면, 콜백함수 안에 또 콜백함수를 집어넣지 않고도 같은 동작을 하는 프로그램을 작성할 수 있었다.
+- 정리하면, 비동기함수에 콜백을 넘기지 않고, 비동기함수가 반환한 Promise 객체에 콜백을 부착하는 방식이기 때문에, 콜백함수안에 콜백함수를 넣어야 하는 콜백지옥에서 벗어날 수 있다는 것이다.
+
+### async function
+
+- `async function` 선언은 `AsyncFunction` 객체를 생성한다
+- `AsyncFunction`은 비동기 함수를 위한 메서드를 제공한다.
+  또한, 모든 비동기 함수는 실제로는 `AsyncFunction` 객체이다
+- `async function`이 호출될 때 마다, 새로운 `Promise`객체를 반환한다
+- 반환된 `Promise`객체에 부착하는 콜백은 비동기함수의 리턴값이나 예외를 매개변수로 받을 수 있다.
+  `async function`의 리턴값은 `Promise.then`, 예외는 `Promise.catch`에 부착하는 콜백의 매개변수로 받아서 처리할 수 있다.
+
+### await expression
+
+- `async function` 안에선 `await`라는 키워드를 사용할 수 있다.
+- `await` 키워드는 *Promise객체를 반환하는 함수*를 마치 동기함수인 것 처럼 사용하게 해준다.  
+  마치 비동기 함수의 완료를 기다리는 것 처럼 동작한다. 물론 그렇게 보이는 것일 뿐이다.
+  실제로는 기다리지 않고, 다른 작업을 수행할 것이다. await 다음의 코드는 해당 이벤트의 완료에 해당하는 메시지가 이벤트 루프에 의해 큐에서 꺼내져서 콜스택에 올라갔을 때 실행된다.
+- `Promise`객체의 `resolve`된 값은 마치 비동기함수의 리턴값인 것 처럼 취급된다.
+- 덕분에 일반적인 `try-catch`문의 블록 안에서 비동기 함수를 사용할 수 있게 된다.
