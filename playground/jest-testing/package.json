@@ -1,0 +1,17 @@
+{
+  "name": "jest-testing-playground",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jest 단위 테스트 입문 예제 (장바구니 모듈)",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "coverage": "jest --coverage"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
+    "babel-jest": "^30.0.0",
+    "jest": "^30.0.0"
+  }
+}
