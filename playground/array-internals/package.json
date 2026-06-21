@@ -1,0 +1,11 @@
+{
+  "name": "array-internals",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "자바스크립트 배열의 내부 동작을 실제로 실행해 확인하는 예제",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "bench": "node src/benchmark.mjs"
+  }
+}

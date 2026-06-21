@@ -1,0 +1,227 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '자바스크립트 배열의 내부 동작 원리',
+  description:
+    '배열이 사실은 객체라는 점에서 출발해 length의 동작, push와 unshift의 속도 차이, 유사 배열 처리까지 실제 측정과 함께 정리합니다.',
+  seriesId: 'frontend',
+  postId: 'array-internals',
+  tags: ['Array', 'JavaScript', '자료구조'],
+  date: '2026-06-17 22:05',
+});
+
+# 자바스크립트 배열의 내부 동작 원리
+
+## 왜 unshift는 push보다 느릴까?
+
+배열 맨 앞에 값을 넣는 `unshift`와 맨 뒤에 넣는 `push`. 하는 일은 똑같이 "원소 하나 추가"인데, 저는 어느 날 코드 리뷰에서 "큐를 배열로 만들면서 `shift`를 쓰면 느려질 수 있다"는 코멘트를 받고 처음으로 이 둘의 비용이 다르다는 걸 의식하게 됐습니다.
+
+말로만 듣고 넘어가긴 찝찝해서 직접 측정해봤습니다. 빈 배열에 10만 개를 넣되, 한 번은 `push`로 뒤에서, 한 번은 `unshift`로 앞에서 넣어봤습니다.
+
+```js
+// N = 100,000
+const a = [];
+for (let i = 0; i < N; i++) a.push(i); // 뒤에 추가
+
+const b = [];
+for (let i = 0; i < N; i++) b.unshift(i); // 앞에 추가
+```
+
+제 환경(Node.js v22, Apple Silicon)에서 `push`는 **0.6ms**, `unshift`는 **789ms**가 나왔습니다.
+
+![push와 unshift의 10만 번 추가 소요 시간 막대그래프. push는 0.6ms, unshift는 789ms로 약 1300배 차이가 난다.](/array-benchmark.png)
+
+같은 10만 번인데 약 1,300배 차이입니다. 똑같이 "원소 하나 추가"인데 왜 위치만 바뀌었다고 이렇게까지 벌어질까요? 이 질문에 답하려면 자바스크립트 배열이 내부적으로 어떻게 생겨 먹었는지를 봐야 합니다.
+
+## 배열은 사실 "객체"다
+
+자바스크립트 배열은 인덱스로 원소를 O(1)에 읽을 수 있는 자료구조입니다. `arr[0]`, `arr[1]`처럼 위치만 알면 곧바로 꺼내올 수 있죠. 여기까지는 다른 언어의 배열과 비슷합니다.
+
+다른 점은 두 가지입니다. 하나는 크기가 고정이 아니라 동적이라는 것, 다른 하나는 그 정체가 **객체**라는 것입니다.
+
+좀 더 정확히 말하면, 배열의 원소는 "인덱스를 키(key)로 가지는 값"입니다. `['a', 'b', 'c']`는 내부적으로 `'0' → 'a'`, `'1' → 'b'`, `'2' → 'c'` 형태의 키-값 쌍을 가진 객체에 가깝습니다. 그리고 원소 개수를 담는 `length`라는 속성이 따로 붙어 있습니다.
+
+![배열은 인덱스를 키로 가지는 객체임을 보여주는 다이어그램. 키 '0','1','2'가 각각 값 'a','b','c'에 매핑되고, length 속성이 3을 가리킨다.](/array-as-object.png)
+
+믿기 어렵다면 직접 확인해볼 수 있습니다. 객체의 키를 순회하는 `for...in`을 배열에 써보면, 인덱스가 **문자열 키**로 나옵니다.
+
+```js
+const arr = ['a', 'b', 'c'];
+
+const keys = [];
+for (const key in arr) keys.push(key);
+console.log(keys); // [ '0', '1', '2' ]
+
+console.log(arr['1'] === arr[1]); // true
+```
+
+- `for...in`이 돌려준 키는 `0`이 아니라 문자열 `'0'`입니다.
+- 그래서 `arr['1']`처럼 문자열로 접근해도 `arr[1]`과 같은 값이 나옵니다. 내부적으로 키가 문자열이기 때문입니다.
+
+객체이다 보니, 인덱스가 아닌 평범한 속성도 붙일 수 있습니다. 다만 이런 속성은 `length`에 포함되지 않습니다.
+
+```js
+const arr = ['a', 'b', 'c'];
+arr.note = 'hello'; // 권장하진 않지만 가능은 하다
+
+console.log(arr.length); // 3  ← note는 세지 않는다
+console.log(arr.note); // hello
+```
+
+## length는 인덱스를 따라 움직인다
+
+`length`는 우리가 직접 관리하는 값이 아니라, 원소 추가/삭제에 따라 자동으로 따라오는 속성입니다. 정확히는 "가장 큰 인덱스 + 1"을 유지합니다.
+
+```js
+const arr = [];
+console.log(arr.length); // 0
+
+arr.push('x');
+console.log(arr[0], arr.length); // x 1
+
+arr[5] = 'y'; // 인덱스 5에 직접 할당
+console.log(arr.length); // 6  ← 중간(1~4)은 비어 있는 채로 점프
+```
+
+- `push('x')`는 현재 `length`(=0)를 키로 값을 넣고 `length`를 1로 올립니다.
+- `arr[5]`에 직접 값을 넣으면, 중간이 비어 있더라도 `length`는 곧장 6으로 뜁니다.
+
+반대로 `length`에 직접 작은 값을 대입하면, 뒤쪽 원소가 잘려 나갑니다. 이건 배열을 비우는 트릭으로도 종종 쓰입니다.
+
+```js
+const arr = ['a', 'b', 'c', 'd'];
+arr.length = 1;
+console.log(arr); // [ 'a' ]
+```
+
+이제 도입부의 `push`/`pop` 이야기로 돌아가 봅시다. `push`는 "현재 `length` 위치에 값을 쓰고 `length`를 1 늘리는" 동작이고, `pop`은 "`length - 1` 위치의 값을 꺼내고 `length`를 줄이는" 동작입니다. 둘 다 **끝**만 건드립니다. 그래서 배열이 아무리 길어도 비용이 일정한 **O(1)**입니다.
+
+반면 `unshift`/`shift`는 **맨 앞**에서 작업합니다. 앞에 자리를 만들거나 앞을 빼면, 인덱스가 키이기 때문에 나머지 원소를 전부 한 칸씩 다시 매겨야 합니다. 1번 원소가 0번이 되고, 2번이 1번이 되고... 원소가 n개면 n번의 재배치가 필요하니 **O(n)**이 됩니다.
+
+| 메서드 | 작업 위치 | 시간 복잡도 | 비고 |
+| --- | --- | --- | --- |
+| `push` | 끝에 추가 | O(1) | length 위치에 쓰고 length++ |
+| `pop` | 끝에서 제거 | O(1) | length-1 꺼내고 length-- |
+| `unshift` | 앞에 추가 | O(n) | 모든 원소를 한 칸씩 뒤로 |
+| `shift` | 앞에서 제거 | O(n) | 모든 원소를 한 칸씩 앞으로 |
+
+도입부의 측정값(`push` 0.6ms vs `unshift` 789ms)이 이 표와 정확히 맞아떨어집니다. 추가로 제거 쪽도 재봤더니 `pop`은 3.4ms, `shift`는 791ms로, 역시 앞에서 빼는 쪽이 약 230배 느렸습니다. 그래서 배열로 큐를 구현하면서 `shift`를 자주 호출하면, 데이터가 많아질수록 점점 느려집니다. 이럴 땐 인덱스 포인터를 따로 두거나 다른 자료구조를 쓰는 편이 낫습니다.
+
+## prototype이 Array이기 때문에
+
+`push`, `pop`, `shift`, `unshift`, 그리고 `map`, `filter`, `reduce` 같은 메서드를 우리가 그냥 쓸 수 있는 이유는, 배열의 prototype이 `Array.prototype`이기 때문입니다. 배열 리터럴로 만든 모든 배열은 이 prototype을 공유하고, 거기에 정의된 메서드를 빌려 씁니다.
+
+```js
+const arr = [3, 1, 2];
+console.log(Object.getPrototypeOf(arr) === Array.prototype); // true
+```
+
+바꿔 말하면, **prototype이 `Array.prototype`이 아니면 이 메서드들을 쓸 수 없다**는 뜻이기도 합니다. 그리고 이게 실무에서 한 번쯤 발을 거는 지점입니다.
+
+## 유사 배열(array-like)의 함정
+
+자바스크립트 API 중에는 배열처럼 생겼지만 진짜 배열은 아닌 값을 돌려주는 것들이 있습니다. `document.querySelectorAll`이 돌려주는 `NodeList`, 함수 안의 `arguments` 객체가 대표적입니다. 이들을 **유사 배열(array-like)**이라고 부릅니다.
+
+유사 배열은 숫자 인덱스와 `length`는 가지고 있지만, prototype이 `Array.prototype`이 아닙니다. 그래서 `map`이나 `sort` 같은 메서드를 호출하면 에러가 납니다.
+
+```js
+const arrayLike = { 0: 'first', 1: 'second', 2: 'third', length: 3 };
+
+console.log(typeof arrayLike.map); // undefined
+// arrayLike.map(...)  → TypeError: arrayLike.map is not a function
+```
+
+`NodeList`로 받은 요소들에 `.map`을 쓰려다 `map is not a function`을 만나본 적이 있다면, 바로 이 이유 때문입니다. 해결책은 두 가지입니다.
+
+첫째, `Array.from`으로 진짜 배열로 변환하는 방법입니다. 인덱스와 `length`를 보고 새 배열을 만들어 줍니다.
+
+```js
+const real = Array.from(arrayLike);
+
+console.log(real.map((s) => s.toUpperCase()));
+// [ 'FIRST', 'SECOND', 'THIRD' ]
+```
+
+둘째, 변환 없이 `Array.prototype`의 메서드를 `call`로 **빌려 쓰는** 방법입니다. 메서드 입장에선 `this`가 배열이든 유사 배열이든, 숫자 인덱스와 `length`만 있으면 동작하기 때문에 가능합니다.
+
+```js
+const result = [];
+Array.prototype.forEach.call(arrayLike, (s) => result.push(s));
+
+console.log(result); // [ 'first', 'second', 'third' ]
+```
+
+요즘은 `Array.from`이나 스프레드(`[...arrayLike]`)가 깔끔해서 변환 후 다루는 쪽을 더 자주 씁니다. 다만 `call`로 빌려 쓰는 방식은, 위에서 본 "배열 메서드는 결국 인덱스와 length만 보고 동작한다"는 사실을 그대로 보여줘서 알아둘 가치가 있습니다.
+
+## 배열인지 확실히 판별하기
+
+유사 배열이 섞여 들어올 수 있는 상황이라면, 받은 값이 진짜 배열인지 확인하고 싶어집니다. 그런데 `typeof`는 도움이 안 됩니다. 배열도 객체라서 둘 다 `'object'`가 나오거든요.
+
+```js
+const real = [1, 2, 3];
+const arrayLike = { 0: 'a', length: 1 };
+
+console.log(typeof real, typeof arrayLike); // object object
+```
+
+이럴 때 쓰는 게 `Array.isArray`입니다. 이름 그대로 진짜 배열인지를 정확히 알려줍니다.
+
+```js
+console.log(Array.isArray(real)); // true
+console.log(Array.isArray(arrayLike)); // false
+```
+
+구형 환경 호환이 필요하던 시절에는 `Object.prototype.toString.call`을 쓰기도 했습니다. 이 방식은 내부 타입 태그를 문자열로 돌려줍니다.
+
+```js
+const tag = (x) => Object.prototype.toString.call(x);
+
+console.log(tag(real)); // [object Array]
+console.log(tag(arrayLike)); // [object Object]
+```
+
+지금은 `Array.isArray`가 표준으로 잘 동작하니 이걸 쓰면 됩니다. `toString.call` 방식은 "왜 이렇게도 판별할 수 있었나"를 이해하는 정도로만 알아두면 충분합니다.
+
+## delete는 length를 줄이지 않는다
+
+마지막으로 한 가지 함정을 짚고 가겠습니다. 객체의 속성을 지울 때 쓰는 `delete`를 배열 원소에 쓰면, 직관과 다르게 동작합니다.
+
+```js
+const arr = [1, 2, 3];
+delete arr[1];
+
+console.log(arr); // [ 1, <1 empty item>, 3 ]
+console.log(arr.length); // 3  ← 줄어들지 않는다!
+```
+
+`delete arr[1]`은 키 `'1'`에 매핑된 값만 지웁니다. 배열도 객체라는 사실을 떠올리면 당연한 동작입니다. 키를 지웠을 뿐, 나머지 인덱스를 다시 매기지도 `length`를 줄이지도 않습니다. 그래서 가운데가 텅 빈 **sparse array(구멍 난 배열)**가 만들어집니다.
+
+이 구멍은 값이 `undefined`인 것과도 다릅니다. 아예 키 자체가 없는 상태이기 때문입니다. `in` 연산자로 확인하면 차이가 보입니다.
+
+```js
+console.log(1 in arr); // false  ← 키가 아예 없음
+console.log(2 in arr); // true
+
+// 일부 메서드는 구멍을 아예 건너뛴다
+const visited = [];
+arr.forEach((v, i) => visited.push(i));
+console.log(visited); // [ 0, 2 ]  ← 인덱스 1은 방문하지 않음
+```
+
+원소를 실제로 빼내면서 길이까지 줄이고 싶다면 `delete`가 아니라 `splice`를 써야 합니다. `arr.splice(1, 1)`은 인덱스 1의 원소를 제거하고 뒤 원소를 당겨 `length`까지 정리해 줍니다.
+
+---
+
+## 정리
+
+- 자바스크립트 배열은 "인덱스를 키로 가지는 객체"이고, `length`는 가장 큰 인덱스 + 1을 자동으로 따라가는 속성입니다.
+- `push`/`pop`은 끝만 건드려 O(1)이지만, `unshift`/`shift`는 모든 원소를 한 칸씩 옮겨야 해서 O(n)입니다. 실제로 10만 번 추가 시 약 1,300배 차이가 났습니다.
+- 배열 메서드를 쓸 수 있는 건 prototype이 `Array.prototype`이기 때문입니다. `NodeList`·`arguments` 같은 유사 배열은 이 prototype이 아니라서, `Array.from`으로 변환하거나 `Array.prototype.method.call`로 빌려 써야 합니다.
+- 배열 판별은 `Array.isArray`가 정답입니다. `typeof`는 배열을 구분하지 못합니다.
+- `delete arr[i]`는 값만 지우고 `length`는 그대로 둬서 구멍(sparse array)을 만듭니다. 길이까지 정리하려면 `splice`를 쓰세요.
+
+## 마치며
+
+배열을 "객체"라는 한 가지 관점으로 다시 보면, 흩어져 있던 동작들이 하나로 꿰어집니다. 인덱스가 키라는 사실 하나로 `length`의 자동 증감도, `unshift`가 느린 이유도, `delete`의 이상한 동작도 전부 설명되니까요.
+
+사실 매일 `push`만 쓰면서도 잘 살 수 있습니다. 그래도 가끔 성능이 이상하게 느껴지는 순간이 오면, 오늘 본 내부 동작이 단서를 줄 겁니다. 긴 글 읽어주셔서 감사합니다. ☺️
