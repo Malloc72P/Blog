@@ -1,0 +1,320 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '라이브러리 없이 GeoJSON으로 지도 그리기',
+  description:
+    'd3나 leaflet 없이 순수 JavaScript와 SVG만으로 GeoJSON 지리 데이터를 지도로 그려봅니다. bounding box 계산부터 Mercator 투영, SVG path 변환, hover 상호작용까지 직접 만들어 봅니다.',
+  seriesId: 'frontend',
+  postId: 'geojson-visualization',
+  tags: ['GeoJSON', 'SVG', 'JavaScript', '시각화'],
+  date: '2026-06-19 21:33',
+});
+
+# 라이브러리 없이 GeoJSON으로 지도 그리기
+
+지도를 화면에 띄우는 일은 보통 한 줄이면 끝납니다. `leaflet`이나 `d3`를 불러오고, GeoJSON을 던져주면 알아서 예쁜 지도가 나오죠.
+저도 한동안은 그렇게 썼습니다. 그런데 어느 날 문득, 그 한 줄 안에서 도대체 무슨 일이 벌어지는지 궁금해졌습니다.
+
+경도와 위도라는 숫자 덩어리가 어떻게 모니터의 픽셀 좌표로 바뀌는 걸까요? 한반도가 옆으로 눕거나 찌그러지지 않고 제 모양을 유지하는 비결은 뭘까요?
+이 질문에 답하기 위해, 라이브러리를 전부 걷어내고 순수 JavaScript와 SVG만으로 대한민국 시도 지도를 직접 그려보기로 했습니다.
+
+결과부터 보여드리면 이렇게 나옵니다.
+
+![순수 JavaScript와 SVG로 그린 대한민국 시도 경계 지도](/geojson-map.png)
+
+이 지도에는 라이브러리가 한 줄도 들어가지 않았습니다. 어떻게 만들었는지 차근차근 풀어보겠습니다.
+
+---
+
+## GeoJSON이란 무엇인가
+
+GeoJSON은 지리 데이터를 표현하기 위한 JSON 포맷입니다. 이름 그대로 그냥 JSON이라, 별도의 파서 없이 `JSON.parse`만으로 읽힙니다.
+가장 바깥은 보통 `FeatureCollection`이고, 그 안에 여러 개의 `Feature`가 들어 있습니다. 시도 지도라면 서울, 부산, 경기도 같은 각 지역이 하나의 Feature가 됩니다.
+
+Feature 하나의 구조를 들여다보면 이렇게 생겼습니다.
+
+```json
+{
+  "type": "Feature",
+  "properties": { "name": "서울특별시", "name_eng": "Seoul", "code": "11" },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [127.022, 37.699],
+        [127.025, 37.699],
+        [127.026, 37.700]
+      ]
+    ]
+  }
+}
+```
+
+- `properties`에는 지역명, 코드 같은 부가 정보가 들어갑니다. 화면에 라벨을 띄우거나 hover 이벤트에서 활용할 값들이죠.
+- `geometry`가 실제 도형 데이터입니다. `type`과 `coordinates`로 이루어집니다.
+- 좌표는 `[경도(longitude), 위도(latitude)]` 순서입니다. **위도가 먼저가 아닙니다.** 위도-경도 순으로 익숙한 분들이 가장 많이 실수하는 지점입니다.
+
+### Polygon과 MultiPolygon
+
+지도를 그리려면 두 가지 geometry 타입만 알면 됩니다.
+
+`Polygon`은 좌표 링(ring)의 배열입니다. 첫 번째 링은 바깥 경계선이고, 그 뒤에 오는 링들은 도형 안의 구멍(예: 호수)을 뜻합니다. 그래서 좌표가 `[[[...]]]`처럼 세 겹으로 중첩됩니다.
+
+`MultiPolygon`은 Polygon들의 배열입니다. 섬이 여러 개라 한 덩어리로 표현할 수 없는 지역이 여기 해당합니다. 제주도나 경상남도처럼 부속 섬이 많은 곳이 MultiPolygon이 되죠. 중첩이 한 단계 더 깊어 `[[[[...]]]]`가 됩니다.
+
+실제로 제가 사용한 데이터를 세어보니 17개 시도 중 7개가 Polygon, 10개가 MultiPolygon이었습니다. 두 타입을 모두 다뤄야 한다는 뜻입니다.
+두 타입이 좌표 깊이가 다르다는 점만 통일해주면, 나머지 처리는 똑같이 할 수 있습니다.
+
+```js
+// Polygon과 MultiPolygon을 "폴리곤들의 배열"이라는 같은 형태로 통일한다.
+function extractPolygons(geometry) {
+  if (geometry.type === 'Polygon') {
+    // Polygon 하나를 길이 1짜리 배열로 감싸 형태를 맞춘다.
+    return [geometry.coordinates];
+  }
+  if (geometry.type === 'MultiPolygon') {
+    // MultiPolygon은 이미 폴리곤들의 배열이라 그대로 반환한다.
+    return geometry.coordinates;
+  }
+  // 점/선 등 이 데모에서 다루지 않는 타입은 무시한다.
+  return [];
+}
+```
+
+이렇게 한 번 감싸두면, 이후 코드는 geometry 타입을 신경 쓰지 않고 "폴리곤 → 링 → 좌표"라는 일관된 3중 루프로 처리할 수 있습니다.
+
+---
+
+## 1단계: 좌표의 영역을 구한다 (bounding box)
+
+데이터에 들어 있는 좌표는 경도 124~132, 위도 33~38 사이의 실수들입니다. 이걸 그대로 화면에 찍으면 좌상단 구석에 점 하나로 뭉쳐버립니다.
+화면에 맞추려면 먼저 "이 데이터가 차지하는 지리적 범위"가 얼마인지 알아야 합니다. 경도와 위도 각각의 최소·최대값, 즉 **bounding box**를 구하는 일입니다.
+
+특별한 기교는 없습니다. 모든 좌표를 한 번 훑으면서 최솟값과 최댓값을 갱신하면 됩니다.
+
+```js
+// FeatureCollection 전체를 순회해 경도/위도의 최소·최대값을 구한다.
+function computeBounds(features) {
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+
+  for (const feature of features) {
+    for (const polygon of extractPolygons(feature.geometry)) {
+      for (const ring of polygon) {
+        for (const [lng, lat] of ring) {
+          // 좌표가 [경도, 위도] 순서임을 기억하자.
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+        }
+      }
+    }
+  }
+  return { minLng, minLat, maxLng, maxLat };
+}
+```
+
+제가 쓴 데이터로 돌려보니 경도는 `124.61 ~ 131.87`, 위도는 `33.11 ~ 38.61`이 나왔습니다.
+제주도 남쪽 끝에서 강원도 북쪽 끝, 그리고 동쪽 끝 울릉도까지를 모두 감싸는 사각형이죠. 이 사각형을 화면 크기에 맞게 펼쳐 넣는 것이 다음 단계입니다.
+
+---
+
+## 2단계: 경위도를 화면 좌표로 투영한다
+
+여기가 이 글의 핵심이자, 제가 가장 오래 헤맨 부분입니다.
+
+지구는 둥근 공이고 화면은 평평합니다. 둥근 표면의 좌표를 평면에 펼치는 작업을 **투영(projection)**이라고 부릅니다.
+귤껍질을 칼집 내서 책상에 납작하게 누르는 장면을 떠올리면 비슷합니다. 어떻게 누르느냐에 따라 모양이 조금씩 달라지죠.
+
+가장 단순한 투영은 경도를 x로, 위도를 y로 그냥 갖다 쓰는 방식(equirectangular)입니다. 적도 근처에서는 그럭저럭 봐줄 만하지만, 우리나라처럼 위도가 높은 지역은 가로로 길쭉하게 늘어나 보입니다.
+그래서 웹 지도에서 표준처럼 쓰이는 **Web Mercator** 투영을 적용했습니다. 위도가 높아질수록 세로 간격을 점점 벌려주는 방식인데, 공식은 다음과 같습니다.
+
+```js
+// 경도는 라디안으로 변환해 x 값으로 쓴다.
+const lngToX = (lng) => (lng * Math.PI) / 180;
+
+// 위도를 Web Mercator의 y 값으로 변환한다(고위도일수록 간격이 벌어진다).
+const latToY = (lat) => {
+  const rad = (lat * Math.PI) / 180;
+  return Math.log(Math.tan(Math.PI / 4 + rad / 2));
+};
+```
+
+이 두 함수 덕분에 한 번 호되게 당했습니다. 처음에 저는 x는 경도를 그대로(degree) 쓰고, y만 위의 Mercator 공식(라디안 기반)으로 계산했습니다.
+그랬더니 지도가 가로로 길게 늘어진 한 줄로 찌부러져 버리더군요. 한참을 들여다보고서야 원인을 찾았습니다.
+
+x는 단위가 **degree**(범위 약 7.3)인데, y는 Mercator를 거치며 **라디안 기반**(범위 약 0.12)이 되어 있었습니다. 두 축의 단위가 60배 넘게 차이가 나니, 세로 방향이 0에 가깝게 짓눌린 겁니다.
+교훈은 단순합니다. **x와 y는 반드시 같은 단위 공간에서 계산해야 합니다.** 그래서 경도도 라디안으로 바꿔 `lngToX`를 따로 둔 것이죠. 이걸 깨닫고 나니 지도가 단번에 제 모양을 찾았습니다.
+
+투영 함수와 bounding box가 준비되면, 이제 화면 크기에 맞게 스케일과 위치를 계산합니다.
+
+```js
+function createProjector(bounds, width, height, padding) {
+  const { minLng, minLat, maxLng, maxLat } = bounds;
+
+  // bounding box의 모서리를 Mercator 공간으로 옮긴다.
+  const xMin = lngToX(minLng);
+  const yMin = latToY(minLat);
+  const yMax = latToY(maxLat);
+
+  const geoWidth = lngToX(maxLng) - lngToX(minLng);
+  const geoHeight = yMax - yMin; // max - min 순서라 항상 양수
+
+  // 가로/세로 중 더 빡빡한 쪽에 맞춰 스케일을 정해 비율이 찌그러지지 않게 한다.
+  const usableW = width - padding * 2;
+  const usableH = height - padding * 2;
+  const scale = Math.min(usableW / geoWidth, usableH / geoHeight);
+
+  // 남는 여백을 반씩 나눠 지도를 가운데로 모은다.
+  const offsetX = padding + (usableW - geoWidth * scale) / 2;
+  const offsetY = padding + (usableH - geoHeight * scale) / 2;
+
+  return ([lng, lat]) => {
+    const x = (lngToX(lng) - xMin) * scale + offsetX;
+    // Mercator y는 위로 갈수록 커지지만 화면 y는 아래로 커진다. 그래서 yMax 기준으로 뒤집는다.
+    const y = (yMax - latToY(lat)) * scale + offsetY;
+    return [x, y];
+  };
+}
+```
+
+코드에서 짚어둘 포인트가 두 가지 있습니다.
+
+- `scale`을 가로·세로 비율 중 **더 작은 값**으로 잡았습니다. 한쪽에만 맞추면 다른 축이 넘쳐 잘리거나 비율이 망가집니다. 작은 쪽에 맞춰야 도형 전체가 안에 들어오면서 가로세로 비율도 보존됩니다.
+- 화면 좌표계는 위쪽이 0이고 아래로 갈수록 y가 커집니다. 반대로 위도는 위로 갈수록 큽니다. 그래서 `yMax - latToY(lat)`로 위아래를 뒤집어줘야 북쪽이 화면 위로 갑니다. 이 부호 하나 빠뜨리면 지도가 거꾸로 뒤집힙니다.
+
+---
+
+## 3단계: 폴리곤을 SVG path로 변환한다
+
+투영 함수까지 나오면 가장 어려운 산은 넘은 셈입니다. 이제 각 지역의 좌표 링을 SVG `path`의 `d` 속성 문자열로 바꾸기만 하면 됩니다.
+
+`path`의 문법은 의외로 간단합니다. 첫 점은 `M`(move to)으로 펜을 옮기고, 이후 점들은 `L`(line to)로 선을 잇고, 마지막에 `Z`로 도형을 닫습니다.
+
+```js
+// 좌표 링 하나를 SVG path의 d 속성 문자열로 만든다.
+function ringToPath(ring, project) {
+  return ring
+    .map(([lng, lat], i) => {
+      const [x, y] = project([lng, lat]);
+      // 첫 점은 M, 나머지는 L. 소수점 2자리로 줄여 path를 가볍게.
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ')
+    .concat(' Z');
+}
+```
+
+MultiPolygon은 서브 경로가 여러 개라는 점만 다릅니다. 각 링을 path 문자열로 만든 뒤 공백으로 이어 붙이면, 하나의 `<path>` 안에 여러 도형이 함께 그려집니다.
+
+```js
+function featureToPath(feature, project) {
+  const d = extractPolygons(feature.geometry)
+    .flatMap((polygon) => polygon.map((ring) => ringToPath(ring, project)))
+    .join(' ');
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('class', 'region');
+  // 지역명을 data 속성에 담아 hover/클릭에서 꺼내 쓴다.
+  path.dataset.name = feature.properties.name ?? '';
+  return path;
+}
+```
+
+여기서 `properties.name`을 `data-name` 속성에 박아둔 게 뒤에서 빛을 발합니다. 도형과 지역명을 한 몸으로 묶어두면, 이벤트에서 별도 조회 없이 곧장 어느 지역인지 알 수 있거든요.
+
+마지막으로 모든 Feature를 순회해 `<svg>`에 붙이면 지도가 완성됩니다.
+
+```js
+export function renderMap(geojson, { width = 720, height = 820, padding = 28 } = {}) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  const bounds = computeBounds(geojson.features);
+  const project = createProjector(bounds, width, height, padding);
+
+  for (const feature of geojson.features) {
+    svg.appendChild(featureToPath(feature, project));
+  }
+  return svg;
+}
+```
+
+생각보다 간단하죠? bounding box → 투영 → path 변환, 이 세 단계가 전부입니다.
+
+---
+
+## 4단계: hover로 지역 강조하기
+
+지도가 그려졌으니 약간의 상호작용을 더해봅니다. 마우스를 올린 지역의 색을 바꾸고, 이름을 화면에 띄우는 정도로 충분합니다.
+
+지역이 17개뿐이라 path마다 리스너를 다는 것도 가능하지만, 저는 SVG 하나에만 리스너를 달고 이벤트 위임으로 처리했습니다. path가 수백 개로 늘어나도 리스너는 하나면 되니까요.
+
+```js
+svg.addEventListener('mouseover', (e) => {
+  const target = e.target;
+  if (!(target instanceof SVGPathElement)) return;
+  // hover한 지역에 강조 클래스를 붙여 채움색을 바꾼다.
+  target.classList.add('is-active');
+  label.textContent = target.dataset.name ?? '';
+});
+
+svg.addEventListener('mouseout', (e) => {
+  const target = e.target;
+  if (!(target instanceof SVGPathElement)) return;
+  target.classList.remove('is-active');
+});
+```
+
+색을 바꾸는 일은 CSS에 맡깁니다. JavaScript는 클래스만 토글하고, 실제 스타일은 `.region`과 `.is-active`로 분리해두면 코드가 깔끔해집니다.
+
+```css
+.region {
+  fill: #dbeafe;
+  stroke: #60a5fa;
+  stroke-width: 0.8;
+  transition: fill 0.12s ease;
+  cursor: pointer;
+}
+.region.is-active {
+  fill: #f59e0b; /* hover 시 주황색으로 강조 */
+}
+```
+
+`data-name`에 지역명을 미리 넣어둔 덕분에, 이벤트 핸들러는 `target.dataset.name`만 읽으면 됩니다. 결과는 이렇습니다.
+
+![경상북도에 마우스를 올려 주황색으로 강조된 지도. 부속 섬인 울릉도까지 함께 강조되고 하단에 지역명이 표시된다](/geojson-hover.png)
+
+경상북도에 마우스를 올리니 본토뿐 아니라 동쪽의 울릉도까지 함께 강조됩니다. 두 도형이 하나의 MultiPolygon으로 묶여 같은 `<path>`에 들어 있기 때문이죠.
+앞서 Polygon과 MultiPolygon을 같은 형태로 통일해둔 처리가 여기서 자연스럽게 맞아떨어집니다.
+
+---
+
+## 정리
+
+라이브러리 없이 GeoJSON을 지도로 그리는 과정을 다시 짚어보면 이렇습니다.
+
+- GeoJSON은 그냥 JSON이고, 좌표는 `[경도, 위도]` 순서다. Polygon과 MultiPolygon만 알면 지도 대부분을 그릴 수 있다.
+- 모든 좌표를 훑어 bounding box를 구하고, 그걸 화면 크기에 맞춰 스케일·정렬한다.
+- 투영의 핵심은 x와 y를 같은 단위 공간에서 계산하는 것. 단위가 어긋나면 지도가 찌부러진다.
+- 화면 y축은 아래로 커지므로 위도를 뒤집어야 북쪽이 위로 간다.
+- 각 도형을 `M`/`L`/`Z` 문법의 SVG path로 바꾸고, `data` 속성과 이벤트 위임으로 상호작용을 붙인다.
+
+## 마치며
+
+막상 직접 만들어 보니, 평소 한 줄로 쓰던 지도 라이브러리가 내부에서 무얼 해주고 있었는지 손에 잡히는 느낌이었습니다.
+좌표를 픽셀로 옮기는 투영, 비율을 지키는 스케일링, 위아래를 뒤집는 부호 처리. 라이브러리가 이런 자잘하지만 틀리기 쉬운 일들을 대신 해주고 있었던 거죠.
+
+물론 실무에서 진짜 지도가 필요하면 저도 leaflet이나 d3를 씁니다. 줌, 타일, 좌표계 변환까지 직접 만드는 건 비효율적이니까요.
+다만 원리를 한 번 들여다보고 나니, 그 도구들이 던지는 옵션 이름이나 에러 메시지가 전보다 훨씬 잘 읽힙니다. 도구를 더 잘 쓰기 위해 바닥을 한 번 긁어보는 일은, 생각보다 자주 남는 장사인 것 같습니다. ☺️
+
+긴 글 읽어주셔서 감사합니다.
+
+---
+
+> 이 글의 예제 코드와 단순화한 GeoJSON 데이터는 저장소의 `playground/geojson-viz`에 있습니다.
+> 지도 데이터 출처는 [southkorea/southkorea-maps](https://github.com/southkorea/southkorea-maps)(통계청 2018년 시도 경계)이며, 원본(약 7.5MB)을 Douglas-Peucker 알고리즘으로 약 158KB까지 단순화해 사용했습니다.

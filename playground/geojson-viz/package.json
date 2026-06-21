@@ -1,0 +1,11 @@
+{
+  "name": "geojson-viz",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "라이브러리 없이 GeoJSON을 SVG 지도로 그리는 예제",
+  "scripts": {
+    "isolated:dev": "npx --yes serve@14 -l 5173 .",
+    "simplify": "node scripts/simplify.mjs"
+  }
+}

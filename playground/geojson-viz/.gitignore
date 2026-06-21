@@ -1,0 +1,9 @@
+# dependencies
+/node_modules
+
+# 캡처/스크린샷 임시 파일
+/tmp
+*.png
+
+# misc
+.DS_Store
