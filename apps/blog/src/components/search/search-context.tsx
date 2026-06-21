@@ -60,6 +60,8 @@ export function SearchProvider({ children }: PropsWithChildren) {
   const fuseRef = useRef<Fuse<SearchDoc> | null>(null);
   // 로딩 중복 방지를 위한 플래그
   const loadingRef = useRef(false);
+  // 단축키 핸들러에서 최신 열림 상태를 참조하기 위한 ref
+  const isOpenRef = useRef(false);
 
   // 검색 인덱스를 최초 1회만 lazy 로드한다
   const loadIndex = useCallback(async () => {
@@ -82,11 +84,15 @@ export function SearchProvider({ children }: PropsWithChildren) {
   }, []);
 
   const open = useCallback(() => {
+    isOpenRef.current = true;
     setIsOpen(true);
     void loadIndex(); // 열 때 인덱스 로드 시작
   }, [loadIndex]);
 
-  const close = useCallback(() => setIsOpen(false), []);
+  const close = useCallback(() => {
+    isOpenRef.current = false;
+    setIsOpen(false);
+  }, []);
 
   const search = useCallback((query: string): SearchDoc[] => {
     const fuse = fuseRef.current;
@@ -100,15 +106,14 @@ export function SearchProvider({ children }: PropsWithChildren) {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsOpen((prev) => {
-          if (!prev) void loadIndex(); // 열릴 때 인덱스 로드
-          return !prev;
-        });
+        // 부수효과는 setState 업데이터 밖에서 처리(open/close 재사용)
+        if (isOpenRef.current) close();
+        else open();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [loadIndex]);
+  }, [open, close]);
 
   const value = useMemo<SearchContextValue>(
     () => ({ isOpen, open, close, status, search }),

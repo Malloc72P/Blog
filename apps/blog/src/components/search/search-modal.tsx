@@ -114,6 +114,11 @@ export function SearchModal() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="포스트 검색…"
+            aria-label="포스트 검색"
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls="search-result-list"
+            aria-activedescendant={results.length > 0 ? `search-option-${activeIndex}` : undefined}
             className="h-14 w-full bg-transparent text-base text-black outline-none placeholder:text-gray-400"
           />
           <button
@@ -146,9 +151,15 @@ export function SearchModal() {
             <p className="px-4 py-6 text-center text-sm text-gray-400">검색 결과가 없습니다.</p>
           )}
 
-          <ul>
+          <ul id="search-result-list" role="listbox">
             {results.map((doc, idx) => (
-              <li key={doc.route} ref={idx === activeIndex ? activeItemRef : null}>
+              <li
+                key={doc.route}
+                id={`search-option-${idx}`}
+                role="option"
+                aria-selected={idx === activeIndex}
+                ref={idx === activeIndex ? activeItemRef : null}
+              >
                 <Link
                   href={doc.route}
                   onClick={close}
