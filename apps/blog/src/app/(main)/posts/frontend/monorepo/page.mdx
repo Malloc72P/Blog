@@ -204,7 +204,8 @@ pnpm add turbo --save-dev --workspace-root
       // 다른 작업에 의존성을 가질 수 있습니다.
       "dependsOn": ["^build"],
       // 해당 작업에 대한 입력 파일을 지정합니다. 여기에 명시된 파일이 수정되면 캐시를 무효화합니다.
-      "inputs": [],
+      // 생략하면 소스 컨트롤에 포함된 모든 파일을 입력으로 간주합니다.
+      "inputs": ["src/**", "package.json", "tsconfig.json"],
       // 빌드 결과물을 캐싱합니다.
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },

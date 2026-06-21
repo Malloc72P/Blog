@@ -103,7 +103,7 @@ services:
 
 ```js
 datasource: {
-    url: process.env["DATABASE_URL"],
+    url: env("DATABASE_URL"),
 },
 ```
 
@@ -126,7 +126,7 @@ pnpm prisma studio
 ```
 
 - prisma는 데이터를 관리할 수 있는 studio라는 도구를 제공합니다.
-- 실행하면 http://localhost:51212/ 주소로 웹페이지가 하나 열릴텐데, 에러 메시지가 표시되지 않는다면, 정상적으로 연결된 것을 의미합니다.
+- 실행하면 http://localhost:5555/ 주소로 웹페이지가 하나 열릴텐데, 에러 메시지가 표시되지 않는다면, 정상적으로 연결된 것을 의미합니다.
 - 만약 실패했다면, DB 컨테이너가 켜져 있는지, 접속 URL에 문제가 없는지 확인해주세요.
 
 #### 엔티티 추가하기
