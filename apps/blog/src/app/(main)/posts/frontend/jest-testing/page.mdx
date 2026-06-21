@@ -81,7 +81,7 @@ mkdir cart-test && cd cart-test && npm init -y
 npm install --save-dev jest
 ```
 
-이대로 테스트 파일에 `import`를 쓰면 보통 한 번 막힙니다. Node가 기본적으로 CommonJS로 파일을 읽기 때문에, `import`/`export` 같은 ESM 문법을 그대로 이해하지 못하는 경우가 많거든요.
+이대로 테스트 파일에 `import`를 쓰면 보통 한 번 막힙니다. Jest는 기본적으로 코드를 CommonJS로 변환해 실행하기 때문에, `import`/`export` 같은 ESM 문법을 그대로 돌리려면 변환기가 필요하거든요.
 저는 소스 코드를 ESM으로 쓰고 싶었기 때문에, 변환기로 babel을 함께 깔았습니다.
 
 ```bash

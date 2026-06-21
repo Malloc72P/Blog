@@ -198,7 +198,7 @@ export function OrderGrid({ orders }: OrderGridProps) {
 
 - 서버 컴포넌트를 통해 비동기 함수를 호출하여 데이터 조회(아직 데이터 조회 기능은 더미임)
 - 서버 컴포넌트에서 클라이언트 컴포넌트로 조회된 데이터 전달(props)
-- 클라이언트 컴포넌트에서 전달받은 데이터 랜더링(OrderGrid)
+- 클라이언트 컴포넌트에서 전달받은 데이터 렌더링(OrderGrid)
 
 #### 서버 액션
 
@@ -263,7 +263,7 @@ export interface OrderGridProps {
 export function OrderGrid({ orders }: OrderGridProps) {
   return (
     <div>
-      {/* 서버 컴포넌트에서 내려준 orders를 랜더링 */}
+      {/* 서버 컴포넌트에서 내려준 orders를 렌더링 */}
       <ul>
         {orders.map((o) => (
           <li key={o.id}>
