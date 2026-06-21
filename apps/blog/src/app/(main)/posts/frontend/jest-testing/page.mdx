@@ -1,0 +1,407 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'Jest로 자바스크립트 단위 테스트 시작하기',
+  description:
+    'Jest 설치와 babel 설정부터 첫 테스트, 비동기 테스트, mock, 비공개 함수 테스트까지 실제로 통과하는 예제로 단위 테스트를 시작해 봅니다.',
+  seriesId: 'frontend',
+  postId: 'jest-testing',
+  tags: ['Jest', 'JavaScript', 'Testing'],
+  date: '2026-06-18 20:47',
+});
+
+# Jest로 단위 테스트 시작하기
+
+얼마 전 장바구니 합계를 계산하는 코드를 손볼 일이 있었습니다.
+할인 로직을 좀 더 깔끔하게 바꾸겠다고 함수 몇 개를 옮기고 이름을 바꿨는데, 정작 화면에서 결제 금액이 이상하게 찍히기 시작하더군요.
+범인은 할인율이 1을 넘어갈 때 음수 금액이 나오는 케이스였습니다. 리팩터링 전에는 우연히 안 건드려졌던 경로였죠.
+
+그때 들었던 생각이 "이걸 매번 손으로 클릭해서 확인할 게 아니라, 한 번 짜두면 알아서 검사해 주는 장치가 있으면 좋겠다"였습니다.
+그게 바로 단위 테스트(unit test)고, 자바스크립트 진영에서 가장 무난하게 시작할 수 있는 도구가 **Jest**입니다.
+
+이번 글에서는 Jest를 처음부터 설치하고, ESM 문법을 쓰기 위해 babel을 곁들이고, 첫 테스트부터 비동기·mock·비공개 함수 테스트까지 손으로 따라가 보겠습니다.
+글에 나오는 코드는 전부 실제로 돌려서 통과시킨 것이고, 결과 스크린샷도 그 실행 화면입니다.
+
+---
+
+## 무엇을 만들고 무엇을 테스트할까
+
+테스트만 따로 떼서 설명하면 추상적이라 와닿지 않습니다. 그래서 작은 장바구니 모듈을 하나 만들고, 그걸 대상으로 테스트를 붙여보겠습니다.
+
+```js
+// src/cart.js
+// 장바구니에 담긴 상품 목록의 합계를 계산한다.
+// items: [{ name, price, quantity }]
+export function calculateTotal(items) {
+  // 배열이 아닌 값이 들어오면 일찍 막는다.
+  if (!Array.isArray(items)) {
+    throw new TypeError('items는 배열이어야 합니다.');
+  }
+  // 각 항목의 price * quantity를 더해 총액을 만든다.
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+
+// 총액에 할인율을 적용한 결과를 리턴한다.
+export function applyDiscount(total, rate) {
+  // 비공개 헬퍼로 할인율을 0~1 범위로 보정한다.
+  const safeRate = clampRate(rate);
+  // 소수점 오차를 막기 위해 정수 단위로 반올림한다.
+  return Math.round(total * (1 - safeRate));
+}
+```
+
+여기서 `clampRate`가 아까 저를 괴롭혔던 그 함수입니다. 할인율이 음수거나 1을 넘어가면 안전한 범위로 잘라주죠.
+
+```js
+// 비공개 헬퍼: export 하지 않는다. 모듈 내부에서만 쓴다.
+function clampRate(rate) {
+  if (rate < 0) return 0;
+  if (rate > 1) return 1;
+  return rate;
+}
+```
+
+`export`가 붙어 있지 않다는 점에 주목해 주세요. 이런 비공개 함수를 어떻게 테스트하는지는 뒤에서 따로 다룹니다.
+
+---
+
+## 설치와 기본 설정
+
+Jest를 개발 의존성으로 설치하는 것부터 시작합니다.
+
+```bash
+npm install --save-dev jest
+```
+
+이대로 테스트 파일에 `import`를 쓰면 보통 한 번 막힙니다. Node가 기본적으로 CommonJS로 파일을 읽기 때문에, `import`/`export` 같은 ESM 문법을 그대로 이해하지 못하는 경우가 많거든요.
+저는 소스 코드를 ESM으로 쓰고 싶었기 때문에, 변환기로 babel을 함께 깔았습니다.
+
+```bash
+npm install --save-dev babel-jest @babel/core @babel/preset-env
+```
+
+- `@babel/core` — babel의 본체입니다.
+- `@babel/preset-env` — 현재 실행 환경(Node 버전)에 맞춰 최신 문법을 변환해 주는 프리셋입니다.
+- `babel-jest` — Jest가 테스트를 돌리기 전에 babel로 코드를 변환하도록 이어주는 어댑터입니다. `babel.config.js`만 있으면 Jest가 알아서 이걸 씁니다.
+
+예전 자료를 보면 babel 없이 안 되는 것처럼 적혀 있기도 한데, 사실 babel은 "ESM 문법을 마음 편히 쓰기 위한" 선택지 중 하나입니다.
+Node의 네이티브 ESM이나 TypeScript의 ts-jest를 쓰는 길도 있지만, 군더더기 없이 동작하고 설정이 짧다는 점에서 저는 babel 조합을 선호합니다.
+
+`babel.config.js`는 이렇게만 적어두면 충분합니다.
+
+```js
+// babel.config.js
+// preset-env가 현재 노드 버전에 맞게 import/export 등을 변환한다.
+export default {
+  presets: [['@babel/preset-env', { targets: { node: 'current' } }]],
+};
+```
+
+다음은 Jest 설정입니다. 사실 설정 파일 없이도 돌아가지만, 환경과 커버리지 수집 대상 정도는 명시해 두는 편이 나중을 위해 좋습니다.
+
+```js
+// jest.config.js
+export default {
+  // 노드 환경에서 실행한다. 브라우저 DOM이 필요하면 'jsdom'으로 바꾼다.
+  testEnvironment: 'node',
+  // 커버리지를 어떤 파일에서 수집할지 지정한다.
+  collectCoverageFrom: ['src/**/*.js'],
+};
+```
+
+마지막으로 `package.json`에 스크립트를 등록합니다.
+
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "coverage": "jest --coverage"
+  }
+}
+```
+
+이제 `npm test` 한 줄이면 프로젝트의 모든 테스트가 돌아갑니다. 준비 끝입니다.
+
+---
+
+## 첫 번째 테스트
+
+Jest는 파일 이름이 `*.test.js`이거나 `__tests__` 폴더 안에 있으면 테스트 파일로 인식합니다.
+저는 소스 옆에 `cart.test.js`를 두는 방식을 좋아합니다. 어떤 파일을 테스트하는지 한눈에 보이거든요.
+
+```js
+// src/cart.test.js
+import { calculateTotal } from './cart.js';
+
+describe('calculateTotal', () => {
+  it('상품들의 가격과 수량을 곱해 합계를 구한다', () => {
+    const items = [
+      { name: '사과', price: 1000, quantity: 3 },
+      { name: '우유', price: 2500, quantity: 2 },
+    ];
+    // 1000*3 + 2500*2 = 8000
+    expect(calculateTotal(items)).toBe(8000);
+  });
+});
+```
+
+세 가지 함수만 알면 일단 테스트를 쓸 수 있습니다.
+
+- `describe(설명, 콜백)` — 관련된 테스트를 묶는 그룹입니다. 같은 함수에 대한 테스트들을 하나로 모아둡니다.
+- `it(설명, 콜백)` — 개별 테스트 케이스입니다. `test`라는 별칭도 있는데, `it('...')`이 영어로 읽으면 "그것은 ~한다"가 되어 자연스러워 저는 `it`을 씁니다.
+- `expect(값).matcher(기대값)` — 실제 값이 기대대로인지 확인합니다. `toBe`가 가장 기본적인 matcher입니다.
+
+`npm test`를 돌려보면 초록색 체크가 뜹니다. 생각보다 간단하죠?
+
+---
+
+## matcher 골라 쓰기
+
+`toBe` 하나로 모든 걸 검증할 수는 없습니다. 상황마다 어울리는 matcher가 따로 있습니다.
+
+### 값이 같은지: toBe vs toEqual
+
+숫자나 문자열 같은 원시값은 `toBe`로 충분합니다. 그런데 객체나 배열은 다릅니다.
+`toBe`는 "같은 메모리 주소를 가리키는가(===)"를 보기 때문에, 모양이 같아도 다른 객체면 실패합니다.
+객체의 **내용**이 같은지 보려면 `toEqual`을 써야 합니다.
+
+```js
+// src/cart.test.js
+import { createItem } from './cart.js';
+
+describe('createItem', () => {
+  it('이름, 가격, 수량을 담은 객체를 만든다', () => {
+    // 객체 비교는 toBe(참조)가 아니라 toEqual(값)을 쓴다.
+    expect(createItem('빵', 3000, 2)).toEqual({
+      name: '빵',
+      price: 3000,
+      quantity: 2,
+    });
+  });
+});
+```
+
+이걸 모르고 객체에 `toBe`를 썼다가 "분명 같은데 왜 실패하지?"라며 한참 헤매는 건, 단위 테스트를 처음 쓸 때 거의 모두가 한 번씩 겪는 통과 의례 같은 것입니다.
+
+### 에러가 나는지: toThrow
+
+잘못된 입력에 함수가 제대로 화를 내는지도 테스트 대상입니다. 이때는 `toThrow`를 씁니다.
+주의할 점은 `expect`에 **함수 호출 결과가 아니라 함수 자체**를 넘겨야 한다는 것입니다. 그래야 Jest가 그 함수를 try-catch로 감싸서 실행해 볼 수 있거든요.
+
+```js
+it('배열이 아닌 값을 넣으면 TypeError를 던진다', () => {
+  // () => ... 로 감싸서 "호출하는 행위"를 넘긴다.
+  expect(() => calculateTotal(null)).toThrow(TypeError);
+  // 에러 메시지의 일부 문자열로도 검증할 수 있다.
+  expect(() => calculateTotal('장바구니')).toThrow('배열이어야');
+});
+```
+
+`toThrow`에는 에러 클래스, 메시지 전체, 메시지 일부(부분 문자열), 정규식 등을 넘길 수 있습니다.
+처음 저를 괴롭혔던 그 할인 버그도, 경계값을 검증하는 테스트 몇 줄을 미리 짜뒀다면 리팩터링 도중에 바로 빨간불이 들어왔을 겁니다.
+
+```js
+describe('applyDiscount', () => {
+  it('할인율이 1을 넘으면 1로 보정되어 0원이 된다', () => {
+    expect(applyDiscount(10000, 1.5)).toBe(0);
+  });
+
+  it('음수 할인율은 0으로 보정되어 원금 그대로다', () => {
+    expect(applyDiscount(10000, -0.3)).toBe(10000);
+  });
+});
+```
+
+---
+
+## 반복 준비는 beforeEach로
+
+테스트마다 똑같은 장바구니 데이터를 만들어 쓰는 일이 잦습니다. 매번 복붙하면 지저분하죠.
+`beforeEach`는 각 `it`이 실행되기 **직전마다** 호출되어, 깨끗한 초기 상태를 만들어 줍니다.
+
+```js
+describe('calculateTotal', () => {
+  let items;
+
+  beforeEach(() => {
+    // 테스트 사이에 데이터가 오염되지 않도록 매번 새로 만든다.
+    items = [
+      { name: '사과', price: 1000, quantity: 3 },
+      { name: '우유', price: 2500, quantity: 2 },
+    ];
+  });
+
+  it('합계를 구한다', () => {
+    expect(calculateTotal(items)).toBe(8000);
+  });
+
+  it('빈 장바구니의 합계는 0이다', () => {
+    expect(calculateTotal([])).toBe(0);
+  });
+});
+```
+
+여기서 핵심은 "매번 새로 만든다"입니다. 한 테스트에서 `items`를 건드려도 다음 테스트는 영향을 받지 않습니다.
+테스트끼리 서로 간섭하면 어느 순간부터 "혼자 돌리면 통과하는데 같이 돌리면 깨지는" 유령 버그를 만나게 됩니다. `beforeEach`는 그걸 막아주는 장치입니다.
+
+비슷하게 `afterEach`, `beforeAll`, `afterAll`도 있습니다. 이름 그대로 각 테스트 뒤, 전체 시작 전, 전체 끝난 뒤에 돌아갑니다.
+
+---
+
+## 비동기 테스트
+
+실무 코드 대부분은 비동기입니다. API를 부르고, 결과를 기다리죠. 테스트도 그 기다림을 다룰 줄 알아야 합니다.
+
+결제를 진행하는 함수를 예로 들어보겠습니다. 실제 결제 API를 인자로 주입받는 형태로 만들었습니다(이렇게 해두면 테스트가 훨씬 편해지는데, 이유는 바로 다음 절에서 설명합니다).
+
+```js
+// src/checkout.js
+import { calculateTotal, applyDiscount } from './cart.js';
+
+export async function checkout(items, rate, pay) {
+  const total = calculateTotal(items);
+  const finalPrice = applyDiscount(total, rate);
+  // 주입받은 결제 함수를 호출한다. Promise를 리턴한다고 가정한다.
+  const receipt = await pay(finalPrice);
+  return { ...receipt, finalPrice };
+}
+```
+
+비동기 테스트의 요령은 단 하나, **테스트 콜백을 `async`로 만들고 `await`로 결과를 기다리는 것**입니다.
+이걸 깜빡하면 Jest가 비동기 작업이 끝나기도 전에 테스트를 통과시켜 버립니다. 실제로는 실패할 코드가 초록불로 보이는, 가장 위험한 상황이죠.
+
+```js
+it('결제가 끝날 때까지 기다린 뒤 결과를 확인한다', async () => {
+  const result = await checkout(items, 0.1, pay);
+  expect(result.finalPrice).toBe(9000);
+});
+```
+
+거부(reject)되는 Promise를 검증할 때는 `rejects` 매처가 깔끔합니다.
+
+```js
+it('결제 함수가 거부되면 그 에러가 그대로 전파된다', async () => {
+  const pay = jest.fn().mockRejectedValue(new Error('카드 한도 초과'));
+  // 비동기 reject는 rejects.toThrow 로 잡는다.
+  await expect(checkout(items, 0, pay)).rejects.toThrow('카드 한도 초과');
+});
+```
+
+---
+
+## mock: 진짜 대신 가짜를 끼우기
+
+방금 예제에서 `jest.fn()`이 나왔습니다. 이게 mock의 핵심입니다.
+
+실제 결제 API를 테스트에서 진짜로 호출하면 어떻게 될까요? 카드가 진짜 긁히거나, 네트워크가 느리거나, 서버가 죽어 있으면 테스트도 같이 실패합니다.
+우리가 검증하고 싶은 건 "결제 API가 잘 동작하는가"가 아니라 "우리 `checkout` 함수가 결제 API를 **올바른 금액으로 한 번** 호출하는가"입니다.
+그래서 진짜 API 대신 가짜 함수를 끼워 넣습니다. 이게 mock입니다.
+
+```js
+// src/checkout.test.js
+import { checkout } from './checkout.js';
+
+it('결제 함수에 할인된 최종 금액을 넘겨 호출한다', async () => {
+  // jest.fn()으로 가짜 결제 함수를 만든다. 호출 기록이 남는다.
+  const pay = jest.fn().mockResolvedValue({ ok: true, id: 'ORDER-1' });
+
+  const items = [{ name: '커피', price: 5000, quantity: 2 }];
+  // 10000원에서 10% 할인 -> 9000원
+  const result = await checkout(items, 0.1, pay);
+
+  // pay가 9000원으로 정확히 한 번 호출됐는지 검증한다.
+  expect(pay).toHaveBeenCalledTimes(1);
+  expect(pay).toHaveBeenCalledWith(9000);
+  expect(result).toEqual({ ok: true, id: 'ORDER-1', finalPrice: 9000 });
+});
+```
+
+`jest.fn()`이 만든 가짜 함수는 자신이 **몇 번**, **어떤 인자로** 불렸는지 전부 기록합니다.
+그 기록을 `toHaveBeenCalledTimes`, `toHaveBeenCalledWith` 같은 matcher로 들여다보는 거죠.
+
+- `mockResolvedValue(값)` — 호출하면 그 값으로 이행되는 Promise를 돌려준다(성공 흉내).
+- `mockRejectedValue(에러)` — 호출하면 그 에러로 거부되는 Promise를 돌려준다(실패 흉내).
+- `toHaveBeenCalledWith(...)` — 가짜 함수가 어떤 인자로 호출됐는지 확인한다.
+
+아까 `checkout`을 만들 때 결제 함수를 인자로 받게 한 이유가 여기 있습니다. 의존성을 밖에서 주입받게 해두면, 테스트에서 가짜로 갈아끼우기가 쉬워집니다.
+모듈 전체를 가로채는 `jest.mock('모듈경로')`도 있지만, 가능하면 이렇게 주입으로 푸는 쪽이 테스트도 코드도 더 깔끔하다고 느낍니다.
+
+---
+
+## 비공개(미export) 함수는 어떻게 테스트할까
+
+맨 앞에서 `clampRate`를 일부러 `export` 없이 남겨뒀습니다. 이런 모듈 내부 함수는 밖에서 불러올 수 없으니 테스트하기 까다롭습니다.
+
+먼저 원칙부터 말하면, **비공개 함수는 대개 직접 테스트하지 않는 게 맞습니다.**
+`clampRate`는 `applyDiscount`를 통해서만 세상에 노출됩니다. 그러니 `applyDiscount(10000, 1.5)`가 0을 돌려주는지 확인하면, `clampRate`도 사실상 함께 검증됩니다.
+비공개 함수는 구현 세부사항이고, 테스트가 세부사항에 너무 들러붙으면 리팩터링할 때마다 테스트가 깨져서 오히려 짐이 됩니다. 그래서 **공개 API를 통해 테스트하는 게 기본**입니다.
+
+그럼에도 내부 로직이 복잡해서 따로 떼어 검증하고 싶을 때가 있습니다. 그럴 때 쓰는 우회법 하나를 소개합니다.
+Jest는 실행 시 `process.env.NODE_ENV`를 자동으로 `'test'`로 맞춰줍니다. 이걸 이용해 **테스트 환경에서만 열리는 출구**를 모듈에 두는 방법입니다.
+
+```js
+// src/cart.js 맨 아래
+// 테스트 전용 출구: 운영 빌드가 아닐 때만 비공개 함수를 노출한다.
+export const __testables__ =
+  process.env.NODE_ENV === 'test' ? { clampRate } : undefined;
+```
+
+```js
+// src/cart.test.js
+import { __testables__ } from './cart.js';
+
+describe('비공개 헬퍼 clampRate', () => {
+  it('0~1 범위 밖의 값을 잘라낸다', () => {
+    // __testables__는 NODE_ENV가 test일 때만 존재한다.
+    expect(__testables__).toBeDefined();
+    const { clampRate } = __testables__;
+    expect(clampRate(-1)).toBe(0);
+    expect(clampRate(0.4)).toBe(0.4);
+    expect(clampRate(2)).toBe(1);
+  });
+});
+```
+
+운영 환경에서는 `__testables__`가 `undefined`라 사실상 내부 구현이 새어 나가지 않습니다.
+
+> 참고로 예전에는 `babel-plugin-rewire`라는 babel 플러그인을 깔고 `require('./cart').__get__('clampRate')` 식으로 비공개 함수를 끄집어내는 방법을 많이 썼습니다.
+> 다만 이 플러그인은 지금은 관리가 거의 멈춘 상태라, 최신 환경에서는 위처럼 환경 변수로 출구를 여는 방식이 훨씬 단순하고 의존성도 안 늘어납니다.
+
+거듭 강조하지만, 이건 어디까지나 "정말 필요할 때의 우회법"입니다. 평소에는 공개 API로 테스트하는 습관을 들이는 편이 건강합니다.
+
+---
+
+## 실행 결과와 커버리지
+
+여기까지 작성한 테스트를 모두 모아 `npm test`를 돌리면 다음과 같이 나옵니다. `describe`로 묶은 그룹과 `it`으로 정의한 케이스가 트리 형태로 펼쳐지고, 통과한 테스트마다 초록 체크가 붙습니다.
+
+![Jest 테스트 실행 결과. 12개의 테스트가 모두 통과한 화면](/jest-test-result.png)
+
+테스트가 코드를 얼마나 훑고 지나갔는지 보고 싶다면 `npm run coverage`를 씁니다. 어느 줄이 한 번도 실행되지 않았는지 표로 알려줍니다.
+
+![Jest 커버리지 표. cart.js와 checkout.js의 statements, branch, functions, lines 커버리지 수치](/jest-coverage.png)
+
+여기서 재밌는 건 `cart.js`의 Branch 커버리지가 90.9%로, 100%가 아니라는 점입니다. 표 오른쪽을 보면 `42`번 줄이 안 짚였다고 나오죠.
+42번 줄은 방금 만든 테스트 전용 출구입니다. `process.env.NODE_ENV === 'test' ? { clampRate } : undefined`라는 삼항에서, Jest로 돌릴 때는 `NODE_ENV`가 늘 `'test'`라 `: undefined` 쪽 분기는 한 번도 실행되지 않습니다. 운영 환경에서만 타는 길이라 테스트에선 영영 안 밟히는, 어찌 보면 당연한 빈칸인 셈이죠.
+이렇게 커버리지 표는 "내가 테스트했다고 생각했지만 사실 한 갈래는 안 밟고 지나갔다"는 사각지대를 짚어주는 용도로 유용합니다.
+
+다만 커버리지 숫자에 집착할 필요는 없습니다. 100%라도 잘못된 단언으로 채운 테스트는 의미가 없고, 80%라도 핵심 경로를 제대로 검증했다면 충분합니다.
+숫자는 어디까지나 참고용 지도일 뿐, 목표 그 자체가 되면 곤란합니다.
+
+---
+
+## 정리
+
+- `describe`로 묶고 `it`으로 케이스를 적고 `expect(...).matcher(...)`로 단언하는 것이 Jest 테스트의 뼈대입니다.
+- 원시값은 `toBe`, 객체·배열은 `toEqual`, 에러는 함수를 감싸 `toThrow`로 검증합니다.
+- 비동기 테스트는 콜백을 `async`로 만들고 `await`로 기다립니다. 거부는 `rejects` 매처로 잡습니다.
+- 외부 의존성은 `jest.fn()` mock으로 갈아끼우고, 호출 횟수·인자를 `toHaveBeenCalledWith`로 확인합니다.
+- 비공개 함수는 우선 공개 API로 검증하고, 꼭 필요할 때만 테스트 전용 출구로 우회합니다.
+
+## 마치며
+
+처음 테스트를 붙일 때는 "이 시간에 기능을 하나라도 더 만드는 게 낫지 않나" 싶었습니다.
+그런데 한 번 안전망을 깔아두니, 리팩터링하다 무언가 깨지면 빨간불이 곧바로 알려주더군요. 그 안도감을 한 번 맛보고 나면 다시 테스트 없이 코드를 고치기가 오히려 불안해집니다.
+
+처음부터 완벽한 커버리지를 노릴 필요는 없습니다. 오늘 손본 함수 하나에 테스트 한 줄 붙이는 것부터 시작하면 됩니다.
+긴 글 읽어주셔서 감사합니다.
