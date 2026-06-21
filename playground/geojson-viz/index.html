@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>라이브러리 없이 GeoJSON 지도 그리기</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --land: #dbeafe;
+        --land-stroke: #60a5fa;
+        --land-hover: #f59e0b;
+        --land-selected: #ef4444;
+        --text: #1e293b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 32px 16px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .hint {
+        margin: 0 0 16px;
+        color: #64748b;
+        font-size: 14px;
+      }
+      .map-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      }
+      .region {
+        fill: var(--land);
+        stroke: var(--land-stroke);
+        stroke-width: 0.8;
+        stroke-linejoin: round;
+        transition:
+          fill 0.12s ease,
+          transform 0.12s ease;
+        cursor: pointer;
+      }
+      .region.is-active {
+        fill: var(--land-hover);
+      }
+      .region.is-selected {
+        fill: var(--land-selected);
+      }
+      #label {
+        min-height: 28px;
+        margin-top: 12px;
+        font-size: 18px;
+        font-weight: 700;
+        color: #b45309;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>라이브러리 없이 그린 대한민국 시도 지도</h1>
+    <p class="hint">지역 위에 마우스를 올리면 강조됩니다. (순수 SVG + JavaScript)</p>
+    <div class="map-card">
+      <div id="app"></div>
+      <div id="label">&nbsp;</div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
