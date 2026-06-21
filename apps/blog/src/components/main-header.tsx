@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { DropdownMenu } from './dropdown-menu';
 import { SeriesModel, TagModel } from '@libs/types/commons';
 import { MobileSidebar } from './mobile-sidebar';
+import { SearchButton } from './search';
 
 export interface MainHeaderProps {
   seriesList: SeriesModel[];
@@ -24,6 +25,9 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
         <MainHeaderLogo />
 
         <span className="grow"></span>
+
+        {/* === SEARCH BUTTON (모든 화면 크기에서 노출) === */}
+        <SearchButton className="mr-5 text-white" />
 
         {/* === HEADER >= MD: RIGHT SECTION === */}
         <nav className="gap-5 hidden md:flex">
