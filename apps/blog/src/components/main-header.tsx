@@ -58,7 +58,11 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
 
 export function MainHeaderLogo() {
   return (
-    <Link href={PageLinkMap.main.landing()}>
+    // 다크 헤더 위에서 키보드 포커스가 보이도록 밝은 outline + offset을 부여한다.
+    <Link
+      href={PageLinkMap.main.landing()}
+      className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+    >
       {/* 로고는 페이지 제목이 아니므로 h1 대신 span으로 강등한다. 페이지 고유 제목만 h1로 남긴다. */}
       <span className="block text-[16px] md:text-[40px]">Malloc72p.Tech</span>
     </Link>
