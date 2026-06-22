@@ -1,6 +1,7 @@
 'use client';
 
-import { IconCopy } from '@tabler/icons-react';
+import { IconCheck, IconCopy } from '@tabler/icons-react';
+import { useState } from 'react';
 import classes from './post-detail.module.scss';
 import classNames from 'classnames';
 
@@ -24,17 +25,41 @@ export interface CopyButtonProps {
  *
  */
 export function CopyButton({ content }: CopyButtonProps) {
+  // 복사 성공 여부를 상태로 관리해 클릭 후 일정 시간 체크 아이콘으로 피드백한다.
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    // 클립보드 쓰기에 실패해도 화면이 깨지지 않도록 예외를 흡수한다.
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      // 1.5초 뒤 원래 복사 아이콘으로 되돌린다.
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // 클립보드 접근이 거부된 환경에서는 조용히 무시한다.
+    }
+  };
+
   return (
     <button
+      type="button"
+      // 복사 상태에 따라 aria-label을 바꿔 스크린리더에 결과를 알린다.
+      aria-label={copied ? '코드 복사됨' : '코드 복사'}
       className={classNames(
-        'absolute right-5 top-5 p-2 rounded-md opacity-80 hover:opacity-90 active:opacity-100',
+        // p-3로 키워 터치 타겟을 약 44px 확보(아이콘 20px + 패딩 24px).
+        'absolute right-5 top-5 p-3 rounded-md opacity-80 hover:opacity-90 active:opacity-100',
+        // 키보드 포커스 시 시각적 표시(focus-visible ring)로 접근성을 높인다.
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400',
         classes.copyBtn
       )}
-      onClick={() => {
-        navigator.clipboard.writeText(content);
-      }}
+      onClick={handleCopy}
     >
-      <IconCopy className="w-5 h-5 stroke-gray-300" title="Copy code to clipboard" />
+      {copied ? (
+        // 복사 성공 시 체크 아이콘으로 시각 피드백을 준다.
+        <IconCheck className="w-5 h-5 stroke-green-400" title="복사됨" />
+      ) : (
+        <IconCopy className="w-5 h-5 stroke-gray-300" title="코드 복사" />
+      )}
     </button>
   );
 }

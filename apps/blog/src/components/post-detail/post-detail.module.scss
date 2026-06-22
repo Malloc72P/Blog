@@ -23,6 +23,9 @@
     padding-bottom: 24px;
     line-height: 28px;
     word-break: keep-all;
+    // 데스크톱에서 한 줄이 지나치게 길어지지 않도록 가독 권장 폭(약 70자)으로 제한한다.
+    // 코드블록/이미지/표는 아래에서 풀폭을 유지하므로 영향받지 않는다.
+    max-width: 70ch;
   }
 
   ul,
@@ -104,15 +107,16 @@
     p {
       padding-top: 8px;
       padding-bottom: 12px;
-      line-height: 20px;
-      font-size: 12px;
+      line-height: 22px;
+      font-size: 14px; // 모바일 가독성을 위해 12px에서 14px로 상향
       word-break: keep-all;
+      max-width: none; // 모바일은 화면이 좁아 측정폭 제한이 불필요하므로 해제
     }
 
     ul,
     ol {
       padding: 0;
-      font-size: 12px;
+      font-size: 14px; // 본문 폰트와 통일해 12px에서 14px로 상향
     }
 
     li {
@@ -149,11 +153,11 @@
     // ```로 감싸진 코드 블록
     pre {
       padding: 16px 12px !important;
-      font-size: 12px;
+      font-size: 14px; // 모바일에서 코드 한 줄 노출량/가독성 개선을 위해 12px에서 14px로 상향
     }
 
     table {
-      font-size: 12px;
+      font-size: 14px; // 본문 폰트와 통일해 12px에서 14px로 상향
     }
 
     th,
@@ -161,8 +165,7 @@
       padding: 6px 8px;
     }
 
-    .copyBtn {
-      display: none;
-    }
+    // 모바일에서도 코드 복사 버튼이 보이도록 숨김 처리를 제거했다.
+    // (복사 버튼의 터치 타겟 크기는 copy-button.tsx에서 확보)
   }
 }
