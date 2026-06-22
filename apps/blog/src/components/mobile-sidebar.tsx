@@ -5,6 +5,7 @@ import { MainHeaderLogo, MainHeaderProps } from './main-header';
 import { IconMenu2, IconMenu3, IconX } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { PageLinkMap } from '@libs/page-link-map';
 import { Divider } from './divider';
 
@@ -93,6 +94,9 @@ interface SidebarSectionProps {
 }
 
 function SidebarSection({ title, items, onClick }: SidebarSectionProps) {
+  // 현재 경로를 읽어 Series 목록에서 활성 항목을 강조한다.
+  const pathname = usePathname();
+
   return (
     <div className="sidebar-section">
       <div className="pb-3 text-lg">
@@ -101,11 +105,24 @@ function SidebarSection({ title, items, onClick }: SidebarSectionProps) {
       </div>
 
       <ul className="space-y-2">
-        {items.map((item) => (
-          <li key={item.id} onClick={onClick}>
-            <Link href={item.href}>{item.label}</Link>
-          </li>
-        ))}
+        {items.map((item) => {
+          // href가 현재 경로와 정확히 일치하면 활성 항목으로 표시한다.
+          const active = item.href === pathname;
+
+          return (
+            <li key={item.id} onClick={onClick}>
+              <Link
+                href={item.href}
+                // 활성 항목은 스크린리더가 현재 위치를 인지하도록 aria-current를 부여한다.
+                aria-current={active ? 'page' : undefined}
+                // 활성 항목은 굵게 + 밑줄로 강조한다.
+                className={classNames(active && 'font-bold underline')}
+              >
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
