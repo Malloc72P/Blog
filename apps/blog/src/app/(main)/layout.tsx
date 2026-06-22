@@ -1,6 +1,7 @@
 import { findSeriesList } from '@libs/api/find-series';
 import { findTags } from '@libs/api/find-tags';
 import { Mapper } from '@libs/mapper';
+import { PostModel } from '@libs/types/commons';
 import { PropsWithChildren } from 'react';
 import MainClientLayout from './main-client-layout';
 import { findPosts } from '@libs/api/find-posts';
@@ -17,6 +18,8 @@ export default async function MainLayout({ children }: PropsWithChildren) {
   const tags = (await findTags()).map(Mapper.toTagModel);
   const posts = (await findPosts())
     .map((item) => Mapper.toPostModel({ item, seriesModels }))
+    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
+    .filter((post): post is PostModel => post !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
   const postDesc = posts.slice().reverse();
 
