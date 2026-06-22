@@ -1,0 +1,17 @@
+{
+  "name": "ts-type-narrowing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "타입 단언(as) 대신 타입 좁히기와 사용자 정의 타입 가드를 실제로 실행해 확인하는 예제",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "as-danger": "tsx src/01-as-danger.ts",
+    "narrowing": "tsx src/02-narrowing.ts",
+    "type-guard": "tsx src/03-type-guard.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
