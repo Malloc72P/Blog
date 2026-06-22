@@ -11,6 +11,7 @@ import classes from './post-detail.module.scss';
 import { Toc, TocItem } from './toc';
 import { PostNavigator, PostNavigatorPlaceholder } from './post-navigator';
 import { PostRecommendation } from './post-recommendation';
+import { GiscusComments } from './giscus-comments';
 
 export interface PostDetailProps extends PropsWithChildren {
   series: SeriesModel;
@@ -221,6 +222,11 @@ export function PostDetail({ children, series, post }: PostDetailProps) {
           </div>
 
           <PostRecommendation />
+
+          {/* === 댓글 (giscus · GitHub Discussions 기반, DB 없음) === */}
+          <div className="mt-16 md:mt-24">
+            <GiscusComments />
+          </div>
         </footer>
       </section>
     </ArticleContainer>
