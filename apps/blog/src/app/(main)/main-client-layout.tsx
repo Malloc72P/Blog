@@ -2,6 +2,7 @@
 
 import { MainFooter } from '@components/main-footer';
 import { MainHeader } from '@components/main-header';
+import { SearchModal, SearchProvider } from '@components/search';
 import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
 import { createContext, PropsWithChildren, useMemo } from 'react';
 
@@ -40,22 +41,28 @@ export default function MainClientLayout({
 
   return (
     <MainLayoutContext.Provider value={contextState}>
-      <div className="blog-main-layout h-full">
-        {/* ------------------------------------------------------ */}
-        {/* HEADER */}
-        {/* ------------------------------------------------------ */}
-        <MainHeader seriesList={seriesList} tags={tags} />
+      {/* 검색 컨텍스트로 헤더 버튼과 모달이 상태를 공유한다 */}
+      <SearchProvider>
+        <div className="blog-main-layout h-full">
+          {/* ------------------------------------------------------ */}
+          {/* HEADER */}
+          {/* ------------------------------------------------------ */}
+          <MainHeader seriesList={seriesList} tags={tags} />
 
-        {/* ------------------------------------------------------ */}
-        {/* ARTICLE */}
-        {/* ------------------------------------------------------ */}
-        {children}
+          {/* ------------------------------------------------------ */}
+          {/* ARTICLE */}
+          {/* ------------------------------------------------------ */}
+          {children}
 
-        {/* ------------------------------------------------------ */}
-        {/* Footer */}
-        {/* ------------------------------------------------------ */}
-        <MainFooter seriesList={seriesList} />
-      </div>
+          {/* ------------------------------------------------------ */}
+          {/* Footer */}
+          {/* ------------------------------------------------------ */}
+          <MainFooter seriesList={seriesList} />
+        </div>
+
+        {/* 검색 모달(전역) */}
+        <SearchModal />
+      </SearchProvider>
     </MainLayoutContext.Provider>
   );
 }
