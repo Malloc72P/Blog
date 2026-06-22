@@ -10,8 +10,6 @@ export const metadata = frontmatter({
   date: '2026-06-22 22:10',
 });
 
-# never와 unknown 제대로 쓰기: 바닥 타입과 꼭대기 타입
-
 타입스크립트를 쓰다 보면 `never`와 `unknown`을 마주칩니다. 분명 내가 적은 적 없는데 에러 메시지에 `never`가 튀어나오기도 하고, 라이브러리 타입에서 `unknown`을 받아 어떻게 다뤄야 할지 막막할 때도 있습니다.
 
 두 타입은 정반대 자리에 있습니다. `never`는 "어떤 값도 될 수 없는" 바닥 타입(bottom type)이고, `unknown`은 "어떤 값이든 될 수 있는" 꼭대기 타입(top type)입니다. 이 위치만 잡아두면 둘이 왜 그렇게 동작하는지 자연스럽게 풀립니다. [이전 글](/posts/frontend/ts-type-narrowing)에서 다룬 타입 좁히기가 여기서도 핵심 도구로 쓰입니다.
