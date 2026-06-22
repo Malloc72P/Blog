@@ -42,17 +42,11 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
               href: PageLinkMap.series.landing(series.id),
             }))}
           />
-          {/* === TAGS DROPDOWN MENU === */}
-          {/* <DropdownMenu
-            title="Tags"
-            width={160}
-            // leftOffset={-25}
-            items={tags.map((tag) => ({
-              id: tag.id,
-              label: tag.id,
-              href: PageLinkMap.tags.landing(tag.id),
-            }))}
-          /> */}
+          {/* === TAGS INDEX LINK ===
+              태그가 49개로 많아 드롭다운 대신 전체 태그 인덱스 페이지로 가는 링크를 노출한다. */}
+          <Link href={PageLinkMap.tags.index()} className="flex items-center">
+            Tags
+          </Link>
         </nav>
 
         {/* === HEADER < MD: RIGHT SECTION === */}
@@ -65,7 +59,8 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
 export function MainHeaderLogo() {
   return (
     <Link href={PageLinkMap.main.landing()}>
-      <h1 className="text-[16px] md:text-[40px]">Malloc72p.Tech</h1>
+      {/* 로고는 페이지 제목이 아니므로 h1 대신 span으로 강등한다. 페이지 고유 제목만 h1로 남긴다. */}
+      <span className="block text-[16px] md:text-[40px]">Malloc72p.Tech</span>
     </Link>
   );
 }
