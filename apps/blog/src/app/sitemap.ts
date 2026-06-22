@@ -25,7 +25,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const post of posts) {
     sitemaps.push({
-      url: [url, post.route].join('/'),
+      // post.route는 이미 '/posts/...'로 시작하므로 join('/') 대신 직접 연결해 이중 슬래시를 방지한다
+      url: `${url}${post.route}`,
       priority: 0.8,
       lastModified: DateUtil.Dayjs(post.date).toDate(),
     });
