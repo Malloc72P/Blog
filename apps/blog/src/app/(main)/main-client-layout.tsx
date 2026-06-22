@@ -30,12 +30,15 @@ export default function MainClientLayout({
   posts,
   children,
 }: MainClientLayoutProps) {
+  // 랜딩 데이터(posts/seriesList/tags)는 force-static 서버 컴포넌트에서 한 번 계산되어
+  // 내려오는 정적 값이므로, 마운트 시 1회만 컨텍스트를 구성하고 이후 재계산하지 않는다.
   const contextState = useMemo<MainLayoutContextType>(
     () => ({
       tags,
       seriesList,
       posts,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 

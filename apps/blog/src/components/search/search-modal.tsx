@@ -16,8 +16,8 @@ export function SearchModal() {
   const containerRef = useRef<HTMLDivElement>(null); // 포커스 트랩 대상 컨테이너
   const activeItemRef = useRef<HTMLLIElement>(null); // 현재 활성 결과 항목
 
-  // 질의/상태가 바뀔 때마다 결과 재계산
-  const results = useMemo(() => search(query), [search, query, status]);
+  // 질의가 바뀔 때마다 결과 재계산(status는 콜백에서 참조하지 않아 의존성에서 제외)
+  const results = useMemo(() => search(query), [search, query]);
 
   // 모달이 열리면 입력 초기화 + 포커스, 배경 스크롤 잠금
   useEffect(() => {

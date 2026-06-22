@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { MainHeaderLogo, MainHeaderProps } from './main-header';
-import { IconMenu2, IconMenu3, IconX } from '@tabler/icons-react';
+import { IconMenu2, IconX } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { PageLinkMap } from '@libs/page-link-map';
 import { Divider } from './divider';
 
-export interface MobileSidebarProps extends MainHeaderProps {}
+// MainHeaderProps와 동일한 props를 받으므로 빈 인터페이스 대신 타입 별칭으로 둔다.
+export type MobileSidebarProps = MainHeaderProps;
 
 export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
