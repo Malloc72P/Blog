@@ -1,9 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    './src/pages/**/*.{js,ts,jsx,tsx}',
-    './src/components/**/*.{js,ts,jsx,tsx}',
-    './src/app/**/*.{js,ts,jsx,tsx}',
+    // 컴포넌트/앱 라우트와 MDX 포스트(page.mdx)까지 클래스 스캔 대상에 포함한다
+    './src/components/**/*.{js,ts,jsx,tsx,md,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,md,mdx}',
     './src/mdx-components.{js,ts,jsx,tsx}',
   ],
   theme: {
