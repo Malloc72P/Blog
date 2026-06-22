@@ -4,6 +4,7 @@ import { IconChevronDown } from '@tabler/icons-react';
 import classNames from 'classnames';
 import { Html } from 'next/document';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export interface DropdownMenuItemProps {
@@ -27,6 +28,9 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   /* ------------------------------------------------------ */
   const [visible, setVisible] = useState(false);
   const [offsetX, setOffsetX] = useState(0);
+
+  // 현재 경로를 읽어 드롭다운 항목 중 활성 시리즈를 강조한다.
+  const pathname = usePathname();
 
   /* ------------------------------------------------------ */
   /* REFS */
@@ -128,21 +132,32 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
         {/* ------------------------------------------------------ */}
         {/* DROPDOWN BODY ITEMS */}
         {/* ------------------------------------------------------ */}
-        {items.map((item) => (
-          <li
-            key={item.id}
-            onClick={() => {
-              setVisible(false);
-            }}
-          >
-            <Link
-              href={item.href}
-              className="block hover:underline p-3 w-full cursor-pointer rounded-md transition-all duration-300"
+        {items.map((item) => {
+          // href가 현재 경로와 정확히 일치하면 활성 항목으로 표시한다.
+          const active = item.href === pathname;
+
+          return (
+            <li
+              key={item.id}
+              onClick={() => {
+                setVisible(false);
+              }}
             >
-              {item.label}
-            </Link>
-          </li>
-        ))}
+              <Link
+                href={item.href}
+                // 활성 항목은 스크린리더가 현재 위치를 인지하도록 aria-current를 부여한다.
+                aria-current={active ? 'page' : undefined}
+                className={classNames(
+                  'block hover:underline p-3 w-full cursor-pointer rounded-md transition-all duration-300',
+                  // 활성 항목은 굵게 + 밑줄로 강조한다.
+                  active && 'font-bold underline',
+                )}
+              >
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
