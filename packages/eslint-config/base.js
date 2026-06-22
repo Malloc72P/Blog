@@ -14,7 +14,8 @@ export const config = tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
-  { ignores: ['jest.config.js'] },
+  // 빌드 산출물·커버리지 등은 린트 대상에서 제외한다(없으면 `eslint .`가 .next 등을 린트해 폭발한다).
+  { ignores: ['jest.config.js', '.next/**', 'out/**', 'dist/**', 'coverage/**'] },
   {
     plugins: {
       turbo: turboPlugin,
