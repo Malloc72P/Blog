@@ -1,0 +1,184 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '타입 단언(as)을 버리고 타입 좁히기로 안전하게',
+  description:
+    'as 단언이 왜 위험한지부터 typeof·in·instanceof 좁히기, 그리고 param is T 사용자 정의 타입 가드까지, 단언 없이 타입을 안전하게 다루는 방법을 다룹니다.',
+  seriesId: 'frontend',
+  postId: 'ts-type-narrowing',
+  tags: ['Typescript', '타입가드', '타입좁히기', '타입단언'],
+  date: '2026-06-22 20:30',
+});
+
+# 타입 단언(as)을 버리고 타입 좁히기로 안전하게
+
+타입스크립트를 쓰다 보면 `as`를 만나는 순간이 옵니다. 컴파일러가 빨간 줄을 긋는데 이 값이 무슨 타입인지 분명히 알 것 같을 때, `as`로 한 줄 덧붙이면 에러가 사라집니다. 편합니다. 그래서 저도 한동안은 막히면 `as`부터 떠올렸습니다.
+
+그런데 `as`로 지운 빨간 줄은 사실 컴파일러가 "이거 위험한데요"라고 보내던 신호였습니다. 이 글에서는 `as`가 어떤 검사를 건너뛰는지, 그리고 그 검사를 우회하지 않고 타입을 좁히는 방법을 정리합니다.
+
+## as는 컴파일러의 눈을 가린다
+
+타입 단언(Type Assertion)은 "이 값은 이 타입이라고 내가 보증할게"라고 컴파일러에게 선언하는 것입니다. 컴파일러는 그 말을 믿고 더 이상 검사하지 않습니다. 문제는 우리의 보증이 틀렸을 때입니다.
+
+```typescript
+// 서버 응답처럼, 타입을 알 수 없는 값이라고 가정한다.
+const raw: unknown = JSON.parse('"42"'); // 실제 값은 문자열 "42"
+
+// "이건 number라고 내가 보증할게" 하고 단언한다.
+const price = raw as number;
+
+// 타입 검사는 통과한다. price는 number로 취급되기 때문이다.
+console.log(price.toFixed(2));
+```
+
+`raw`의 실제 값은 문자열 `"42"`인데, `as number`로 단언하면서 컴파일러는 `price`를 number로 받아들입니다. 타입 검사는 깔끔하게 통과합니다. 하지만 문자열에는 `toFixed`가 없으니, 실행하면 그대로 터집니다.
+
+![타입 단언으로 인한 런타임 에러를 보여주는 터미널 화면. npx tsx로 실행하자 price.toFixed is not a function 이라는 TypeError가 빨간색으로 출력된다.](/ts-as-runtime-error.png)
+
+타입 검사를 통과했는데 런타임에 `TypeError: price.toFixed is not a function`이 났습니다. 타입스크립트를 쓰는 이유가 이런 에러를 컴파일 타임에 잡으려는 것인데, `as`가 바로 그 검사를 꺼버린 셈입니다.
+
+`as`는 "값을 변환"하지 않습니다. 런타임에는 아무 일도 하지 않고, 오직 컴파일러에게 타입을 다르게 보라고 지시할 뿐입니다. 그래서 보증이 틀리면 막아줄 장치가 없습니다.
+
+## typeof, in, instanceof로 좁히기
+
+`as`의 대안은 타입 좁히기(Narrowing)입니다. 타입스크립트는 조건문 안에서 값의 타입을 자동으로 좁혀줍니다. 우리가 우회하지 않아도, 분기마다 가능한 타입만 남겨줍니다.
+
+좁히지 않으면 어떤 일이 생기는지부터 봅시다. `string | number`를 받아 곧바로 문자열 메서드를 호출하면 이렇게 막힙니다.
+
+```typescript
+function format(value: string | number): string {
+  return value.trim();
+  // error TS2339: Property 'trim' does not exist on type 'string | number'.
+  //   Property 'trim' does not exist on type 'number'.
+}
+```
+
+`value`가 number일 수도 있으니 `trim`을 보장할 수 없다는 것입니다. 여기서 `as string`으로 우회하는 대신, `typeof`로 분기하면 컴파일러가 알아서 타입을 좁혀줍니다.
+
+```typescript
+function format(value: string | number): string {
+  if (typeof value === 'number') {
+    // 이 분기 안에서 value는 number로 좁혀진다.
+    return value.toFixed(2);
+  }
+  // 여기서는 자동으로 string으로 좁혀진다.
+  return value.trim();
+}
+
+console.log(format(3.14159)); // 3.14
+console.log(format('  hi  ')); // hi
+```
+
+`typeof`는 원시 타입을 좁힐 때 쓰고, 객체라면 `in`과 `instanceof`가 있습니다. `in`은 속성이 있는지로, `instanceof`는 어떤 클래스의 인스턴스인지로 좁힙니다.
+
+```typescript
+interface Admin {
+  role: 'admin';
+  permissions: string[];
+}
+interface Guest {
+  role: 'guest';
+  expiresAt: number;
+}
+
+function describe(user: Admin | Guest): string {
+  if ('permissions' in user) {
+    // permissions 속성을 가진 쪽, 즉 Admin으로 좁혀진다.
+    return `관리자(${user.permissions.length}개 권한)`;
+  }
+  // Guest로 좁혀진다.
+  return `게스트(만료 ${user.expiresAt})`;
+}
+
+function dump(value: Date | string): string {
+  if (value instanceof Date) {
+    // Date로 좁혀져 getTime을 안전하게 쓸 수 있다.
+    return String(value.getTime());
+  }
+  return value;
+}
+
+console.log(describe({ role: 'admin', permissions: ['read', 'write'] })); // 관리자(2개 권한)
+console.log(dump(new Date(0))); // 0
+```
+
+세 연산자 모두 공통점이 있습니다. 우리가 "이건 이 타입이야"라고 단언하는 게 아니라, 런타임에 실제로 확인한 뒤 그 결과를 컴파일러가 타입에 반영한다는 점입니다. 검사를 우회하는 게 아니라 검사를 통과시키는 방향입니다.
+
+## 사용자 정의 타입 가드: param is T
+
+`typeof`나 `in`만으로 좁히기 애매한 경우도 있습니다. 판별 로직이 길거나, 여러 곳에서 같은 검사를 재사용하고 싶을 때입니다. 이럴 때 사용자 정의 타입 가드를 만듭니다. 반환 타입을 `param is T` 형태로 선언하는 함수입니다.
+
+```typescript
+interface Cat {
+  type: 'cat';
+  meow(): string;
+}
+interface Dog {
+  type: 'dog';
+  bark(): string;
+}
+
+// 반환 타입이 'animal is Cat' 이다.
+// 이 함수가 true를 반환하면 호출한 쪽에서 animal은 Cat으로 좁혀진다.
+function isCat(animal: Cat | Dog): animal is Cat {
+  return animal.type === 'cat';
+}
+
+function speak(animal: Cat | Dog): string {
+  if (isCat(animal)) {
+    // 타입 가드 덕분에 animal은 Cat으로 좁혀진다. 단언이 필요 없다.
+    return animal.meow();
+  }
+  return animal.bark();
+}
+```
+
+`isCat`은 평범한 함수처럼 boolean을 반환하지만, 반환 타입을 `animal is Cat`으로 적었기 때문에 컴파일러는 이 함수가 `true`를 주면 인자를 Cat으로 간주합니다. 검사 로직을 함수 하나로 묶어두고, 호출하는 쪽은 좁혀진 타입을 그대로 받습니다.
+
+처음에 봤던 `getElementById` 같은 현실 예시에도 잘 맞습니다. 이 함수의 반환 타입은 `HTMLElement | null`이라 곧바로 `value`에 접근할 수 없는데, 보통 여기서 `as HTMLInputElement`를 쓰고 싶어집니다.
+
+```typescript
+// as HTMLInputElement로 단언하는 대신, 타입 가드로 검증한다.
+function isInput(el: HTMLElement | null): el is HTMLInputElement {
+  return el instanceof HTMLInputElement;
+}
+
+function readValue(id: string): string {
+  const el = document.getElementById(id);
+  if (isInput(el)) {
+    // el은 HTMLInputElement로 좁혀져 value에 안전하게 접근한다.
+    return el.value;
+  }
+  return '';
+}
+```
+
+`as`를 쓴 버전은 그 요소가 정말 input이 아니어도 컴파일러가 통과시키고, 런타임에 `el.value`가 `undefined`가 되거나 엉뚱하게 동작합니다. 반면 타입 가드 버전은 `instanceof`로 실제 확인을 거치기 때문에, 아닌 경우를 코드가 직접 처리하게 강제합니다.
+
+## 그래도 as가 필요한 순간
+
+`as`를 무조건 금지하자는 건 아닙니다. 컴파일러가 도저히 알 수 없지만 개발자는 문맥상 확신하는 경우가 있습니다. 예를 들어 테스트에서 일부 속성만 채운 목 객체를 만들거나, 라이브러리 타입 정의가 실제보다 느슨할 때입니다.
+
+다만 그럴 때도 두 가지는 기억할 만합니다. 첫째, `as`는 런타임 검사가 아니라 컴파일러에게 보내는 약속일 뿐이라 틀리면 막아줄 게 없습니다. 둘째, `as`를 쓰기 전에 "이걸 `typeof`나 타입 가드로 바꿀 수 있나?"를 먼저 떠올리는 편이 좋습니다. 좁히기로 표현되는 검사는 대부분 좁히기로 두는 게 안전합니다.
+
+참고로 `as const`는 여기서 말하는 타입 단언과 목적이 다릅니다. `as const`는 값을 리터럴 타입으로 좁혀 고정하는 용도라 검사를 우회하지 않습니다. 같은 키워드를 쓰지만 헷갈리지 않아도 됩니다.
+
+## 정리
+
+이번 글에서는 `as`를 줄이고 타입 좁히기로 안전하게 타입을 다루는 방법을 살펴봤습니다.
+
+| 방법                  | 검사 시점 | 특징                                              |
+| --------------------- | --------- | ------------------------------------------------- |
+| `as` 단언             | 없음      | 컴파일러 검사를 우회. 틀리면 런타임에 터진다       |
+| `typeof`              | 런타임    | 원시 타입(string, number 등)을 좁힌다             |
+| `in`                  | 런타임    | 속성 존재 여부로 객체 타입을 좁힌다               |
+| `instanceof`          | 런타임    | 클래스 인스턴스인지로 좁힌다                       |
+| 사용자 정의 타입 가드 | 런타임    | `param is T`로 판별 로직을 재사용 가능하게 묶는다 |
+
+- `as`는 값을 변환하지 않고 컴파일러의 눈만 가린다. 보증이 틀리면 런타임 에러로 돌아온다.
+- `typeof`, `in`, `instanceof`는 실제 확인을 거쳐 타입을 좁히므로 검사를 우회하지 않는다.
+- 판별 로직이 복잡하거나 재사용이 필요하면 `param is T` 타입 가드로 묶는다.
+
+## 마치며
+
+`as`가 보이면 한 번쯤 "이 빨간 줄이 원래 무슨 말을 하려던 거였지?"를 떠올려 보면 좋겠습니다. 대부분은 좁히기로 바꿀 수 있고, 그 편이 미래의 나를 덜 고생시킵니다. 다음 글에서는 같은 타입 안전성의 연장선에서 `never`와 `unknown`을 다뤄보겠습니다. 긴 글 읽어주셔서 감사합니다.

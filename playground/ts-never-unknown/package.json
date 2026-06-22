@@ -1,0 +1,19 @@
+{
+  "name": "ts-never-unknown",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "never와 unknown 타입의 동작을 실제로 실행해 확인하는 예제",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "unknown": "tsx src/01-unknown.ts",
+    "never": "tsx src/02-never.ts",
+    "exhaustive": "tsx src/03-exhaustive.ts",
+    "check-broken": "tsc --noEmit --strict --target ES2020 broken/exhaustive-broken.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
