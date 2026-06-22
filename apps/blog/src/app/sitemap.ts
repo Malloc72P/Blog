@@ -4,11 +4,15 @@ import { findTags } from '@libs/api/find-tags';
 import { Constants } from '@libs/constants';
 import { DateUtil } from '@libs/date-util';
 import { Mapper } from '@libs/mapper';
+import { PostModel } from '@libs/types/commons';
 import { MetadataRoute } from 'next';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const seriesModels = (await findSeriesList()).map((item) => Mapper.toSeriesModel(item));
-  const posts = (await findPosts()).map((item) => Mapper.toPostModel({ item, seriesModels }));
+  const posts = (await findPosts())
+    .map((item) => Mapper.toPostModel({ item, seriesModels }))
+    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
+    .filter((post): post is PostModel => post !== null);
   const tags = await findTags();
   const uniqueTags = [...new Set(tags)];
 

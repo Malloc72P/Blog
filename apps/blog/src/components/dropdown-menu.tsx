@@ -19,8 +19,6 @@ export interface DropdownMenuProps {
   leftOffset?: number;
 }
 
-const HIDE_TIMEOUT_LENGTH = 0;
-
 export function DropdownMenu({ title, items, leftOffset = 0, ...option }: DropdownMenuProps) {
   /* ------------------------------------------------------ */
   /* STATES */
@@ -36,7 +34,6 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   /* ------------------------------------------------------ */
   const rootRef = useRef<HTMLDivElement>(null);
   const dropdownBodyRef = useRef<HTMLUListElement>(null);
-  const hideTimeoutRef = useRef<any>(null);
 
   /* ------------------------------------------------------ */
   /* FUNCTIONS */
@@ -63,6 +60,9 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   /* ------------------------------------------------------ */
   /* EFFECTS */
   /* ------------------------------------------------------ */
+  // 마운트 시 1회 위치 보정 + resize 리스너 등록만 수행한다.
+  // adjustOffsetX는 매 렌더마다 새로 생성되므로 의존성에 넣으면 리스너가 반복 재등록되어
+  // 동작이 바뀐다. 최신 ref/state를 클로저로 읽으므로 빈 배열로 1회만 실행한다.
   useLayoutEffect(() => {
     adjustOffsetX();
 
@@ -71,6 +71,7 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
     return () => {
       window.removeEventListener('resize', adjustOffsetX);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

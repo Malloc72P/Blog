@@ -28,12 +28,16 @@ export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
     }
   }, []);
 
+  // fragId가 바뀔 때만 스크롤 이동 콜백을 호출한다.
+  // onFragIdChanged는 부모(PostDetail)에서 매 렌더마다 새로 생성되는 인라인 콜백이라
+  // 의존성에 넣으면 부모 리렌더마다 effect가 재실행되어 의도치 않은 scrollIntoView가 발생한다.
   useEffect(() => {
     if (!fragId) {
       return;
     }
 
     onFragIdChanged({ fragId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fragId]);
 
   return (

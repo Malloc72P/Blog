@@ -6,7 +6,7 @@ import { SeriesBadge } from '@components/series-badge';
 import { Constants } from '@libs/constants';
 import { DateUtil } from '@libs/date-util';
 import { PageLinkMap } from '@libs/page-link-map';
-import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
+import { PostModel, SeriesModel } from '@libs/types/commons';
 import { IconArrowRight } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
@@ -34,7 +34,7 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
   /* ------------------------------------------------------ */
   /* CONTEXT */
   /* ------------------------------------------------------ */
-  const { seriesList, tags } = useContext(MainLayoutContext);
+  const { seriesList } = useContext(MainLayoutContext);
 
   /* ------------------------------------------------------ */
   /* STATES */

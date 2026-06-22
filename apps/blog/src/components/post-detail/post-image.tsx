@@ -23,7 +23,7 @@ export function PostImage({ src, alt, blur }: PostImageProps) {
         priority
       />
       <span className="block text-gray-600 text-center leading-[28px] italic py-5 break-words">
-        "{alt}"
+        &quot;{alt}&quot;
       </span>
     </span>
   );

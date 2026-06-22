@@ -1,9 +1,7 @@
-import { PageLinkMap } from '@libs/page-link-map';
 import { PostModel } from '@libs/types/commons';
 import { IconSquareChevronLeft, IconSquareChevronRight } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { useState } from 'react';
 
 export interface PostNavigatorProps {
   mode: 'prev' | 'next';

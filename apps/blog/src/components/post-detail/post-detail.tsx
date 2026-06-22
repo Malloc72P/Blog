@@ -6,7 +6,7 @@ import { Divider } from '@components/divider';
 import { PostJsonLd } from '@components/post-json-ld';
 import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
 import classNames from 'classnames';
-import { PropsWithChildren, ReactNode, useEffect, useRef, useState } from 'react';
+import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 import classes from './post-detail.module.scss';
 import { Toc, TocItem } from './toc';
 import { PostNavigator, PostNavigatorPlaceholder } from './post-navigator';
@@ -16,7 +16,6 @@ export interface PostDetailProps extends PropsWithChildren {
   series: SeriesModel;
   tags: TagModel[];
   post: PostModel;
-  bottomContent?: ReactNode;
 }
 
 /**
@@ -36,12 +35,7 @@ function slugify(text: string): string {
  *
  * mdx-components에서 해당 컴포넌트를 사용해서 블로그 상세 페이지를 랜더링한다.
  */
-export function PostDetail({
-  children,
-  series,
-  post,
-  bottomContent = null,
-}: PostDetailProps) {
+export function PostDetail({ children, series, post }: PostDetailProps) {
   const [activeTocId, setActiveTocId] = useState('');
   // 본문 DOM에서 헤딩을 수집해 만든 목차 데이터. 빌드 타임이 아닌 마운트 후 클라이언트에서 채운다.
   const [toc, setToc] = useState<TocItem[]>([]);

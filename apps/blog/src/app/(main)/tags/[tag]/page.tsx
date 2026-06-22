@@ -64,7 +64,10 @@ export default async function TagPage(props: TagPageParams) {
   //   PostModel로 가공
   const seriesList = await findSeriesList();
   const seriesModels = seriesList.map(Mapper.toSeriesModel);
-  const postModels: PostModel[] = posts.map((p) => Mapper.toPostModel({ item: p, seriesModels }));
+  const postModels: PostModel[] = posts
+    .map((p) => Mapper.toPostModel({ item: p, seriesModels }))
+    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
+    .filter((post): post is PostModel => post !== null);
 
   return <TagDetail tag={tagModel} posts={postModels} />;
 }

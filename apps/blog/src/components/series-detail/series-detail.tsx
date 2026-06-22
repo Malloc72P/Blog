@@ -7,7 +7,7 @@ import { findSeriesList } from '@libs/api/find-series';
 import { Constants } from '@libs/constants';
 import { Mapper } from '@libs/mapper';
 import { PageLinkMap } from '@libs/page-link-map';
-import { SeriesModel } from '@libs/types/commons';
+import { PostModel, SeriesModel } from '@libs/types/commons';
 import classNames from 'classnames';
 import Link from 'next/link';
 
@@ -20,7 +20,10 @@ export async function SeriesDetail({ series }: SeriesDetailProps) {
   const seriesList = await findSeriesList();
   const seriesModels = seriesList.map(Mapper.toSeriesModel);
 
-  const posts = allPosts.map((item) => Mapper.toPostModel({ item, seriesModels }));
+  const posts = allPosts
+    .map((item) => Mapper.toPostModel({ item, seriesModels }))
+    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
+    .filter((post): post is PostModel => post !== null);
 
   // latest 시리즈는 여러 시리즈가 섞인 목록이므로 카드에 시리즈 배지를 노출한다.
   const showSeriesBadge = series.id === Constants.series.latestId;

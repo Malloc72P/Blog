@@ -24,7 +24,10 @@ export default async function LandingPage() {
       seriesId: series.id,
     });
 
-    seriesPosts[series.id] = seriesPost.map((item) => Mapper.toPostModel({ item, seriesModels }));
+    seriesPosts[series.id] = seriesPost
+      .map((item) => Mapper.toPostModel({ item, seriesModels }))
+      // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
+      .filter((post): post is PostModel => post !== null);
   }
 
   return <MainClientPage seriesPosts={seriesPosts} />;
