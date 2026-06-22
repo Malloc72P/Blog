@@ -162,7 +162,9 @@ export function PostDetail({
     <ArticleContainer
       jsonLd={<PostJsonLd post={post} series={series} />}
       right={
-        <div className="post-detail-toc-container justify-center sticky top-0 left-0 hidden lg:flex">
+        /* TOC 패널은 폭이 고정(w-[240px])이라 거터가 충분히 넓은 xl(1280px) 이상에서만 노출한다.
+           lg(1024px)에서는 거터가 좁아 패널이 뷰포트를 넘겨 가로 스크롤을 유발하므로 제외한다. */
+        <div className="post-detail-toc-container justify-center sticky top-0 left-0 hidden xl:flex">
           <Toc
             toc={toc}
             activeId={activeTocId}

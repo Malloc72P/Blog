@@ -37,7 +37,8 @@ export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
   }, [fragId]);
 
   return (
-    <div className="w-[320px] mt-[200px]">
+    /* 폭을 240px로 두어 xl(1280px) 거터 안에 들어가 가로 스크롤이 생기지 않게 한다. */
+    <div className="w-[240px] mt-[200px]">
       <ol className="flex flex-col gap-4 p-4 text-sm">
         {toc.map((item) => (
           <li
