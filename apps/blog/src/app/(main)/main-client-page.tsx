@@ -105,13 +105,16 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
         {/* ------------------------------------------------------ */}
         {/* SERIES */}
         {/* ------------------------------------------------------ */}
-        <div className="my-[30px] md:my-[65px] flex flex-wrap gap-5">
+        {/* 데스크톱 첫 화면에 포스트가 더 들어오도록 세로 마진을 md:my-[65px]에서 절반 수준(32px)으로 축소한다. 모바일(my-[30px])은 유지. */}
+        <div className="my-[30px] md:my-[32px] flex flex-wrap gap-5">
           {seriesFilters.map((series) => (
             <SeriesBadge
               key={series.id}
               seriesId={series.id}
               title={series.title}
               color={series.active ? 'primary' : 'secondary'}
+              // 활성 필터를 보조기술에 알리기 위해 active 값을 aria-current로 내려준다.
+              active={series.active}
               onClick={() => changeSeriesFilter(series.id)}
             />
           ))}
@@ -125,7 +128,8 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
         {/* ------------------------------------------------------ */}
         {/* ARTICLE */}
         {/* ------------------------------------------------------ */}
-        <div className="my-[30px] md:my-[65px]">
+        {/* 아티클 영역도 동일하게 세로 마진을 md:my-[65px]에서 절반 수준(32px)으로 축소한다. 모바일(my-[30px])은 유지. */}
+        <div className="my-[30px] md:my-[32px]">
           {posts.map((post) => {
             const series = seriesList.find((currentSeries) => currentSeries.id === post.series.id);
 

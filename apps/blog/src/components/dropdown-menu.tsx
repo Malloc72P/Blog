@@ -2,7 +2,6 @@
 
 import { IconChevronDown } from '@tabler/icons-react';
 import classNames from 'classnames';
-import { Html } from 'next/document';
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 

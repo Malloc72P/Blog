@@ -6,9 +6,11 @@ export interface BadgeProps extends PropsWithChildren {
   onClick?: () => void;
   href: string;
   color?: 'primary' | 'secondary';
+  // 현재 선택된(활성) 필터 여부. 보조기술에 현재 항목임을 알리기 위해 aria-current로 연결된다.
+  active?: boolean;
 }
 
-export function Badge({ href, children, onClick, color = 'secondary' }: BadgeProps) {
+export function Badge({ href, children, onClick, color = 'secondary', active }: BadgeProps) {
   const onBadgeClick = onClick
     ? (e: React.MouseEvent) => {
         e.preventDefault();
@@ -31,7 +33,13 @@ export function Badge({ href, children, onClick, color = 'secondary' }: BadgePro
       )}
     >
       {/* 모바일 가독성을 위해 폰트를 12px로 올린다(데스크톱은 기존 16px 유지). */}
-      <Link href={href} className="text-[12px] md:text-[16px]" onClick={onBadgeClick}>
+      {/* 활성 필터일 때만 aria-current="true"를 부여해 보조기술에 현재 선택 항목임을 알린다. */}
+      <Link
+        href={href}
+        className="text-[12px] md:text-[16px]"
+        onClick={onBadgeClick}
+        aria-current={active ? 'true' : undefined}
+      >
         {children}
       </Link>
     </span>

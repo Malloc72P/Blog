@@ -22,8 +22,9 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
       {/* ------------------------------------------------------ */}
       {/* SIDEBAR TRIGGER */}
       {/* ------------------------------------------------------ */}
-      <div className="flex md:hidden cursor-pointer">
-        <IconMenu2 className="w-5 h-5" onClick={() => setOpen(true)} />
+      {/* 탭 영역 확대를 위해 래퍼에 패딩(p-2.5)을 주고 onClick을 래퍼로 올린다(아이콘 크기는 유지). */}
+      <div className="flex md:hidden cursor-pointer p-2.5" onClick={() => setOpen(true)}>
+        <IconMenu2 className="w-5 h-5" />
       </div>
 
       {/* ------------------------------------------------------ */}
@@ -46,7 +47,8 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
           {/* ------------------------------------------------------ */}
           {/* SIDEBAR CLOSE BUTTON */}
           {/* ------------------------------------------------------ */}
-          <div className="flex items-center cursor-pointer" onClick={() => setOpen(false)}>
+          {/* 탭 영역 확대를 위해 닫기 버튼 래퍼에 패딩(p-2.5)을 더한다(아이콘 크기는 유지). */}
+          <div className="flex items-center cursor-pointer p-2.5" onClick={() => setOpen(false)}>
             <IconX className="w-5 h-5 " />
           </div>
         </div>
