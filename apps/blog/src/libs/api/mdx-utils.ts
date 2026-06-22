@@ -59,48 +59,55 @@ export async function getAllMdxFiles(dir: string = POSTS_DIR): Promise<MdxFileIn
 function extractMetadata(filePath: string): MdxFileInfo['frontMatter'] | null {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-
-    const startMarker = 'frontmatter({';
-    const startIndex = content.indexOf(startMarker);
-    if (startIndex === -1) return null;
-
-    const blockStart = startIndex + startMarker.length;
-    let depth = 1;
-    let blockEnd = blockStart;
-
-    while (blockEnd < content.length && depth > 0) {
-      const char = content[blockEnd];
-      if (char === '{') depth++;
-      else if (char === '}') depth--;
-      if (depth > 0) blockEnd++;
-    }
-
-    const body = content.slice(blockStart, blockEnd);
-
-    const title = extractStringField(body, 'title');
-    const date = extractStringField(body, 'date');
-
-    if (!title || !date) return null;
-
-    const description = extractStringField(body, 'description') ?? undefined;
-    const seriesId = extractStringField(body, 'seriesId') ?? undefined;
-    const postId = extractStringField(body, 'postId') ?? undefined;
-    const tags = extractArrayField(body, 'tags');
-    const isSeriesLanding = /isSeriesLanding:\s*true/.test(body) ? true : undefined;
-
-    return {
-      title,
-      description,
-      series: seriesId,
-      tags: tags.length > 0 ? tags : undefined,
-      date,
-      isSeriesLanding,
-      id: postId ?? seriesId,
-    };
+    return parseFrontmatterMetadata(content);
   } catch (e) {
     console.error(`Failed to parse metadata from ${filePath}`, e);
     return null;
   }
+}
+
+/**
+ * 파일 본문 문자열에서 frontmatter({ ... }) 블록을 파싱해 메타데이터를 추출한다.
+ * fs 접근과 분리된 순수 함수라 단위 테스트가 용이하다.
+ */
+export function parseFrontmatterMetadata(content: string): MdxFileInfo['frontMatter'] | null {
+  const startMarker = 'frontmatter({';
+  const startIndex = content.indexOf(startMarker);
+  if (startIndex === -1) return null;
+
+  const blockStart = startIndex + startMarker.length;
+  let depth = 1;
+  let blockEnd = blockStart;
+
+  while (blockEnd < content.length && depth > 0) {
+    const char = content[blockEnd];
+    if (char === '{') depth++;
+    else if (char === '}') depth--;
+    if (depth > 0) blockEnd++;
+  }
+
+  const body = content.slice(blockStart, blockEnd);
+
+  const title = extractStringField(body, 'title');
+  const date = extractStringField(body, 'date');
+
+  if (!title || !date) return null;
+
+  const description = extractStringField(body, 'description') ?? undefined;
+  const seriesId = extractStringField(body, 'seriesId') ?? undefined;
+  const postId = extractStringField(body, 'postId') ?? undefined;
+  const tags = extractArrayField(body, 'tags');
+  const isSeriesLanding = /isSeriesLanding:\s*true/.test(body) ? true : undefined;
+
+  return {
+    title,
+    description,
+    series: seriesId,
+    tags: tags.length > 0 ? tags : undefined,
+    date,
+    isSeriesLanding,
+    id: postId ?? seriesId,
+  };
 }
 
 function extractStringField(body: string, field: string): string | null {

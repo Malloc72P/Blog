@@ -19,6 +19,15 @@ function extractPlainText(filePath: string): string {
     return '';
   }
 
+  return stripMdxToText(raw);
+}
+
+/**
+ * MDX/TSX 본문 문자열에서 검색용 평문만 남긴다.
+ * (frontmatter 호출 블록, import/export, 코드 블록, JSX 태그, 마크다운 기호 제거)
+ * fs 접근과 분리된 순수 함수라 단위 테스트가 용이하다.
+ */
+export function stripMdxToText(raw: string): string {
   // 1) frontmatter({ ... }) 메타데이터 호출 블록을 괄호 짝을 세어 통째로 제거
   const metaStart = raw.indexOf('frontmatter(');
   if (metaStart !== -1) {
