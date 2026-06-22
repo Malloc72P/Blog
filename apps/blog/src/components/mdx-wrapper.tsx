@@ -25,7 +25,7 @@ export function MdxWrapper({ children }: MdxWrapperProps) {
   if (!series || !post) return null;
 
   return (
-    <PostDetail series={series} post={post} toc={[]} tags={tags} bottomContent={undefined}>
+    <PostDetail series={series} post={post} tags={tags} bottomContent={undefined}>
       {children}
     </PostDetail>
   );
