@@ -1,0 +1,416 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '자바스크립트 this 완전 정복',
+  description:
+    'this는 선언이 아니라 호출 방식으로 결정됩니다. 다섯 가지 호출 규칙과 call/apply/bind, 화살표 함수의 렉시컬 this를 코드로 따라가며 정리합니다.',
+  seriesId: 'frontend',
+  postId: 'js-this',
+  tags: ['JavaScript', 'this', '함수'],
+  date: '2026-06-23 09:00',
+});
+
+## 같은 함수인데 this가 달라진다
+
+```js
+const person = {
+  name: '말록',
+  greet() {
+    console.log(this.name);
+  },
+};
+
+person.greet(); // '말록'
+
+const greet = person.greet;
+greet(); // undefined (strict mode 기준)
+```
+
+`greet`는 분명 같은 함수입니다. 그런데 `person.greet()`로 부를 때는 `'말록'`이 찍히고, 변수에 담아 `greet()`로 부르면 `undefined`가 나옵니다.
+
+함수 코드는 한 글자도 바뀌지 않았는데 `this`가 가리키는 대상이 달라졌습니다. 이 차이를 만드는 건 함수의 내용이 아니라 **함수를 어떻게 호출했는가**입니다. 이 글의 목표는 그 규칙을 손에 익히는 것입니다.
+
+## this를 결정하는 건 선언이 아니라 호출이다
+
+`this`를 어렵게 느끼는 이유는 대부분 한 가지 오해에서 출발합니다. 함수를 정의할 때 `this`가 정해진다고 생각하는 것입니다. 하지만 화살표 함수를 제외하면, `this`는 함수가 **호출되는 순간**에 결정됩니다.
+
+비유하자면 `this`는 함수에 미리 새겨 둔 이름표가 아니라, **호출할 때마다 새로 건네받는 명함**에 가깝습니다. 누가 어떤 방식으로 함수를 부르느냐에 따라 명함의 주인이 바뀝니다. 같은 함수라도 호출 방식이 다르면 `this`도 달라지는 이유가 여기에 있습니다.
+
+그래서 `this`를 읽을 때는 함수 정의를 보는 게 아니라, **호출하는 코드의 형태**를 봐야 합니다. 호출 형태는 크게 다섯 가지로 나눌 수 있고, 각각 `this`를 정하는 규칙이 다릅니다. 하나씩 보겠습니다.
+
+## 규칙 ① 일반(독립) 호출
+
+함수 이름 뒤에 괄호만 붙여 그냥 부르는 경우입니다. 점(`.`)도, `new`도, `call`도 없는 가장 단순한 형태입니다.
+
+```js
+'use strict';
+
+function check() {
+  console.log(this);
+}
+
+check(); // undefined
+```
+
+엄격 모드(`'use strict'`)에서 독립 호출의 `this`는 `undefined`입니다. 명함을 건네주는 사람이 아무도 없으니 빈손인 셈입니다.
+
+엄격 모드가 아니라면 `this`는 전역 객체(브라우저에서는 `window`, Node.js에서는 `globalThis`)가 됩니다.
+
+```js
+function check() {
+  console.log(this);
+}
+
+check(); // 비엄격 모드: 전역 객체 (window 등)
+```
+
+이 비엄격 모드 동작은 의도치 않게 전역 객체를 건드릴 수 있어 위험합니다. ES 모듈과 클래스 내부 코드는 항상 엄격 모드로 동작하므로, 요즘 코드에서 독립 호출의 `this`는 사실상 `undefined`라고 생각하면 됩니다. 이 글의 예제도 별도 언급이 없으면 엄격 모드를 기준으로 합니다.
+
+## 규칙 ② 메서드 호출
+
+`객체.메서드()` 형태로, 호출하는 코드에서 **점 바로 앞에 있는 객체**가 `this`가 됩니다.
+
+```js
+'use strict';
+
+const counter = {
+  count: 0,
+  increase() {
+    this.count += 1;
+    return this.count;
+  },
+};
+
+counter.increase(); // this === counter
+console.log(counter.count); // 1
+```
+
+여기서 핵심은 `this`가 "이 메서드가 어느 객체 안에 정의됐는가"가 아니라 "호출 시점에 점 앞에 무엇이 있었는가"로 정해진다는 점입니다. 도입부에서 본 문제도 같은 원리였습니다.
+
+```js
+'use strict';
+
+const person = {
+  name: '말록',
+  greet() {
+    console.log(this.name);
+  },
+};
+
+person.greet(); // 점 앞이 person → this === person → '말록'
+
+const greet = person.greet;
+greet(); // 점이 없는 독립 호출 → this === undefined → TypeError
+```
+
+`const greet = person.greet`는 함수만 꺼내 온 것이고, `greet()`는 점이 없는 독립 호출입니다. 점 앞에 객체가 없으니 규칙 ①이 적용되어 `this`가 `undefined`가 됩니다. 메서드를 변수에 담거나 콜백으로 넘기는 순간 `this`가 끊기는 현상은 거의 모두 이 한 가지 이유에서 출발합니다.
+
+점이 여러 단계라면 가장 마지막 점 앞의 객체가 `this`가 됩니다.
+
+```js
+'use strict';
+
+const outer = {
+  inner: {
+    value: 42,
+    show() {
+      console.log(this.value);
+    },
+  },
+};
+
+outer.inner.show(); // 마지막 점 앞은 inner → 42
+```
+
+## 규칙 ③ call / apply / bind로 명시 바인딩
+
+`this`를 호출 방식에 맡기지 않고 직접 지정하는 방법입니다. 명함을 건넬 사람을 우리가 손으로 골라 주는 셈입니다.
+
+`call`과 `apply`는 함수를 **즉시 호출**하면서 첫 번째 인자로 `this`를 지정합니다. 둘의 차이는 나머지 인자를 넘기는 방식뿐입니다.
+
+```js
+'use strict';
+
+function introduce(greeting, punctuation) {
+  console.log(`${greeting}, ${this.name}${punctuation}`);
+}
+
+const user = { name: '말록' };
+
+// call: 인자를 하나씩 나열
+introduce.call(user, '안녕하세요', '!'); // '안녕하세요, 말록!'
+
+// apply: 인자를 배열로 전달
+introduce.apply(user, ['안녕하세요', '!']); // '안녕하세요, 말록!'
+```
+
+`bind`는 호출하지 않습니다. 대신 `this`가 **고정된 새 함수**를 만들어 돌려줍니다. 한 번 묶어 두면 그 함수를 어떻게 호출하든 `this`가 바뀌지 않습니다.
+
+```js
+'use strict';
+
+function introduce() {
+  console.log(this.name);
+}
+
+const user = { name: '말록' };
+const boundIntroduce = introduce.bind(user);
+
+boundIntroduce(); // '말록'
+
+// 독립 호출처럼 보이지만 this는 이미 user로 고정됨
+const detached = boundIntroduce;
+detached(); // '말록'
+```
+
+`bind`로 고정한 `this`는 나중에 다시 `call`이나 `apply`로 바꾸려 해도 바뀌지 않습니다. 한 번 묶으면 그 약속이 끝까지 유지됩니다.
+
+```js
+'use strict';
+
+function whoAmI() {
+  console.log(this.name);
+}
+
+const a = { name: 'A' };
+const b = { name: 'B' };
+
+const boundToA = whoAmI.bind(a);
+boundToA.call(b); // 'A' — bind가 이긴다
+```
+
+## 규칙 ④ new(생성자) 호출
+
+함수 앞에 `new`를 붙여 호출하면 자바스크립트는 내부적으로 다음 순서를 밟습니다.
+
+1. 빈 객체를 새로 만든다.
+2. 그 객체를 `this`로 삼아 함수 본문을 실행한다.
+3. 함수가 객체를 따로 반환하지 않으면, 새로 만든 객체를 자동으로 반환한다.
+
+즉 `new` 호출에서 `this`는 **이번에 새로 생성되는 객체**를 가리킵니다.
+
+```js
+'use strict';
+
+function Person(name) {
+  // this는 new가 새로 만든 빈 객체
+  this.name = name;
+}
+
+const p = new Person('말록');
+console.log(p.name); // '말록'
+```
+
+`new` 없이 `Person('말록')`처럼 그냥 부르면 규칙 ①이 적용되어 `this`가 `undefined`가 되고, `this.name = name`에서 에러가 납니다. 그래서 생성자로 쓸 함수는 반드시 `new`와 함께 호출해야 합니다. 참고로 `class` 문법으로 만든 클래스는 `new` 없이 호출하면 아예 에러를 던지므로, 이 실수를 언어 차원에서 막아 줍니다.
+
+## 규칙 ⑤ 화살표 함수 — this를 빌려 쓴다
+
+앞의 네 규칙은 모두 "호출 방식이 `this`를 정한다"는 원칙을 따랐습니다. 화살표 함수는 이 흐름에서 완전히 빠져 있습니다.
+
+화살표 함수는 **자신만의 `this`를 아예 갖지 않습니다.** 호출 방식과 무관하게, 함수가 **정의된 위치의 상위 스코프**에 있는 `this`를 그대로 빌려 씁니다. 이것을 렉시컬(lexical) `this`라고 부릅니다. 여기서 렉시컬은 "코드가 작성된 위치"를 뜻합니다. 호출 시점이 아니라 **작성된 자리**가 기준이라는 의미입니다.
+
+```js
+'use strict';
+
+const obj = {
+  name: '말록',
+  regular() {
+    console.log(this.name); // 메서드 호출이므로 this === obj → '말록'
+
+    const arrow = () => {
+      // 화살표 함수: 자신의 this가 없으므로 상위 스코프(regular)의 this를 빌림
+      console.log(this.name); // '말록'
+    };
+    arrow();
+  },
+};
+
+obj.regular();
+```
+
+`regular`는 메서드 호출이라 `this`가 `obj`입니다. 그 안에서 정의된 화살표 함수 `arrow`는 자신의 `this`가 없으므로 한 단계 위인 `regular`의 `this`, 즉 `obj`를 그대로 사용합니다.
+
+화살표 함수의 `this`는 정의된 위치에서 결정되므로, `call`이나 `apply`로도 바꿀 수 없습니다. 명함을 건네받지 않고 옆자리 동료의 명함을 그대로 들고 있는 것과 같아서, 누가 다른 명함을 내밀어도 받지 않습니다.
+
+```js
+'use strict';
+
+const arrow = () => this; // 모듈 최상위 스코프의 this
+
+console.log(arrow.call({ name: '바꿔보기' })); // call이 무시됨
+```
+
+## 실전: setInterval과 이벤트 콜백에서 this가 깨지는 이유
+
+이론을 실제 버그에 적용해 보겠습니다. 다음 코드는 1초마다 카운트를 올리려는 의도지만 동작하지 않습니다.
+
+```js
+'use strict';
+
+class Timer {
+  constructor() {
+    this.seconds = 0;
+  }
+
+  start() {
+    setInterval(function () {
+      // 이 콜백은 setInterval이 독립 호출 형태로 부른다
+      this.seconds += 1; // TypeError: this는 undefined
+      console.log(this.seconds);
+    }, 1000);
+  }
+}
+
+new Timer().start();
+```
+
+`start`는 메서드 호출이라 그 안의 `this`는 `Timer` 인스턴스가 맞습니다. 문제는 `setInterval`에 넘긴 **콜백 함수**입니다. 이 콜백은 나중에 `setInterval`이 내부에서 점 없이 독립 호출하므로 규칙 ①이 적용됩니다. 결국 콜백 안의 `this`는 `Timer` 인스턴스와 아무 상관이 없어집니다.
+
+콜백으로 함수를 넘기는 순간, 그 함수가 어디서 정의됐는지는 중요하지 않습니다. **누가 어떻게 호출하느냐**가 `this`를 정하기 때문입니다.
+
+### 해결 1: 화살표 함수 (권장)
+
+콜백을 화살표 함수로 바꾸면, 화살표 함수는 자신의 `this`를 갖지 않고 상위 스코프인 `start` 메서드의 `this`를 빌립니다. `start`의 `this`는 인스턴스이므로 의도대로 동작합니다.
+
+```js
+'use strict';
+
+class Timer {
+  constructor() {
+    this.seconds = 0;
+  }
+
+  start() {
+    setInterval(() => {
+      // 화살표 함수가 start의 this(인스턴스)를 그대로 빌려 씀
+      this.seconds += 1;
+      console.log(this.seconds); // 1, 2, 3, ...
+    }, 1000);
+  }
+}
+
+new Timer().start();
+```
+
+### 해결 2: bind로 this 고정
+
+화살표 함수가 없던 시절부터 쓰던 방법입니다. 콜백에 `bind`로 인스턴스를 미리 묶어 두면, `setInterval`이 어떻게 호출하든 `this`가 인스턴스로 고정됩니다.
+
+```js
+'use strict';
+
+class Timer {
+  constructor() {
+    this.seconds = 0;
+  }
+
+  start() {
+    setInterval(
+      function () {
+        this.seconds += 1;
+        console.log(this.seconds);
+      }.bind(this), // 여기의 this는 start의 this(인스턴스)
+      1000,
+    );
+  }
+}
+
+new Timer().start();
+```
+
+이벤트 핸들러에서도 같은 문제가 똑같이 나타납니다. DOM 이벤트 콜백을 일반 함수로 등록하면 `this`는 이벤트가 걸린 요소가 되어 버려서, 클래스 인스턴스의 메서드를 호출하면 의도와 어긋납니다.
+
+```js
+'use strict';
+
+class Counter {
+  constructor(button) {
+    this.count = 0;
+    // 화살표 함수로 감싸면 this가 인스턴스로 유지된다
+    button.addEventListener('click', () => this.increase());
+  }
+
+  increase() {
+    this.count += 1;
+    console.log(this.count);
+  }
+}
+```
+
+여기서 `() => this.increase()`는 화살표 함수라 인스턴스의 `this`를 빌립니다. 그 안에서 `this.increase()`는 점 앞에 인스턴스가 있는 **메서드 호출**이므로, `increase` 안의 `this`도 정상적으로 인스턴스가 됩니다. 규칙 ⑤로 바깥의 `this`를 살리고, 규칙 ②로 안쪽의 `this`를 이어 주는 구조입니다.
+
+## 언제 어떤 함수를 쓸까
+
+지금까지 본 규칙을 실제 선택 기준으로 정리하면 다음과 같습니다.
+
+- **객체의 메서드는 일반 함수(메서드 축약형)로 정의한다.** 메서드는 `this`로 자기 객체를 가리켜야 하는데, 화살표 함수로 정의하면 상위 스코프의 `this`를 빌려 와 객체를 못 가리키게 됩니다.
+
+```js
+'use strict';
+
+const obj = {
+  name: '말록',
+  // 잘못된 예: 화살표 함수는 obj가 아니라 상위 스코프의 this를 빌린다
+  greetWrong() {
+    const arrow = () => this.name; // 메서드 안이라면 obj.name이 되지만,
+    return arrow();
+  },
+  // 올바른 예: 메서드 축약형은 호출 시 점 앞 객체(obj)를 this로 받는다
+  greetRight() {
+    return this.name; // '말록'
+  },
+};
+```
+
+객체 리터럴의 프로퍼티 자리에 화살표 함수를 바로 쓰면 더 분명하게 어긋납니다. 그 화살표 함수의 상위 스코프는 객체가 아니라 객체를 둘러싼 바깥 스코프이기 때문입니다.
+
+```js
+'use strict';
+
+const obj = {
+  name: '말록',
+  // 화살표 함수의 this는 obj가 아니라 모듈 최상위 스코프의 this(undefined)
+  greetArrow: () => this.name,
+  greetRight() {
+    return this.name;
+  },
+};
+
+console.log(obj.greetRight()); // '말록'
+console.log(obj.greetArrow()); // 엄격 모드 모듈: this가 undefined → TypeError
+```
+
+`greetArrow`의 화살표 함수는 객체 안에 적혀 있어도 `obj`를 `this`로 쓰지 않습니다. 상위 스코프인 모듈 최상위의 `this`(엄격 모드에서 `undefined`)를 빌리므로, `this.name`에서 에러가 납니다. 메서드는 메서드 축약형으로 정의해야 하는 이유입니다.
+
+- **콜백 안에서 바깥의 `this`를 그대로 쓰고 싶다면 화살표 함수를 쓴다.** `setInterval`, 이벤트 핸들러, 배열 메서드 콜백처럼 호출 주체가 내가 아닐 때, 화살표 함수가 바깥 `this`를 안전하게 이어 줍니다.
+
+- **`this`를 명시적으로 한 번 정해 고정하고 싶다면 `bind`를 쓴다.** 콜백을 여러 곳에 넘겨야 하거나, 화살표 함수로 감싸기 곤란한 상황에서 유용합니다.
+
+- **다른 객체의 메서드를 빌려 한 번만 실행하고 싶다면 `call`이나 `apply`를 쓴다.** 유사 배열 객체에 배열 메서드를 적용하는 경우가 대표적입니다.
+
+```js
+'use strict';
+
+function sum() {
+  // arguments는 배열이 아닌 유사 배열 객체다
+  // 배열의 slice를 빌려 와 진짜 배열로 바꾼다
+  const args = Array.prototype.slice.call(arguments);
+  return args.reduce((acc, cur) => acc + cur, 0);
+}
+
+console.log(sum(1, 2, 3)); // 6
+```
+
+## 정리
+
+- `this`는 함수를 **정의할 때**가 아니라 **호출할 때** 결정된다. 화살표 함수만 예외다.
+- 일반(독립) 호출: 엄격 모드면 `undefined`, 비엄격 모드면 전역 객체.
+- 메서드 호출: 호출 시점에 **점 바로 앞에 있는 객체**가 `this`.
+- `call` / `apply`: `this`를 지정하며 즉시 호출. `bind`: `this`가 고정된 새 함수를 반환.
+- `new` 호출: 새로 생성되는 객체가 `this`.
+- 화살표 함수: 자신의 `this`가 없고, **정의된 위치의 상위 스코프 `this`**를 빌려 쓴다. `call`/`apply`로도 못 바꾼다.
+- 콜백에서 `this`가 깨지는 버그는 대부분 "독립 호출이 되어 버렸다"가 원인이며, 화살표 함수나 `bind`로 해결한다.
+
+## 마치며
+
+`this`는 규칙 자체가 어렵다기보다, 함수를 볼 때 정의가 아니라 호출 형태를 봐야 한다는 관점 전환이 핵심입니다. 코드를 읽다 `this`가 나오면 "이 함수가 지금 어떤 방식으로 호출되고 있는가"를 먼저 따져 보는 습관을 들이면, 대부분의 혼란은 사라집니다. 긴 글 읽어주셔서 감사합니다.
