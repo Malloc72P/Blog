@@ -10,8 +10,6 @@ export const metadata = frontmatter({
   date: '2026-06-24 09:00',
 });
 
-# useEffect는 언제 호출되나? 커밋 페이즈와 useLayoutEffect의 차이
-
 이 블로그도 React(Next.js) 위에서 돌아갑니다. 작업을 하다 보면 "분명히 로직은 맞는데 화면이 한 번 깜빡인다"거나, "effect 안에서 읽은 값이 한 박자 늦다"는 경험을 종종 합니다. 저의 경우 이런 버그는 대부분 로직 자체가 틀렸다기보다 **effect가 언제 실행되는지**를 잘못 알고 있을 때 생겼습니다.
 
 그래서 이 글에서는 `useEffect`가 호출되는 규칙을 먼저 정리하고, 그 다음 React의 렌더 → 커밋 → paint 타임라인 위에 `useEffect`와 `useLayoutEffect`를 올려두고 둘이 정확히 어느 지점에서 끼어드는지를 따라가 보겠습니다.
