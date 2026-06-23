@@ -23,12 +23,12 @@ const person = {
 person.greet(); // '말록'
 
 const greet = person.greet;
-greet(); // undefined (strict mode 기준)
+greet(); // TypeError (strict mode 기준)
 ```
 
-`greet`는 분명 같은 함수입니다. 그런데 `person.greet()`로 부를 때는 `'말록'`이 찍히고, 변수에 담아 `greet()`로 부르면 `undefined`가 나옵니다.
+`greet`는 분명 같은 함수입니다. 그런데 `person.greet()`로 부를 때는 `'말록'`이 찍히는데, 변수에 담아 `greet()`로 부르면 이번엔 `TypeError`가 납니다.
 
-함수 코드는 한 글자도 바뀌지 않았는데 `this`가 가리키는 대상이 달라졌습니다. 이 차이를 만드는 건 함수의 내용이 아니라 **함수를 어떻게 호출했는가**입니다. 이 글의 목표는 그 규칙을 손에 익히는 것입니다.
+함수 코드는 한 글자도 바뀌지 않았는데 `this`가 가리키는 대상이 달라졌고, 그 탓에 `this.name`을 읽다 실패한 것입니다. 이 차이를 만드는 건 함수의 내용이 아니라 **함수를 어떻게 호출했는가**입니다. 이 글의 목표는 그 규칙을 손에 익히는 것입니다.
 
 ## this를 결정하는 건 선언이 아니라 호출이다
 
