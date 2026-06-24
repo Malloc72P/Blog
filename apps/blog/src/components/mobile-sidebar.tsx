@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { PageLinkMap } from '@libs/page-link-map';
 import { Divider } from './divider';
+import { useBodyScrollLock } from '@hooks/use-body-scroll-lock';
 
 // MainHeaderProps와 동일한 props를 받으므로 빈 인터페이스 대신 타입 별칭으로 둔다.
 export type MobileSidebarProps = MainHeaderProps;
@@ -17,18 +18,7 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
 
   // 사이드바가 열린 동안 배경(body) 스크롤을 잠근다.
   // 잠그지 않으면 사이드바 뒤의 본문이 함께 스크롤되어 동작이 어색해진다.
-  useEffect(() => {
-    // 닫혀 있을 때는 아무 것도 하지 않고, 기존 overflow 값을 건드리지 않는다.
-    if (!open) return;
-
-    // 잠그기 직전의 overflow 값을 저장해 두었다가 닫힐 때 그대로 복구한다.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
+  useBodyScrollLock(open);
 
   // 데스크톱(md, 768px 이상) 너비로 넓어지면 모바일 사이드바를 닫는다.
   // 닫지 않으면 트리거가 숨겨진 채 패널이 남고, 위 스크롤 잠금도 해제되지 않는다.
