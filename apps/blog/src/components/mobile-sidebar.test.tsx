@@ -10,15 +10,12 @@ jest.mock('next/navigation', () => ({
 // 시리즈는 동작 검증에 1개면 충분하다.
 const seriesList: SeriesModel[] = [{ id: 'frontend', title: 'Frontend', date: '2026-01-01' }];
 
-// 이슈 #101 재현: 태그가 많아 사이드바 높이를 넘기는 상황을 만든다.
+// 태그가 많아 사이드바 높이를 넘기는 상황을 만든다.
 const tags: TagModel[] = Array.from({ length: 49 }, (_, index) => ({ id: `tag-${index}` }));
 
-// 비시맨틱(div) 트리거/닫기 버튼을 아이콘 클래스로 찾아 클릭한다.
-function clickByIcon(container: HTMLElement, iconClass: string) {
-  const button = container.querySelector(`.${iconClass}`)?.closest('div');
-  if (!button) throw new Error(`button not found: ${iconClass}`);
-  fireEvent.click(button);
-}
+// 라벨이 부여된 button을 역할/이름으로 찾아 조작한다(아이콘 클래스 의존 제거).
+const openSidebar = () => fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }));
+const closeSidebar = () => fireEvent.click(screen.getByRole('button', { name: '메뉴 닫기' }));
 
 describe('MobileSidebar', () => {
   // 테스트 간 body 스타일이 누수되지 않도록 초기화한다.
@@ -27,25 +24,22 @@ describe('MobileSidebar', () => {
   });
 
   it('사이드바를 열면 배경 스크롤을 잠그고, 닫으면 원래대로 복구한다', () => {
-    const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
 
     // 초기(닫힘) 상태에서는 body 스크롤을 잠그지 않는다.
     expect(document.body.style.overflow).not.toBe('hidden');
 
-    // 사이드바 열기 → 배경 스크롤 잠금
-    clickByIcon(container, 'tabler-icon-menu-2');
+    openSidebar();
     expect(document.body.style.overflow).toBe('hidden');
 
-    // 사이드바 닫기 → 배경 스크롤 복구
-    clickByIcon(container, 'tabler-icon-x');
+    closeSidebar();
     expect(document.body.style.overflow).not.toBe('hidden');
   });
 
   it('데스크톱(md) 너비로 리사이즈되면 사이드바를 닫아 배경 스크롤 잠금을 해제한다', () => {
-    const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
 
-    // 사이드바 열기 → 배경 스크롤 잠금
-    clickByIcon(container, 'tabler-icon-menu-2');
+    openSidebar();
     expect(document.body.style.overflow).toBe('hidden');
 
     // 뷰포트를 md(768px) 이상으로 넓히고 resize 이벤트를 발생시킨다.
@@ -73,5 +67,54 @@ describe('MobileSidebar', () => {
     tags.forEach((tag) => {
       expect(scrollArea).toContainElement(screen.getByText(tag.id));
     });
+  });
+
+  it('트리거에 라벨이 있고 aria-expanded가 열림 상태를 반영한다', () => {
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    const trigger = screen.getByRole('button', { name: '메뉴 열기' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    openSidebar();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('Esc 키로 사이드바를 닫는다', () => {
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    openSidebar();
+    expect(document.body.style.overflow).toBe('hidden');
+
+    // 패널(dialog)에서 Esc 입력 → 닫힘
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+    expect(screen.getByRole('button', { name: '메뉴 열기' })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
+  it('닫힌 동안 패널이 inert이고, 열면 inert가 해제된다', () => {
+    const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    // role=dialog 패널은 닫혀 있어도 DOM에 존재하므로 querySelector로 직접 잡는다.
+    const panel = container.querySelector('[role="dialog"]');
+    expect(panel).not.toBeNull();
+    if (!panel) throw new Error('panel not found');
+
+    // 닫힘 → inert로 내부 포커스 요소를 탭 순서/스크린리더에서 제외
+    expect(panel).toHaveAttribute('inert');
+
+    // 열기 → inert 해제
+    openSidebar();
+    expect(panel).not.toHaveAttribute('inert');
+  });
+
+  it('열면 닫기 버튼으로 포커스가 이동하고, 닫으면 트리거로 복귀한다', () => {
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    openSidebar();
+    expect(screen.getByRole('button', { name: '메뉴 닫기' })).toHaveFocus();
+
+    closeSidebar();
+    expect(screen.getByRole('button', { name: '메뉴 열기' })).toHaveFocus();
   });
 });
