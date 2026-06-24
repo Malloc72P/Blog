@@ -3,7 +3,7 @@ export const Constants = {
     latestId: 'latest',
   },
   recommendation: {
-    postIds: ['ai-tool', 'sse-exam', 'next-grid-app-1', 'closure', 'execution-context'] as string[],
+    postIds: ['ai-tool', 'sse-exam', 'nextjs-grid-app-1', 'closure', 'execution-context'] as string[],
   },
   siteConfig: {
     name: 'Malloc72p.TechBlog',
