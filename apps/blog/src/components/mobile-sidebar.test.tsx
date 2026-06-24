@@ -41,6 +41,21 @@ describe('MobileSidebar', () => {
     expect(document.body.style.overflow).not.toBe('hidden');
   });
 
+  it('데스크톱(md) 너비로 리사이즈되면 사이드바를 닫아 배경 스크롤 잠금을 해제한다', () => {
+    const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    // 사이드바 열기 → 배경 스크롤 잠금
+    clickByIcon(container, 'tabler-icon-menu-2');
+    expect(document.body.style.overflow).toBe('hidden');
+
+    // 뷰포트를 md(768px) 이상으로 넓히고 resize 이벤트를 발생시킨다.
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
+    fireEvent(window, new Event('resize'));
+
+    // 사이드바가 닫히며 배경 스크롤 잠금이 해제된다.
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
   it('태그가 많아도 모든 태그가 렌더되고, 스크롤 가능한 콘텐츠 영역에 담긴다', () => {
     const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
 
@@ -49,7 +64,14 @@ describe('MobileSidebar', () => {
       expect(screen.getByText(tag.id)).toBeInTheDocument();
     });
 
-    // 콘텐츠 영역이 세로 스크롤(overflow-y-auto)을 갖는다.
-    expect(container.querySelector('.overflow-y-auto')).not.toBeNull();
+    // 콘텐츠 영역이 세로 스크롤(overflow-y-auto)을 갖고, 모든 태그가 그 안에 담겨 있다.
+    // (jsdom에는 레이아웃이 없어 실제 스크롤 동작 자체는 검증 불가하며, 구조만 보장한다.)
+    const scrollArea = container.querySelector('.overflow-y-auto');
+    expect(scrollArea).not.toBeNull();
+    // non-null assertion 대신 타입 가드로 좁힌다.
+    if (!scrollArea) throw new Error('scroll area not found');
+    tags.forEach((tag) => {
+      expect(scrollArea).toContainElement(screen.getByText(tag.id));
+    });
   });
 });

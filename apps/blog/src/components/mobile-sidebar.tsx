@@ -30,6 +30,16 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
     };
   }, [open]);
 
+  // 데스크톱(md, 768px 이상) 너비로 넓어지면 모바일 사이드바를 닫는다.
+  // 닫지 않으면 트리거가 숨겨진 채 패널이 남고, 위 스크롤 잠금도 해제되지 않는다.
+  useEffect(() => {
+    const closeOnDesktop = () => {
+      if (window.innerWidth >= 768) setOpen(false);
+    };
+    window.addEventListener('resize', closeOnDesktop);
+    return () => window.removeEventListener('resize', closeOnDesktop);
+  }, []);
+
   const onLinkClick = () => {
     setOpen(false);
   };
@@ -50,10 +60,13 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
       <div
         className={classNames(
           // 모바일 브라우저 주소창 높이를 반영하도록 100vh 대신 100dvh를 사용한다.
-          'h-[100dvh] w-full bg-white z-50 fixed top-0 right-0',
+          // md:hidden — 데스크톱 너비에서는 패널이 열린 채 남지 않도록 숨긴다.
+          'h-[100dvh] w-full bg-white z-50 fixed top-0 right-0 md:hidden',
           // 헤더는 고정하고 콘텐츠 영역만 스크롤시키기 위해 세로 flex 컬럼으로 구성한다.
           'flex flex-col',
-          'transition-all duration-300',
+          // 전이는 가로 슬라이드(transform)로 한정한다. transition-all이면 dvh 높이 변화까지
+          // 애니메이션되어 iOS 주소창 접힘 시 패널 높이가 늘었다 줄었다 하는 잔상이 생긴다.
+          'transition-transform duration-300',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
@@ -77,8 +90,9 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
         {/* SIDEBAR CONTENT */}
         {/* ------------------------------------------------------ */}
         {/* flex-1로 남은 높이를 모두 차지하고, 넘치는 태그 목록은 overflow-y-auto로 스크롤시킨다. */}
+        {/* overscroll-contain: 끝단에서 스크롤이 배경 문서로 전파(체이닝)되거나 iOS 러버밴딩되는 것을 막는다. */}
         {/* 마지막 항목이 화면 끝에 붙지 않도록 하단 패딩(pb-10)을 둔다. */}
-        <div className="flex-1 overflow-y-auto pt-10 pb-10 text-black px-5 space-y-10">
+        <div className="flex-1 overflow-y-auto overscroll-contain pt-10 pb-10 text-black px-5 space-y-10">
           <SidebarSection
             onClick={onLinkClick}
             title="Series"
