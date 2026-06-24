@@ -10,6 +10,10 @@ describe('DateUtil.format', () => {
   it('postCard 포맷은 "YYYY. MM. DD"(분 단위 없음)', () => {
     expect(DateUtil.format('2026-06-22 22:10', 'postCard')).toBe('2026. 06. 22');
   });
+
+  it('isoOffset 포맷은 초와 타임존 오프셋(+09:00)을 포함한 ISO 8601', () => {
+    expect(DateUtil.format('2026-03-23 22:42', 'isoOffset')).toBe('2026-03-23T22:42:00+09:00');
+  });
 });
 
 describe('DateUtil.postSorter', () => {
