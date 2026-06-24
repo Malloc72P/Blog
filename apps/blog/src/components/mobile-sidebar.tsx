@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MainHeaderLogo, MainHeaderProps } from './main-header';
 import { IconMenu2, IconX } from '@tabler/icons-react';
 import classNames from 'classnames';
@@ -14,6 +14,21 @@ export type MobileSidebarProps = MainHeaderProps;
 
 export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
+
+  // 사이드바가 열린 동안 배경(body) 스크롤을 잠근다.
+  // 잠그지 않으면 사이드바 뒤의 본문이 함께 스크롤되어 동작이 어색해진다.
+  useEffect(() => {
+    // 닫혀 있을 때는 아무 것도 하지 않고, 기존 overflow 값을 건드리지 않는다.
+    if (!open) return;
+
+    // 잠그기 직전의 overflow 값을 저장해 두었다가 닫힐 때 그대로 복구한다.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   const onLinkClick = () => {
     setOpen(false);
@@ -34,7 +49,10 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
       {/* ------------------------------------------------------ */}
       <div
         className={classNames(
-          'h-[100vh] w-full bg-white z-50 fixed top-0 right-0',
+          // 모바일 브라우저 주소창 높이를 반영하도록 100vh 대신 100dvh를 사용한다.
+          'h-[100dvh] w-full bg-white z-50 fixed top-0 right-0',
+          // 헤더는 고정하고 콘텐츠 영역만 스크롤시키기 위해 세로 flex 컬럼으로 구성한다.
+          'flex flex-col',
           'transition-all duration-300',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
@@ -42,7 +60,7 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
         {/* ------------------------------------------------------ */}
         {/* SIDEBAR HEADER */}
         {/* ------------------------------------------------------ */}
-        <div className="flex items-center px-5 h-[60px] bg-black">
+        <div className="flex items-center px-5 h-[60px] bg-black shrink-0">
           <MainHeaderLogo />
           <span className="grow"></span>
 
@@ -58,7 +76,9 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
         {/* ------------------------------------------------------ */}
         {/* SIDEBAR CONTENT */}
         {/* ------------------------------------------------------ */}
-        <div className="pt-10 text-black px-5 space-y-10">
+        {/* flex-1로 남은 높이를 모두 차지하고, 넘치는 태그 목록은 overflow-y-auto로 스크롤시킨다. */}
+        {/* 마지막 항목이 화면 끝에 붙지 않도록 하단 패딩(pb-10)을 둔다. */}
+        <div className="flex-1 overflow-y-auto pt-10 pb-10 text-black px-5 space-y-10">
           <SidebarSection
             onClick={onLinkClick}
             title="Series"
