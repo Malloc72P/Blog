@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearch } from './search-context';
+import { useBodyScrollLock } from '@hooks/use-body-scroll-lock';
 
 export function SearchModal() {
   const { isOpen, close, status, search } = useSearch();
@@ -19,21 +20,20 @@ export function SearchModal() {
   // 질의가 바뀔 때마다 결과 재계산(status는 콜백에서 참조하지 않아 의존성에서 제외)
   const results = useMemo(() => search(query), [search, query]);
 
-  // 모달이 열리면 입력 초기화 + 포커스, 배경 스크롤 잠금
+  // 모달이 열리면 입력 초기화 + 포커스
   useEffect(() => {
     if (!isOpen) return;
     setQuery('');
     setActiveIndex(0);
     // 렌더 직후 다음 프레임에 포커스
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
-    // 배경 스크롤 잠금
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     return () => {
       window.cancelAnimationFrame(frame);
-      document.body.style.overflow = prevOverflow;
     };
   }, [isOpen]);
+
+  // 모달이 열린 동안 배경 스크롤 잠금(공용 훅으로 일원화)
+  useBodyScrollLock(isOpen);
 
   // 질의가 바뀌면 활성 인덱스 초기화
   useEffect(() => {
