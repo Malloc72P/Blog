@@ -97,6 +97,9 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
   return (
     <ArticleContainer>
       <div className="blog-landing-page pb-[10rem] max-w-[700px] mx-auto">
+        {/* 시각적으로는 소개 카드가 첫 화면을 차지하지만, 문서/스크린리더에는 페이지 제목 h1이 필요하다. */}
+        <h1 className="sr-only">Malloc72P 기술 블로그</h1>
+
         {/* ------------------------------------------------------ */}
         {/* INTRODUCE CARD */}
         {/* ------------------------------------------------------ */}
