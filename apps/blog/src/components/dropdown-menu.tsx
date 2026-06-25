@@ -4,7 +4,7 @@ import { IconChevronDown } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
 export interface DropdownMenuItemProps {
   id: string;
@@ -29,11 +29,16 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   // 현재 경로를 읽어 드롭다운 항목 중 활성 시리즈를 강조한다.
   const pathname = usePathname();
 
+  // 트리거(button)와 드롭다운 목록(ul)을 aria-controls로 연결하기 위한 고유 id.
+  const listId = useId();
+
   /* ------------------------------------------------------ */
   /* REFS */
   /* ------------------------------------------------------ */
   const rootRef = useRef<HTMLDivElement>(null);
   const dropdownBodyRef = useRef<HTMLUListElement>(null);
+  // Esc로 닫은 뒤 포커스를 되돌릴 트리거 버튼 참조.
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   /* ------------------------------------------------------ */
   /* FUNCTIONS */
@@ -54,6 +59,14 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
       setOffsetX(-(rightEdge - rightBoundary));
     } else {
       setOffsetX(0);
+    }
+  };
+
+  // Esc로 드롭다운을 닫고 트리거로 포커스를 되돌린다.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape' && visible) {
+      setVisible(false);
+      triggerRef.current?.focus();
     }
   };
 
@@ -102,25 +115,40 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
     <div
       ref={rootRef}
       className="relative"
-      onClick={() => {
-        setVisible((prev) => !prev);
+      onKeyDown={onKeyDown}
+      // 포커스가 드롭다운 영역 밖으로 나가면 닫는다(항목 간 이동은 유지).
+      onBlur={(e) => {
+        if (!rootRef.current?.contains(e.relatedTarget as Node | null)) {
+          setVisible(false);
+        }
       }}
     >
       {/* ------------------------------------------------------ */}
       {/* DROPDOWN TRIGGER */}
       {/* ------------------------------------------------------ */}
-      <div className="flex items-center gap-2 cursor-pointer select-none">
+      {/* 디스클로저 패턴: button + aria-expanded/aria-controls로 키보드·스크린리더를 지원한다. */}
+      <button
+        type="button"
+        ref={triggerRef}
+        aria-expanded={visible}
+        aria-controls={listId}
+        onClick={() => setVisible((prev) => !prev)}
+        className="flex items-center gap-2 cursor-pointer select-none"
+      >
         {title}
+        {/* 아이콘은 장식 요소이므로 스크린리더에서 숨긴다. */}
         <IconChevronDown
+          aria-hidden
           className="w-5 h-5 transition-all duration-500"
           style={{ transform: visible ? 'rotate(180deg)' : 'rotate(0)' }}
         />
-      </div>
+      </button>
 
       {/* ------------------------------------------------------ */}
       {/* DROPDOWN BODY */}
       {/* ------------------------------------------------------ */}
       <ul
+        id={listId}
         ref={dropdownBodyRef}
         className={classNames(
           'absolute top-6 bg-gray-950 z-50 px-2 py-4 flex-col transition-all duration-300',

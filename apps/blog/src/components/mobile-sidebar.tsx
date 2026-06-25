@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { MainHeaderLogo, MainHeaderProps } from './main-header';
 import { IconMenu2, IconX } from '@tabler/icons-react';
 import classNames from 'classnames';
@@ -16,6 +16,20 @@ export type MobileSidebarProps = MainHeaderProps;
 export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
 
+  // 트리거와 패널을 aria-controls로 연결하기 위한 고유 id.
+  const panelId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // 사용자가 명시적으로(닫기 버튼/Esc) 닫을 때만 트리거로 포커스를 되돌리기 위한 플래그.
+  const restoreFocusRef = useRef(false);
+
+  // 닫기 버튼/Esc로 닫을 때 사용한다. 닫은 뒤 트리거로 포커스를 되돌리도록 표시한다.
+  const closeSidebar = () => {
+    restoreFocusRef.current = true;
+    setOpen(false);
+  };
+
   // 사이드바가 열린 동안 배경(body) 스크롤을 잠근다.
   // 잠그지 않으면 사이드바 뒤의 본문이 함께 스크롤되어 동작이 어색해진다.
   useBodyScrollLock(open);
@@ -30,8 +44,44 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
     return () => window.removeEventListener('resize', closeOnDesktop);
   }, []);
 
+  // 열리면 닫기 버튼으로 포커스를 옮긴다. 사용자가 닫은 경우에만 트리거로 되돌린다.
+  // (리사이즈로 닫히는 경우엔 트리거가 md:hidden이라 포커스가 유실되므로 되돌리지 않는다.)
+  useEffect(() => {
+    if (open) {
+      closeButtonRef.current?.focus();
+    } else if (restoreFocusRef.current) {
+      triggerRef.current?.focus();
+      restoreFocusRef.current = false;
+    }
+  }, [open]);
+
   const onLinkClick = () => {
     setOpen(false);
+  };
+
+  // Esc로 닫고, Tab은 패널 내부에 가둔다(포커스 트랩).
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      closeSidebar();
+      return;
+    }
+    if (e.key === 'Tab') {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusables = panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus(); // 처음에서 Shift+Tab → 마지막으로 순환
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus(); // 마지막에서 Tab → 처음으로 순환
+      }
+    }
   };
 
   return (
@@ -39,15 +89,32 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
       {/* ------------------------------------------------------ */}
       {/* SIDEBAR TRIGGER */}
       {/* ------------------------------------------------------ */}
-      {/* 탭 영역 확대를 위해 래퍼에 패딩(p-2.5)을 주고 onClick을 래퍼로 올린다(아이콘 크기는 유지). */}
-      <div className="flex md:hidden cursor-pointer p-2.5" onClick={() => setOpen(true)}>
-        <IconMenu2 className="w-5 h-5" />
-      </div>
+      {/* 탭 영역 확대를 위해 버튼에 패딩(p-2.5)을 준다(아이콘 크기는 유지). */}
+      <button
+        type="button"
+        ref={triggerRef}
+        aria-label="메뉴 열기"
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex md:hidden cursor-pointer p-2.5"
+        onClick={() => setOpen(true)}
+      >
+        <IconMenu2 aria-hidden className="w-5 h-5" />
+      </button>
 
       {/* ------------------------------------------------------ */}
       {/* SIDEBAR BODY */}
       {/* ------------------------------------------------------ */}
       <div
+        ref={panelRef}
+        id={panelId}
+        role="dialog"
+        aria-label="사이트 메뉴"
+        // 배경을 inert로 만들지 않으므로 aria-modal은 선언하지 않는다(보조기술에 잘못된 약속을 피함).
+        // 키보드 사용자에게는 Tab 포커스 트랩 + 배경 스크롤 잠금으로 모달처럼 동작한다.
+        // 닫힌 동안에는 inert로 패널 내부 요소를 포커스/스크린리더에서 제외한다.
+        inert={!open}
+        onKeyDown={onKeyDown}
         className={classNames(
           // 모바일 브라우저 주소창 높이를 반영하도록 100vh 대신 100dvh를 사용한다.
           // md:hidden — 데스크톱 너비에서는 패널이 열린 채 남지 않도록 숨긴다.
@@ -70,10 +137,16 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
           {/* ------------------------------------------------------ */}
           {/* SIDEBAR CLOSE BUTTON */}
           {/* ------------------------------------------------------ */}
-          {/* 탭 영역 확대를 위해 닫기 버튼 래퍼에 패딩(p-2.5)을 더한다(아이콘 크기는 유지). */}
-          <div className="flex items-center cursor-pointer p-2.5" onClick={() => setOpen(false)}>
-            <IconX className="w-5 h-5 " />
-          </div>
+          {/* 탭 영역 확대를 위해 닫기 버튼에 패딩(p-2.5)을 더한다(아이콘 크기는 유지). */}
+          <button
+            type="button"
+            ref={closeButtonRef}
+            aria-label="메뉴 닫기"
+            className="flex items-center cursor-pointer p-2.5"
+            onClick={closeSidebar}
+          >
+            <IconX aria-hidden className="w-5 h-5" />
+          </button>
         </div>
 
         {/* ------------------------------------------------------ */}
