@@ -40,8 +40,9 @@ export function PostCard({ post, showSeriesBadge = true }: PostCardProps) {
       {/* === POST TITLE AND LINK === */}
       {/* 제목 Link는 키보드 포커스/새 탭 열기 등 접근성을 위해 실제 <a>로 유지한다. */}
       <Link href={post.route}>
-        {/* 모바일 제목을 키워 태그(배지)와 위계를 확보한다. */}
-        <span className="text-sm md:text-lg font-bold">{post.title}</span>
+        {/* 목록의 각 글 제목은 문서 구조상 h2다(스크린리더 헤딩 탐색·SEO 위계).
+            모바일 제목을 키워 태그(배지)와 위계를 확보한다. */}
+        <h2 className="text-sm md:text-lg font-bold">{post.title}</h2>
       </Link>
 
       {/* 목록에서는 분/시 없이 날짜만 노출한다(date-format의 postCard 패턴 사용). */}

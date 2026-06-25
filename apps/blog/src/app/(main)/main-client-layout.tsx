@@ -47,6 +47,15 @@ export default function MainClientLayout({
       {/* 검색 컨텍스트로 헤더 버튼과 모달이 상태를 공유한다 */}
       <SearchProvider>
         <div className="blog-main-layout h-full">
+          {/* 키보드 사용자가 헤더 내비를 건너뛰고 본문으로 바로 이동할 수 있는 skip 링크.
+              평소엔 sr-only로 숨기고 포커스되면 좌상단에 노출한다. */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-black focus:px-4 focus:py-2 focus:text-white"
+          >
+            본문으로 건너뛰기
+          </a>
+
           {/* ------------------------------------------------------ */}
           {/* HEADER */}
           {/* ------------------------------------------------------ */}
