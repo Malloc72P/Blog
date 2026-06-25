@@ -170,7 +170,9 @@ export function PostDetail({ children, series, post }: PostDetailProps) {
                 return;
               }
 
-              targetEl.scrollIntoView({ behavior: 'smooth' });
+              // 동작 줄이기(prefers-reduced-motion) 설정 시 부드러운 스크롤 대신 즉시 이동한다.
+              const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              targetEl.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
             }}
           />
         </div>

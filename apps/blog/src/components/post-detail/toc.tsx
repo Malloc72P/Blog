@@ -1,7 +1,7 @@
 'use client';
 
 import classNames from 'classnames';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 /** 목차 한 항목. 본문 헤딩에서 수집한 id/텍스트/레벨을 담는다. */
 export interface TocItem {
@@ -17,28 +17,16 @@ export interface TocProps {
 }
 
 export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
-  const [fragId, setFragId] = useState('');
-
-  /**
-   * url의 Fragment Identifier를 읽어서 상태로 저장함.
-   */
+  // 진입 시 URL 해시가 있으면 해당 섹션으로 한 번 스크롤한다(딥링크).
+  // getElementById와 형식을 맞추기 위해 '#'를 제거한 값을 넘긴다.
+  // onFragIdChanged는 부모에서 매 렌더 새로 생성되므로 의존성에서 제외(마운트 1회만 실행).
   useEffect(() => {
-    if (window.location.hash) {
-      setFragId(window.location.hash);
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      onFragIdChanged({ fragId: hash });
     }
-  }, []);
-
-  // fragId가 바뀔 때만 스크롤 이동 콜백을 호출한다.
-  // onFragIdChanged는 부모(PostDetail)에서 매 렌더마다 새로 생성되는 인라인 콜백이라
-  // 의존성에 넣으면 부모 리렌더마다 effect가 재실행되어 의도치 않은 scrollIntoView가 발생한다.
-  useEffect(() => {
-    if (!fragId) {
-      return;
-    }
-
-    onFragIdChanged({ fragId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fragId]);
+  }, []);
 
   return (
     /* 폭을 240px로 두어 xl(1280px) 거터 안에 들어가 가로 스크롤이 생기지 않게 한다. */
@@ -59,9 +47,10 @@ export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
               // 현재 위치한 항목임을 스크린리더에 알린다.
               aria-current={item.id === activeId ? 'location' : undefined}
               onClick={(e) => {
-                // 네이티브 즉시 점프를 막고 기존의 부드러운 스크롤(scrollIntoView smooth)을 유지한다.
+                // 네이티브 즉시 점프를 막고 부모의 부드러운 스크롤을 직접 호출한다.
+                // state를 경유하지 않으므로 같은 항목을 다시 눌러도 매번 스크롤된다.
                 e.preventDefault();
-                setFragId(item.id);
+                onFragIdChanged({ fragId: item.id });
                 // 딥링크를 위해 스크롤 없이 URL 해시만 동기화한다.
                 window.history.replaceState(null, '', `#${item.id}`);
               }}
