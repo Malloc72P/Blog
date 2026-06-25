@@ -32,7 +32,9 @@ export function MainFooter({ seriesList }: MainFooterProps) {
               color="primary"
               leftIcon={IconArrowUp}
               onClick={() => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                // 동작 줄이기 설정 시 즉시 이동한다(JS 스크롤은 CSS scroll-behavior의 영향을 받지 않으므로 별도 분기).
+                const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
               }}
             >
               <span>Back to top</span>

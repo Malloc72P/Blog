@@ -18,9 +18,12 @@ const post: PostModel = {
 };
 
 describe('PostCard', () => {
-  it('포스트 제목을 레벨 2 헤딩(h2)으로 렌더한다(헤딩 위계/스크린리더 탐색)', () => {
+  it('포스트 제목을 레벨 2 헤딩(h2)으로 렌더하며, 제목 링크 안에 위치한다', () => {
     render(<PostCard post={post} series={series} />);
 
-    expect(screen.getByRole('heading', { level: 2, name: '내 포스트 제목' })).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 2, name: '내 포스트 제목' });
+    expect(heading).toBeInTheDocument();
+    // 제목은 헤딩이면서 동시에 글로 이동하는 링크여야 한다.
+    expect(heading.closest('a')).toHaveAttribute('href', post.route);
   });
 });
