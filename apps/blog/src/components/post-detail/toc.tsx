@@ -47,17 +47,34 @@ export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
         {toc.map((item) => (
           <li
             key={item.id}
-            onClick={() => {
-              setFragId(item.id);
-            }}
             className={classNames(
-              'hover:cursor-pointer hover:underline list-decimal',
+              'list-decimal',
               // h3는 하위 항목이므로 들여쓰기로 계층을 표현한다.
               item.level === 3 ? 'ml-4' : '',
-              item.id === activeId ? 'opacity-100' : 'opacity-30 hover:opacity-50',
             )}
           >
-            {item.value}
+            {/* a[href]로 키보드 포커스·Enter 이동·딥링크·스크린리더 접근을 동시에 얻는다. */}
+            <a
+              href={`#${item.id}`}
+              // 현재 위치한 항목임을 스크린리더에 알린다.
+              aria-current={item.id === activeId ? 'location' : undefined}
+              onClick={(e) => {
+                // 네이티브 즉시 점프를 막고 기존의 부드러운 스크롤(scrollIntoView smooth)을 유지한다.
+                e.preventDefault();
+                setFragId(item.id);
+                // 딥링크를 위해 스크롤 없이 URL 해시만 동기화한다.
+                window.history.replaceState(null, '', `#${item.id}`);
+              }}
+              className={classNames(
+                'block hover:underline focus-visible:underline',
+                // 비활성 항목은 흐리게 두되, 키보드 포커스 시에는 또렷하게 보이도록 한다.
+                item.id === activeId
+                  ? 'opacity-100'
+                  : 'opacity-30 hover:opacity-50 focus-visible:opacity-100',
+              )}
+            >
+              {item.value}
+            </a>
           </li>
         ))}
       </ol>
