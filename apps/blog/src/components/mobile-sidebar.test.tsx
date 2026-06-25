@@ -117,4 +117,17 @@ describe('MobileSidebar', () => {
     closeSidebar();
     expect(screen.getByRole('button', { name: '메뉴 열기' })).toHaveFocus();
   });
+
+  it('리사이즈로 닫힐 때는 (숨겨진) 트리거로 포커스를 강제하지 않는다', () => {
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    openSidebar();
+
+    // 데스크톱(md) 폭으로 리사이즈 → 닫힘
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
+    fireEvent(window, new Event('resize'));
+
+    // 데스크톱에서 트리거는 md:hidden이므로 포커스를 되돌리지 않는다(포커스 유실 방지).
+    expect(screen.getByRole('button', { name: '메뉴 열기' })).not.toHaveFocus();
+  });
 });

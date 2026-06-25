@@ -112,7 +112,17 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   /* ------------------------------------------------------ */
 
   return (
-    <div ref={rootRef} className="relative" onKeyDown={onKeyDown}>
+    <div
+      ref={rootRef}
+      className="relative"
+      onKeyDown={onKeyDown}
+      // 포커스가 드롭다운 영역 밖으로 나가면 닫는다(항목 간 이동은 유지).
+      onBlur={(e) => {
+        if (!rootRef.current?.contains(e.relatedTarget as Node | null)) {
+          setVisible(false);
+        }
+      }}
+    >
       {/* ------------------------------------------------------ */}
       {/* DROPDOWN TRIGGER */}
       {/* ------------------------------------------------------ */}

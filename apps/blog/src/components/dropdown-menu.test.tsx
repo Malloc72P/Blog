@@ -47,4 +47,22 @@ describe('DropdownMenu', () => {
     fireEvent.keyDown(trigger, { key: 'Escape' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
+
+  it('포커스가 드롭다운 영역 밖으로 나가면 닫힌다', () => {
+    render(
+      <>
+        <DropdownMenu title="Series" items={items} />
+        <button>바깥 버튼</button>
+      </>,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Series' });
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    // 포커스가 드롭다운 바깥 요소로 이동(focusout) → 닫힘
+    const outside = screen.getByRole('button', { name: '바깥 버튼' });
+    fireEvent.focusOut(trigger, { relatedTarget: outside });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
 });

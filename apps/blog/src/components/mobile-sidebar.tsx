@@ -21,8 +21,14 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  // 닫힐 때만 포커스를 복귀시키기 위해 직전 열림 여부를 추적한다(최초 마운트 시 포커스 가로채기 방지).
-  const wasOpenRef = useRef(false);
+  // 사용자가 명시적으로(닫기 버튼/Esc) 닫을 때만 트리거로 포커스를 되돌리기 위한 플래그.
+  const restoreFocusRef = useRef(false);
+
+  // 닫기 버튼/Esc로 닫을 때 사용한다. 닫은 뒤 트리거로 포커스를 되돌리도록 표시한다.
+  const closeSidebar = () => {
+    restoreFocusRef.current = true;
+    setOpen(false);
+  };
 
   // 사이드바가 열린 동안 배경(body) 스크롤을 잠근다.
   // 잠그지 않으면 사이드바 뒤의 본문이 함께 스크롤되어 동작이 어색해진다.
@@ -38,15 +44,14 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
     return () => window.removeEventListener('resize', closeOnDesktop);
   }, []);
 
-  // 열리면 닫기 버튼으로 포커스를 옮겨 키보드 사용자가 바로 조작하게 하고,
-  // 닫히면 트리거로 포커스를 되돌린다.
+  // 열리면 닫기 버튼으로 포커스를 옮긴다. 사용자가 닫은 경우에만 트리거로 되돌린다.
+  // (리사이즈로 닫히는 경우엔 트리거가 md:hidden이라 포커스가 유실되므로 되돌리지 않는다.)
   useEffect(() => {
     if (open) {
       closeButtonRef.current?.focus();
-      wasOpenRef.current = true;
-    } else if (wasOpenRef.current) {
+    } else if (restoreFocusRef.current) {
       triggerRef.current?.focus();
-      wasOpenRef.current = false;
+      restoreFocusRef.current = false;
     }
   }, [open]);
 
@@ -57,7 +62,7 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
   // Esc로 닫고, Tab은 패널 내부에 가둔다(포커스 트랩).
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
-      setOpen(false);
+      closeSidebar();
       return;
     }
     if (e.key === 'Tab') {
@@ -104,8 +109,9 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
         ref={panelRef}
         id={panelId}
         role="dialog"
-        aria-modal="true"
         aria-label="사이트 메뉴"
+        // 배경을 inert로 만들지 않으므로 aria-modal은 선언하지 않는다(보조기술에 잘못된 약속을 피함).
+        // 키보드 사용자에게는 Tab 포커스 트랩 + 배경 스크롤 잠금으로 모달처럼 동작한다.
         // 닫힌 동안에는 inert로 패널 내부 요소를 포커스/스크린리더에서 제외한다.
         inert={!open}
         onKeyDown={onKeyDown}
@@ -137,7 +143,7 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
             ref={closeButtonRef}
             aria-label="메뉴 닫기"
             className="flex items-center cursor-pointer p-2.5"
-            onClick={() => setOpen(false)}
+            onClick={closeSidebar}
           >
             <IconX aria-hidden className="w-5 h-5" />
           </button>
