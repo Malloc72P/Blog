@@ -5,10 +5,15 @@
    arbitrary 유틸리티로 참조한다(이 프로젝트의 Turbopack+v4 빌드에서 @theme는
    유틸리티를 생성하지 않아, 코드베이스가 이미 쓰는 arbitrary value 방식으로 통일). */
 :root {
-  /* 브랜드 액센트(인디고). 활성 칩·현재 시리즈·포커스 링 등에 절제 있게 적용한다. */
-  --color-brand: #6366f1;
+  /* 브랜드 액센트(인디고) 스케일. */
+  --color-brand: #6366f1; /* 비텍스트 액센트(포커스 링 등) */
+  --color-brand-strong: #4f46e5; /* 브랜드 위 흰 텍스트용 — 대비 AA(6.3:1) 확보 */
   /* 다크 서피스 단일 토큰. 헤더·드롭다운·사이드바·뱃지의 검정 계열(black/gray-900/950)을 통일한다. */
   --color-ink: #0a0a0a;
+  /* 중립 구조색. 값은 기존 Tailwind gray와 동일해 시각 변화 없이 단일 출처로 모은다. */
+  --color-surface-muted: #f9fafb; /* gray-50: 카드 배경 */
+  --color-border: #e5e7eb; /* gray-200: 카드/모달 경계 */
+  --color-border-subtle: #f3f4f6; /* gray-100: 옅은 구분선 */
 }
 
 html,

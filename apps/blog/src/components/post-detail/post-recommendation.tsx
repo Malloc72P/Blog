@@ -34,7 +34,7 @@ export function PostRecommendation({ currentPost }: PostRecommendationProps) {
           <Link
             key={post.id}
             href={post.route}
-            className="group/rec-card shrink-0 flex flex-col gap-2 bg-gray-50 p-4 rounded-md w-55 cursor-pointer"
+            className="group/rec-card shrink-0 flex flex-col gap-2 bg-[var(--color-surface-muted)] p-4 rounded-md w-55 cursor-pointer"
           >
             <span className="text-xs text-gray-400">{post.series.title}</span>
             <span className="text-sm font-bold leading-snug group-hover/rec-card:underline line-clamp-3">
