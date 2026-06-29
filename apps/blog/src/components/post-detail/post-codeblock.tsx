@@ -1,15 +1,10 @@
-import React, { PropsWithChildren } from 'react';
+import { ComponentPropsWithoutRef } from 'react';
 import { PostCodeblockClient } from './post-codeblock-client';
 
-// children만 받으므로 빈 인터페이스 대신 타입 별칭으로 둔다.
-export type PostCodeblockProps = PropsWithChildren;
+// MDX의 pre 매핑 컴포넌트. rehype-pretty-code가 하이라이팅한 pre 속성을 그대로 받는다.
+export type PostCodeblockProps = ComponentPropsWithoutRef<'pre'>;
 
 export function PostCodeblock(props: PostCodeblockProps) {
-  const { children } = props;
-  const codeProps = (children as React.ReactElement<{ className?: string; children?: string }>)?.props;
-
-  const language = codeProps?.className?.replace('language-', '') ?? '';
-  const code = codeProps?.children ?? '';
-
-  return <PostCodeblockClient language={language} code={code} />;
+  // 복사 버튼은 이벤트 핸들러가 필요해 별도 클라이언트 컴포넌트로 분리한다(copy-button.tsx 주석 참고).
+  return <PostCodeblockClient {...props} />;
 }

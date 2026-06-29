@@ -6,7 +6,8 @@ import classes from './post-detail.module.scss';
 import classNames from 'classnames';
 
 export interface CopyButtonProps {
-  content: string;
+  // 복사 시점에 코드 원문을 읽어오는 함수. 빌드타임 하이라이팅에선 pre의 textContent에서 읽으므로 함수로 받는다.
+  getContent: () => string;
 }
 
 /**
@@ -24,14 +25,14 @@ export interface CopyButtonProps {
  * 이렇게 하면 PostCodeBlock은 서버 컴포넌트처럼 취급되더라도, 자식 컴포넌트는 정상적으로 클라이언트 사이드에서 처리된다.
  *
  */
-export function CopyButton({ content }: CopyButtonProps) {
+export function CopyButton({ getContent }: CopyButtonProps) {
   // 복사 성공 여부를 상태로 관리해 클릭 후 일정 시간 체크 아이콘으로 피드백한다.
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     // 클립보드 쓰기에 실패해도 화면이 깨지지 않도록 예외를 흡수한다.
     try {
-      await navigator.clipboard.writeText(content);
+      await navigator.clipboard.writeText(getContent());
       setCopied(true);
       // 1.5초 뒤 원래 복사 아이콘으로 되돌린다.
       setTimeout(() => setCopied(false), 1500);
