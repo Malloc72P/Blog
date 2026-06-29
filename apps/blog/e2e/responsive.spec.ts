@@ -11,12 +11,12 @@ test.describe('모바일 반응형', () => {
     // 데스크톱 전용 Tags 네비 링크는 md 미만에서 숨겨져야 한다.
     await expect(page.getByRole('link', { name: 'Tags' })).toBeHidden();
 
-    // 햄버거(메뉴) 아이콘을 눌러 사이드바를 연다.
-    await page.locator('.tabler-icon-menu-2').click();
+    // 햄버거(메뉴) 버튼을 눌러 사이드바를 연다(#87에서 추가된 접근성 라벨 사용).
+    await page.getByRole('button', { name: '메뉴 열기' }).click();
 
-    // 닫혀 있을 땐 화면 밖(translate-x-full)에 있던 사이드바의 Series 섹션 단락이
+    // 닫혀 있을 땐 화면 밖(translate-x-full)에 있던 사이드바 패널(dialog)이
     // 열린 뒤에는 뷰포트 안으로 들어와야 한다(패널이 실제로 슬라이드인됐음을 검증).
-    const sidebarSeries = page.getByRole('paragraph').filter({ hasText: /^Series$/ });
-    await expect(sidebarSeries).toBeInViewport();
+    const sidebar = page.getByRole('dialog', { name: '사이트 메뉴' });
+    await expect(sidebar).toBeInViewport();
   });
 });

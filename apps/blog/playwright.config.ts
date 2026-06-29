@@ -13,8 +13,8 @@ export default defineConfig({
   timeout: 60_000,
   // CI에서만 실패 1회 재시도로 일시적 플레이키를 흡수한다(로컬은 즉시 실패가 디버깅에 유리).
   retries: process.env.CI ? 1 : 0,
-  // 실패 원인 추적용 리포터. 로컬에서 결과를 바로 열어볼 수 있게 한다.
-  reporter: process.env.CI ? 'github' : 'list',
+  // 리포터: 로컬은 간결한 list, CI는 GitHub 어노테이션 + 실패 분석용 HTML 리포트(아티팩트 업로드용).
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     // 모든 테스트가 동일 출처를 바라보도록 기준 URL을 둔다(상대경로 goto 가능).
     baseURL: 'http://localhost:3000',
