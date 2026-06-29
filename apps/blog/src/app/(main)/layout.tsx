@@ -1,10 +1,6 @@
-import { findSeriesList } from '@libs/api/find-series';
-import { findTags } from '@libs/api/find-tags';
-import { Mapper } from '@libs/mapper';
-import { PostModel } from '@libs/types/commons';
+import { loadMainLayoutData } from '@libs/api/load-layout-data';
 import { PropsWithChildren } from 'react';
 import MainClientLayout from './main-client-layout';
-import { findPosts } from '@libs/api/find-posts';
 
 export const dynamic = 'force-static';
 
@@ -14,13 +10,9 @@ export const dynamic = 'force-static';
  * 포스트, 시리즈, 태그 페이지는 해당 레이아웃을 기본적으로 사용한다
  */
 export default async function MainLayout({ children }: PropsWithChildren) {
-  const seriesModels = (await findSeriesList()).map(Mapper.toSeriesModel);
-  const tags = (await findTags()).map(Mapper.toTagModel);
-  const posts = (await findPosts())
-    .map((item) => Mapper.toPostModel({ item, seriesModels }))
-    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
-    .filter((post): post is PostModel => post !== null)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const { seriesModels, tags, posts: loadedPosts } = await loadMainLayoutData();
+  // 시리즈 내 이전/다음 글 계산을 위해 날짜 오름차순으로 정렬한다.
+  const posts = [...loadedPosts].sort((a, b) => a.date.localeCompare(b.date));
   const postDesc = posts.slice().reverse();
 
   const preparedPosts = posts.map((currentPost) => ({
