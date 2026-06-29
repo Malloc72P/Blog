@@ -28,7 +28,9 @@ export function Badge({ href, children, onClick, color = 'secondary', active }: 
         'px-[8px] py-[8px]',
         'md:px-[12px] md:py-[6px]',
         'whitespace-nowrap',
-        color === 'primary' ? 'bg-[var(--color-brand)] text-white' : 'bg-gray-100 text-gray-700',
+        color === 'primary'
+          ? 'bg-[var(--color-brand-strong)] text-white'
+          : 'bg-gray-100 text-gray-700',
         'hover:brightness-95 active:brightness-90',
       )}
     >

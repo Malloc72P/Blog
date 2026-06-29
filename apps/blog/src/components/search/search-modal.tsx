@@ -107,7 +107,7 @@ export function SearchModal() {
         onKeyDown={onKeyDown}
       >
         {/* 검색 입력 영역 */}
-        <div className="flex items-center gap-3 border-b border-gray-200 px-4">
+        <div className="flex items-center gap-3 border-b border-[var(--color-border)] px-4">
           <IconSearch className="h-5 w-5 shrink-0 text-gray-400" />
           <input
             ref={inputRef}
@@ -165,7 +165,7 @@ export function SearchModal() {
                   onClick={close}
                   onMouseEnter={() => setActiveIndex(idx)}
                   className={classNames(
-                    'block border-b border-gray-100 px-4 py-3',
+                    'block border-b border-[var(--color-border-subtle)] px-4 py-3',
                     idx === activeIndex ? 'bg-gray-100' : 'bg-white',
                   )}
                 >

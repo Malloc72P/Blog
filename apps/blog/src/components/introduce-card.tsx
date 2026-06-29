@@ -3,7 +3,7 @@ import classNames from 'classnames';
 export function IntroduceCard() {
   // 데스크톱 첫 화면 밀도 확보를 위해 상단 마진을 md:mt-30(120px)에서 절반 수준(60px)으로 축소한다. 모바일(mt-7.5)은 유지.
   return (
-    <div className="rounded-md border border-gray-100 flex relative shadow-md mt-7.5 md:mt-15 break-keep">
+    <div className="rounded-md border border-[var(--color-border-subtle)] flex relative shadow-md mt-7.5 md:mt-15 break-keep">
       {/* === INTRODUCE CARD LEFT Bar === */}
       <div className="w-2 md:w-4.25 h-full bg-gray-700  absolute left-0 top-0"></div>
 
