@@ -18,7 +18,9 @@ const withMDX = createMDX({
           keepBackground: true,
           // 언어를 명시하지 않은 코드블록도 동일하게 grid/라인 처리되도록 기본 언어를 지정한다.
           // (이전 Prism 구현은 모든 블록에 라인넘버를 붙였으므로 그 동작을 보존한다.)
-          defaultLang: 'text',
+          // block 키로 한정한다: 문자열로 주면 인라인 코드(백틱 1개)에도 적용돼
+          // shiki가 다크 배경을 inline style로 주입(keepBackground) → 회색 배경이 덮인다.
+          defaultLang: { block: 'text' },
         },
       ],
     ],
