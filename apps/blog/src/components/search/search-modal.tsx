@@ -93,7 +93,7 @@ export function SearchModal() {
   return (
     // 배경 오버레이(클릭 시 닫힘)
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 px-4 pt-[12vh]"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-[var(--color-ink)]/50 px-4 pt-[12vh]"
       onClick={close}
     >
       {/* 모달 본체(내부 클릭은 닫힘 전파 차단) */}
