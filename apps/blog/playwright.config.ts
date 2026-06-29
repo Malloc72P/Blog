@@ -32,11 +32,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // 테스트 실행 전 블로그 개발 서버를 자동으로 띄운다.
+  // 테스트 실행 전 블로그 서버를 자동으로 띄운다.
   webServer: {
-    // 프로젝트의 dev 스크립트를 그대로 사용한다(날짜 결정성을 위한 TZ 주입 포함).
-    command: 'pnpm dev',
-    // dev 서버 기본 포트가 응답하면 준비 완료로 간주한다.
+    // CI에서는 프로덕션 빌드(SSG/force-static/빌드타임 shiki 등)를 실제로 검증하기 위해 build+start를,
+    // 로컬에서는 빠른 반복을 위해 dev 서버를 사용한다(둘 다 dev 스크립트의 TZ 주입을 따른다).
+    command: process.env.CI ? 'pnpm build && pnpm start' : 'pnpm dev',
+    // 서버 기본 포트가 응답하면 준비 완료로 간주한다.
     url: 'http://localhost:3000',
     // 이미 떠 있는 서버가 있으면 재사용해 로컬 반복 실행을 빠르게 한다. CI는 항상 새로 띄운다.
     reuseExistingServer: !process.env.CI,

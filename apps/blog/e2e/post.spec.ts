@@ -33,8 +33,9 @@ test.describe('포스트 목록 → 상세', () => {
     // 상세 경로(/posts/{series}/{postId})로 진입했는지 확인한다.
     await expect(page).toHaveURL(/\/posts\/[^/]+\/[^/]+/);
 
-    // 상세 헤더의 h1에 목록에서 본 제목이 포함되어야 한다.
-    await expect(page.locator('h1')).toContainText(title);
+    // 상세 헤더의 제목 h1에 목록에서 본 제목이 포함되어야 한다.
+    // (본문 MDX가 별도 H1을 가질 수 있으므로 제목 헤더로 스코프를 한정한다 — 이슈 #98 참고)
+    await expect(page.locator('header.post-detail-header h1')).toContainText(title);
 
     // 상세 헤더(post-detail-header)에 작성일(연도 4자리)이 노출되어야 한다.
     await expect(page.locator('header.post-detail-header')).toContainText(/\d{4}/);
