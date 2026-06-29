@@ -11,7 +11,9 @@
     "start": "next start",
     "test": "TZ=\"Atlantic/Reykjavik\" jest",
     "test:watch": "TZ=\"Atlantic/Reykjavik\" jest --watch",
-    "test:coverage": "TZ=\"Atlantic/Reykjavik\" jest --coverage"
+    "test:coverage": "TZ=\"Atlantic/Reykjavik\" jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@giscus/react": "^3.1.0",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@next/mdx": "^16.2.1",
+    "@playwright/test": "^1.61.1",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4",

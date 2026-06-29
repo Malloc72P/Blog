@@ -8,6 +8,8 @@ const config = {
   coverageProvider: 'v8',
   // 컴포넌트 렌더 테스트를 위해 jsdom. fs 기반 파이프라인 테스트도 Node가 받쳐주므로 함께 동작한다.
   testEnvironment: 'jsdom',
+  // Playwright E2E(e2e/*.spec.ts)는 jest가 잡지 않도록 제외한다(전용 러너로 실행).
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/e2e/'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   // tsconfig의 path alias를 테스트에서도 해석할 수 있게 매핑한다.
   moduleNameMapper: {

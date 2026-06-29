@@ -50,3 +50,31 @@
   - 혹시라도 Next.js API가 변경되더라도 서버 컴포넌트에서 가공하는 코드만 변경하면 해결되도록 하기 위해서 위와 같이 작업중입니다.
 - 조회한 데이터를 위의 타입으로 변환하는 Mapper 객체가 있습니다.
   - apps/blog/src/libs/mapper.ts에 있습니다.
+
+## 테스트
+
+블로그 앱(`apps/blog`)은 단위 테스트(Jest)와 E2E 테스트(Playwright)를 갖추고 있습니다.
+
+### 단위 테스트 (Jest)
+
+- `next/jest`(SWC 변환) 기반이며, `src` 하위의 `*.test.ts`를 실행합니다.
+- 주요 대상은 `src/libs`의 순수 로직(frontmatter, mapper, find-posts 등)입니다.
+
+```bash
+pnpm --filter blog test           # 1회 실행
+pnpm --filter blog test:watch     # 변경 감지 실행
+pnpm --filter blog test:coverage  # 커버리지 포함
+```
+
+### E2E 테스트 (Playwright)
+
+- `e2e` 디렉토리의 시나리오를 Chromium에서 실행합니다.
+- `playwright.config.ts`의 `webServer` 설정이 개발 서버(`pnpm dev`)를 자동으로 띄우므로, 별도 서버 실행 없이 바로 돌릴 수 있습니다.
+- 최초 1회 브라우저 설치가 필요합니다: `pnpm --filter blog exec playwright install chromium`
+
+```bash
+pnpm --filter blog test:e2e       # 헤드리스 실행
+pnpm --filter blog test:e2e:ui    # UI 모드(디버깅)
+```
+
+- 실패한 테스트는 스크린샷과 trace를 `apps/blog/test-results`에 남깁니다(git에는 포함되지 않습니다).
