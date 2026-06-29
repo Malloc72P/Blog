@@ -52,8 +52,8 @@ export async function SeriesDetail({ series }: SeriesDetailProps) {
                   'px-3 py-1.5 text-xs md:text-sm',
                   'transition-all duration-200 ease-in-out',
                   active
-                    ? // 활성 시리즈: 진한 배경으로 강조한다.
-                      'bg-gray-900 text-white'
+                    ? // 활성 시리즈: 브랜드 액센트로 현재 위치를 강조한다.
+                      'bg-[var(--color-brand)] text-white'
                     : // 비활성 시리즈: 옅은 배경 + hover 강조로 클릭 가능함을 알린다.
                       'bg-gray-100 text-gray-700 hover:bg-gray-200',
                 )}

@@ -171,7 +171,7 @@ export function SearchModal() {
                 >
                   <div className="flex items-center gap-2">
                     {doc.series && (
-                      <span className="shrink-0 rounded bg-black px-1.5 py-0.5 text-[11px] text-white">
+                      <span className="shrink-0 rounded bg-[var(--color-ink)] px-1.5 py-0.5 text-[11px] text-white">
                         {doc.series}
                       </span>
                     )}

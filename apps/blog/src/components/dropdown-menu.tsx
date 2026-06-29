@@ -151,7 +151,7 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
         id={listId}
         ref={dropdownBodyRef}
         className={classNames(
-          'absolute top-6 bg-gray-950 z-50 px-2 py-4 flex-col transition-all duration-300',
+          'absolute top-6 bg-[var(--color-ink)] z-50 px-2 py-4 flex-col transition-all duration-300',
           'rounded-b-lg drop-shadow-2xl',
           visible ? 'block' : 'hidden'
         )}
