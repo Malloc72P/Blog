@@ -1,0 +1,362 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'TypeScript 제네릭 단독 정복기: 타입 파라미터부터 extends·keyof까지',
+  description:
+    'any로 잃어버린 타입 정보를 제네릭이 어떻게 보존하는지부터, 타입 파라미터 추론, extends 제약, keyof 조합, 그리고 재사용 가능한 타입 설계까지 왜·언제·어떻게 순으로 한 편에 정리합니다.',
+  seriesId: 'frontend',
+  postId: 'ts-generics',
+  tags: ['Typescript', '제네릭', 'Generic', 'keyof', '타입추론'],
+  date: '2026-06-29 11:00',
+});
+
+제네릭(Generic)은 처음 봤을 때 가장 진입장벽이 높게 느껴진 문법이었습니다. `<T>` 같은 꺾쇠 괄호가 함수 이름 옆에 붙어 있으면, 코드를 읽다가도 잠깐 멈칫하게 됩니다. 저도 한동안은 라이브러리 타입 정의에서 제네릭을 보면 "이건 일단 넘어가자"는 마음이었습니다.
+
+그런데 제네릭을 피하다 보니 결국 `any`로 도망치게 되더군요. 그리고 `any`로 도망친 코드는 타입스크립트를 쓰는 의미를 거의 다 깎아먹고 있었습니다. 이 글에서는 제네릭이 **왜** 필요한지부터, **언제** 쓰고, **어떻게** 직접 설계하는지까지 한 편에서 정리해 보겠습니다.
+
+## 빈칸이 있는 틀, 제네릭
+
+본격적인 코드에 들어가기 전에 비유 하나만 짚고 가겠습니다. 저는 제네릭을 **빈칸이 있는 양식 틀**로 이해하면 편했습니다.
+
+택배 송장 양식을 떠올려 봅시다. "보내는 사람 ___, 받는 사람 ___" 처럼 양식 자체는 고정되어 있고, 빈칸은 쓸 때마다 채웁니다. 제네릭의 `<T>`가 바로 이 빈칸입니다. **타입을 지금 정하지 않고, 쓰는 순간에 채우도록 미뤄두는 장치**입니다. 양식(코드 구조)은 한 번만 만들고, 빈칸(타입)만 그때그때 바꿔 끼우는 셈입니다.
+
+이 "빈칸"이 왜 필요한지는, 빈칸 없이 만든 코드가 어떻게 망가지는지를 보면 분명해집니다.
+
+## 왜: any는 타입 정보를 버린다
+
+가장 단순한 함수부터 시작하겠습니다. 인자로 받은 값을 그대로 돌려주는 함수입니다. 타입을 어떻게 붙여야 할지 막막하면, 처음엔 `any`가 떠오릅니다.
+
+```typescript
+// 받은 값을 그대로 돌려주는 함수. 타입을 any로 대충 막았다.
+function identity(value: any): any {
+  return value;
+}
+
+// number를 넣었다.
+const price = identity(1000);
+// 하지만 price의 타입은 number가 아니라 any다.
+
+// any라서 아래 코드가 컴파일 에러 없이 통과한다.
+price.toUpperCase(); // number에는 없는 메서드인데 컴파일러가 막지 않는다
+// 런타임에 TypeError: price.toUpperCase is not a function
+```
+
+`any`를 쓰는 순간, 함수에 들어간 `number`라는 정보가 함수를 나오면서 증발합니다. 반환값 `price`는 `number`가 아니라 `any`가 되어버리고, `any`는 무엇이든 허용하기 때문에 `toUpperCase` 같은 엉뚱한 호출도 컴파일러가 막지 못합니다. 결국 런타임에 가서야 터집니다.
+
+`any`의 문제는 "타입을 모른다"가 아니라 **"타입 검사를 끄는 것"**에 가깝습니다. 들어올 때 알고 있던 타입마저 출구에서 잃어버립니다.
+
+### 제네릭으로 타입 정보 보존하기
+
+같은 함수를 제네릭으로 바꾸면 이 정보가 보존됩니다. 함수 이름 옆에 `<T>`라는 빈칸을 하나 선언하고, 인자와 반환값을 모두 그 빈칸으로 묶어줍니다.
+
+```typescript
+// <T>는 "타입 빈칸"을 하나 선언하겠다는 뜻이다.
+// 인자 타입과 반환 타입을 같은 T로 묶었다.
+function identity<T>(value: T): T {
+  return value;
+}
+
+// number를 넣으면 T가 number로 채워진다.
+const price = identity(1000);
+// price: number  (any가 아니다!)
+
+// string을 넣으면 같은 함수인데 T가 string으로 채워진다.
+const name = identity('claude');
+// name: string
+
+// 이제는 잘못된 호출을 컴파일러가 막아준다.
+price.toUpperCase();
+// Property 'toUpperCase' does not exist on type 'number'.
+```
+
+핵심은 `value: T`와 반환 타입 `T`가 **같은 빈칸**이라는 점입니다. 입력에 채워진 타입이 그대로 출력으로 흘러나옵니다. `any`처럼 정보를 버리지 않고, "들어온 타입이 곧 나갈 타입"이라는 관계를 컴파일러에게 알려주는 것입니다.
+
+비교해 보면 차이가 분명합니다.
+
+| 구분         | 입력 타입 | 반환 타입 | 잘못된 호출 차단 |
+| ------------ | --------- | --------- | ---------------- |
+| `any` 버전   | 버려짐    | `any`     | 막지 못함        |
+| 제네릭 버전  | 보존됨    | 입력과 동일 | 막아줌          |
+
+## 어떻게: 타입 파라미터는 어디에 선언하나
+
+제네릭의 빈칸, 즉 **타입 파라미터(Type Parameter)**는 함수뿐 아니라 여러 곳에 선언할 수 있습니다. 선언 위치에 따라 빈칸이 채워지는 시점이 달라집니다.
+
+### 함수에서: 호출할 때 추론된다
+
+함수의 타입 파라미터는 보통 우리가 직접 적지 않아도 **인자를 보고 추론(Inference)**됩니다. 위 예제에서 `identity(1000)`라고만 썼는데 `T`가 `number`로 채워진 것이 그 추론입니다.
+
+```typescript
+// 배열의 첫 요소를 돌려주는 함수.
+// 요소 타입을 모르므로 T로 비워둔다.
+function first<T>(items: T[]): T | undefined {
+  // 빈 배열이면 undefined가 나올 수 있으므로 반환 타입에 명시했다.
+  return items[0];
+}
+
+// number[]를 넣으면 T가 number로 추론된다.
+const n = first([1, 2, 3]);
+// n: number | undefined
+
+// string[]를 넣으면 T가 string으로 추론된다.
+const s = first(['a', 'b']);
+// s: string | undefined
+
+// 추론이 애매하면 <>로 직접 채워 넣을 수도 있다.
+const empty = first<boolean>([]);
+// empty: boolean | undefined
+```
+
+대부분은 추론에 맡기면 되고, 추론이 우리가 의도한 것과 다를 때만 `first<boolean>([])`처럼 빈칸을 직접 채웁니다.
+
+### 타입 별칭·인터페이스에서: 쓸 때 채운다
+
+타입 자체에도 빈칸을 둘 수 있습니다. API 응답처럼 "겉 구조는 같은데 안에 담기는 데이터만 다른" 경우에 특히 잘 맞습니다.
+
+```typescript
+// 응답의 공통 구조는 고정하고, data에 담길 타입만 T로 비워둔다.
+interface ApiResponse<T> {
+  status: number; // 어떤 응답이든 동일
+  message: string; // 어떤 응답이든 동일
+  data: T; // 응답마다 달라지는 부분
+}
+
+interface User {
+  id: number;
+  name: string;
+}
+
+// 사용할 때 빈칸을 User로 채운다.
+const userRes: ApiResponse<User> = {
+  status: 200,
+  message: 'ok',
+  data: { id: 1, name: 'claude' },
+};
+
+// userRes.data는 User로 좁혀져 있다.
+userRes.data.name; // string
+
+// 같은 틀을 User[]로 채우면 목록 응답이 된다.
+const listRes: ApiResponse<User[]> = {
+  status: 200,
+  message: 'ok',
+  data: [{ id: 1, name: 'claude' }],
+};
+```
+
+`ApiResponse`라는 양식은 한 번만 만들고, `ApiResponse<User>`, `ApiResponse<User[]>`처럼 빈칸만 바꿔 끼워 여러 응답 타입을 찍어냅니다. 만약 제네릭이 없었다면 `UserResponse`, `UserListResponse`처럼 거의 똑같은 타입을 응답 종류마다 복사했을 것입니다.
+
+### 클래스에서: 인스턴스를 만들 때 채운다
+
+클래스에도 같은 방식으로 빈칸을 둘 수 있습니다. 자료구조를 만들 때 흔히 쓰는 패턴입니다.
+
+```typescript
+// 어떤 타입이든 담을 수 있는 스택. 담길 타입을 T로 비워둔다.
+class Stack<T> {
+  private items: T[] = [];
+
+  push(item: T): void {
+    this.items.push(item);
+  }
+
+  // 비어 있을 수 있으므로 T | undefined를 돌려준다.
+  pop(): T | undefined {
+    return this.items.pop();
+  }
+}
+
+// 인스턴스를 만들 때 T를 number로 채운다.
+const numberStack = new Stack<number>();
+numberStack.push(1);
+numberStack.push(2);
+const popped = numberStack.pop();
+// popped: number | undefined
+
+numberStack.push('3');
+// Argument of type 'string' is not assignable to parameter of type 'number'.
+```
+
+`Stack<number>`로 만든 인스턴스에는 `number`만 들어갈 수 있습니다. 빈칸을 채우는 순간, 그 클래스 인스턴스 전체가 해당 타입에 맞춰 고정됩니다.
+
+## 언제: extends로 빈칸에 조건을 건다
+
+여기까지의 `T`는 어떤 타입이든 받습니다. 그런데 "아무 타입이나"는 종종 너무 헐겁습니다. 예를 들어 길이를 재는 함수라면, 들어오는 값이 적어도 `length` 속성은 가지고 있어야 합니다.
+
+이때 쓰는 것이 **`extends` 제약(Constraint)**입니다. 빈칸에 "최소한 이 형태는 만족해야 한다"는 조건을 거는 것입니다.
+
+```typescript
+// T는 length: number를 가진 타입이어야 한다는 제약을 걸었다.
+function logLength<T extends { length: number }>(value: T): T {
+  // 제약 덕분에 value.length 접근이 안전하다.
+  console.log(value.length);
+  return value;
+}
+
+logLength('hello'); // OK - string에는 length가 있다
+logLength([1, 2, 3]); // OK - 배열에도 length가 있다
+logLength({ length: 10, name: 'box' }); // OK - length를 가진 객체
+
+logLength(42);
+// Argument of type 'number' is not assignable to
+// parameter of type '{ length: number; }'.
+// number에는 length가 없으므로 막힌다.
+```
+
+제약이 없다면 함수 안에서 `value.length`를 쓰는 순간 "`T`에 `length`가 있는지 모른다"며 컴파일러가 막습니다. `extends { length: number }`를 붙이면, 컴파일러는 "들어오는 `T`는 적어도 `length`는 가진 놈"이라고 신뢰하고 안전하게 접근하게 해줍니다.
+
+> 한 가지 짚어둘 점은, 여기서의 `extends`는 인터페이스를 상속할 때 쓰는 `extends`(예: `interface Dog extends Animal`)와 키워드만 같을 뿐 역할이 다릅니다. 인터페이스 상속의 `extends`는 "이 타입을 물려받겠다"는 선언이고, 제네릭의 `extends`는 "타입 파라미터가 이 조건을 만족해야 한다"는 제약입니다. 같은 단어지만 문맥으로 구분하면 됩니다.
+
+제약은 타입 정보도 더 정확하게 유지해 줍니다. 위 함수는 반환 타입을 `T`로 두었기 때문에, `logLength('hello')`의 결과는 그냥 `string`이 아니라 입력 그대로의 타입으로 흘러나옵니다. 제약을 걸면서도 구체 타입을 잃지 않는 것입니다.
+
+## 어떻게: keyof와 제네릭의 조합
+
+제네릭이 가장 빛나는 순간 중 하나가 `keyof`와 만날 때입니다. `keyof`는 객체 타입의 **키들을 유니온 타입으로 뽑아내는** 연산자입니다.
+
+```typescript
+interface User {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+// keyof User는 'id' | 'name' | 'active' 라는 유니온 타입이다.
+type UserKey = keyof User;
+// UserKey: 'id' | 'name' | 'active'
+```
+
+이걸 제네릭과 엮으면, 객체에서 키로 값을 꺼내는 함수를 **반환 타입까지 정확하게** 만들 수 있습니다. 우선 `any`로 만든 버전이 어떻게 정보를 흘리는지부터 봅시다.
+
+```typescript
+// any로 막은 버전. 키가 진짜 있는지도, 값 타입도 알 수 없다.
+function getValueBad(obj: any, key: string): any {
+  return obj[key];
+}
+
+const user = { id: 1, name: 'claude', active: true };
+
+const name = getValueBad(user, 'name');
+// name: any  (string이라는 정보가 사라졌다)
+
+const typo = getValueBad(user, 'nmae');
+// 오타지만 컴파일러가 막지 못한다. 런타임에 undefined가 나온다.
+```
+
+여기에 제네릭과 `keyof`, 그리고 앞에서 본 `extends` 제약을 결합하면 두 문제를 한 번에 잡습니다.
+
+```typescript
+// T: 객체 타입 (빈칸)
+// K: 그 객체의 키 중 하나여야 한다는 제약 (K extends keyof T)
+function getValue<T, K extends keyof T>(obj: T, key: K): T[K] {
+  // T[K]는 "T에서 K 키에 해당하는 값의 타입"이다. (인덱스드 액세스 타입)
+  return obj[key];
+}
+
+const user = { id: 1, name: 'claude', active: true };
+
+const name = getValue(user, 'name');
+// name: string  (정확한 타입으로 추론된다)
+
+const id = getValue(user, 'id');
+// id: number
+
+const active = getValue(user, 'active');
+// active: boolean
+
+// 존재하지 않는 키는 컴파일 타임에 막힌다.
+const typo = getValue(user, 'nmae');
+// Argument of type '"nmae"' is not assignable to
+// parameter of type '"name" | "id" | "active"'.
+```
+
+여기서 일어나는 일을 한 줄씩 풀어 보면 이렇습니다. `K extends keyof T`는 "두 번째 인자 `key`는 반드시 `obj`가 실제로 가진 키여야 한다"는 제약입니다. 덕분에 `'nmae'` 같은 오타는 키 목록에 없으니 컴파일 단계에서 걸러집니다. 그리고 반환 타입 `T[K]`는 **인덱스드 액세스 타입(Indexed Access Type)**으로, "그 키가 가리키는 값의 타입"을 그대로 가져옵니다. `'name'`을 넣으면 `string`, `'id'`를 넣으면 `number`가 정확히 추론됩니다.
+
+`any` 버전은 "키가 있는지"도 "값이 무엇인지"도 모두 포기했지만, 제네릭 버전은 둘 다 컴파일러가 보장해 줍니다.
+
+## 실전: 재사용 가능한 타입을 직접 설계하기
+
+마지막으로 지금까지의 조각들을 모아, 작은 라이브러리 수준의 함수를 직접 설계해 보겠습니다. 객체 배열을 특정 키 기준으로 묶어주는 `groupBy`입니다. 로그를 레벨별로, 주문을 상태별로 묶는 식으로 실무에서 자주 쓰는 도구입니다.
+
+요구사항을 타입으로 옮기면 이렇습니다.
+
+- 어떤 객체 배열이든 받는다 → 요소 타입을 `T`로 비운다.
+- 묶는 기준은 그 객체가 실제로 가진 키여야 한다 → `K extends keyof T`.
+- 키의 값은 그룹 이름으로 쓰이므로, 객체 키가 될 수 있는 타입이어야 한다 → `T[K] extends PropertyKey`.
+
+```typescript
+// PropertyKey는 string | number | symbol을 가리키는 내장 타입이다.
+// 그룹 이름(객체 키)으로 쓸 수 있는 값만 허용하기 위한 제약이다.
+function groupBy<T, K extends keyof T>(
+  items: T[],
+  key: K,
+): T[K] extends PropertyKey ? Record<T[K], T[]> : never {
+  // 결과를 담을 객체. 아래에서 한 칸씩 채운다.
+  const result = {} as Record<PropertyKey, T[]>;
+
+  for (const item of items) {
+    // item[key]의 타입은 T[K]. 이 값을 그룹 이름으로 쓴다.
+    const groupName = item[key] as PropertyKey;
+
+    // 해당 그룹이 처음이면 빈 배열을 만든다. (옵셔널 체이닝 대신 명시적 초기화)
+    const bucket = result[groupName] ?? [];
+    bucket.push(item);
+    result[groupName] = bucket;
+  }
+
+  // 위에서 정의한 조건부 반환 타입에 맞춰 단언 없이 돌려준다.
+  return result as T[K] extends PropertyKey ? Record<T[K], T[]> : never;
+}
+```
+
+타입이 다소 빽빽하니 사용 예시로 결과를 확인해 보겠습니다.
+
+```typescript
+interface LogEntry {
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
+const logs: LogEntry[] = [
+  { level: 'info', message: '서버 시작' },
+  { level: 'error', message: 'DB 연결 실패' },
+  { level: 'info', message: '요청 처리' },
+  { level: 'warn', message: '응답 지연' },
+];
+
+// level 기준으로 묶는다.
+const byLevel = groupBy(logs, 'level');
+// byLevel: Record<'info' | 'warn' | 'error', LogEntry[]>
+// 키가 정확히 세 레벨로 추론된다.
+
+byLevel.info.length; // 2  - info 로그 두 개
+byLevel.error[0].message; // 'DB 연결 실패' - 요소가 LogEntry로 추론된다
+
+// 없는 키로 묶으려 하면 컴파일 타임에 막힌다.
+const wrong = groupBy(logs, 'severity');
+// Argument of type '"severity"' is not assignable to
+// parameter of type 'keyof LogEntry'.
+```
+
+주목할 점은 `groupBy(logs, 'level')`의 결과 타입이 단순한 `Record<string, LogEntry[]>`가 아니라, `Record<'info' | 'warn' | 'error', LogEntry[]>`로 **키 후보까지 정확히** 추론된다는 것입니다. `byLevel.info`처럼 실제로 존재할 수 있는 그룹 이름을 자동완성으로 받을 수 있고, 요소를 꺼내면 `LogEntry`로 좁혀져 `.message`에 안전하게 접근합니다.
+
+이 함수는 `LogEntry`에 대해 특별히 만든 것이 아닙니다. 주문(status), 사용자(role) 등 **어떤 객체 배열에도** 그대로 재사용됩니다. 타입 파라미터라는 빈칸 덕분에, 한 번 설계한 도구가 다양한 데이터에 안전하게 들어맞는 것입니다.
+
+> 위 `groupBy`에서는 동적 키로 객체를 채우는 과정에서 컴파일러가 끝까지 따라오지 못하는 부분이 있어 두 군데에 단언을 사용했습니다. 이렇게 내부 구현이 복잡한 유틸리티는 함수 안에서 단언을 쓰더라도, **함수 시그니처(입력·출력 타입)를 정확히 설계**해 두면 사용하는 쪽은 완전히 타입 안전한 경험을 얻습니다. 단언의 범위를 함수 내부로 가두는 셈입니다.
+
+## 정리
+
+이번 글에서는 제네릭을 왜·언제·어떻게 쓰는지 한 편에 정리했습니다.
+
+| 개념                    | 한 줄 요약                                              |
+| ----------------------- | ------------------------------------------------------ |
+| 타입 파라미터 `<T>`     | "타입을 나중에 채우는 빈칸". 정보 손실 없이 타입을 묶는다 |
+| 타입 추론               | 함수는 보통 인자를 보고 `T`를 자동으로 채운다           |
+| `extends` 제약          | 빈칸에 "최소한 이 형태"라는 조건을 건다                 |
+| `keyof` + 제네릭        | `K extends keyof T`로 객체의 실제 키만 받게 한다        |
+| 인덱스드 액세스 `T[K]`  | 키에 해당하는 값의 타입을 정확히 가져온다               |
+
+- `any`는 들어올 때 알던 타입까지 버린다. 제네릭은 입력 타입을 출력까지 보존한다.
+- 타입 파라미터는 함수·타입·클래스에 선언할 수 있고, 채워지는 시점만 다르다.
+- `extends`로 빈칸에 제약을 걸면, 헐거운 `T`를 안전하게 다룰 수 있다.
+- `keyof`·`T[K]`와 엮으면, 객체에서 키로 값을 꺼내는 동작까지 타입으로 보장된다.
+
+제네릭은 결국 "코드 구조는 한 번만 만들고, 타입은 그때그때 채운다"는 한 문장으로 요약됩니다. 처음엔 꺾쇠 괄호가 부담스러웠지만, 빈칸이라는 비유로 접근하니 라이브러리 타입 정의를 읽는 것도 한결 수월해졌습니다. 긴 글 읽어주셔서 감사합니다.
