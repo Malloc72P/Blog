@@ -6,9 +6,6 @@ export const Constants = {
     // skip 링크(본문 바로가기)와 <main> 타깃을 잇는 앵커 id. 두 파일이 같은 값을 공유하도록 단일화한다.
     mainContentId: 'main-content',
   },
-  recommendation: {
-    postIds: ['ai-tool', 'sse-exam', 'nextjs-grid-app-1', 'closure', 'execution-context'] as string[],
-  },
   siteConfig: {
     name: 'Malloc72p.TechBlog',
     title: 'Malloc72P의 기술블로그',
