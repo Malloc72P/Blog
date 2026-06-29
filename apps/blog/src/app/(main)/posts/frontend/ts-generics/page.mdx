@@ -265,7 +265,7 @@ const active = getValue(user, 'active');
 // 존재하지 않는 키는 컴파일 타임에 막힌다.
 const typo = getValue(user, 'nmae');
 // Argument of type '"nmae"' is not assignable to
-// parameter of type '"id" | "name" | "active"'.
+// parameter of type '"name" | "id" | "active"'.
 ```
 
 여기서 일어나는 일을 한 줄씩 풀어 보면 이렇습니다. `K extends keyof T`는 "두 번째 인자 `key`는 반드시 `obj`가 실제로 가진 키여야 한다"는 제약입니다. 덕분에 `'nmae'` 같은 오타는 키 목록에 없으니 컴파일 단계에서 걸러집니다. 그리고 반환 타입 `T[K]`는 **인덱스드 액세스 타입(Indexed Access Type)**으로, "그 키가 가리키는 값의 타입"을 그대로 가져옵니다. `'name'`을 넣으면 `string`, `'id'`를 넣으면 `number`가 정확히 추론됩니다.
