@@ -8,8 +8,12 @@ test.describe('존재하지 않는 경로', () => {
     // HTTP 응답 상태가 404여야 한다(가장 안정적인 계약).
     expect(response?.status()).toBe(404);
 
-    // 화면에 404가 노출되는지 확인한다. Next 내부 문구 전체에 의존하지 않도록 "404"만 검증한다.
-    // (커스텀 404는 별도 이슈 #93)
+    // 화면에 404가 노출되어야 한다.
     await expect(page.locator('body')).toContainText('404');
+
+    // 커스텀 404(#93): 헤더와 복구 동선(홈으로/전체 태그)이 포함되어야 한다.
+    await expect(page.locator('header.blog-main-header')).toBeVisible();
+    await expect(page.getByRole('link', { name: '홈으로' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '전체 태그' })).toBeVisible();
   });
 });

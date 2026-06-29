@@ -4,6 +4,7 @@ import { ArticleHeader } from '@components/article';
 import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
 import { PostJsonLd } from '@components/post-json-ld';
+import { Constants } from '@libs/constants';
 import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
 import classNames from 'classnames';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
@@ -11,6 +12,7 @@ import classes from './post-detail.module.scss';
 import { Toc, TocItem } from './toc';
 import { PostNavigator, PostNavigatorPlaceholder } from './post-navigator';
 import { PostRecommendation } from './post-recommendation';
+import { ShareButtons } from './share-buttons';
 import { GiscusComments } from './giscus-comments';
 
 export interface PostDetailProps extends PropsWithChildren {
@@ -209,7 +211,10 @@ export function PostDetail({ children, series, post }: PostDetailProps) {
         {/* POST DETAIL Footer */}
         {/* ------------------------------------------------------ */}
         <footer className="post-detail-footer pb-15 md:pb-25 w-full">
-          <div className="flex gap-10 flex-col md:flex-row">
+          {/* 글 공유: 정식 절대 URL을 넘겨 localhost가 아닌 canonical 링크가 공유되게 한다. */}
+          <ShareButtons url={`${Constants.siteConfig.url}${post.route}`} title={post.title} />
+
+          <div className="mt-10 flex gap-10 flex-col md:flex-row">
             {post.prevPost ? (
               <PostNavigator mode="prev" post={post.prevPost} />
             ) : (
@@ -223,7 +228,7 @@ export function PostDetail({ children, series, post }: PostDetailProps) {
             )}
           </div>
 
-          <PostRecommendation />
+          <PostRecommendation currentPost={post} />
 
           {/* === 댓글 (giscus · GitHub Discussions 기반, DB 없음) === */}
           <div className="mt-16 md:mt-24">

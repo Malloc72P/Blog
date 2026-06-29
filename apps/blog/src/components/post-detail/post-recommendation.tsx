@@ -1,20 +1,27 @@
 'use client';
 
-import { Constants } from '@libs/constants';
 import { MainLayoutContext } from 'src/app/(main)/main-client-layout';
+import { recommendPosts } from '@libs/recommend-posts';
+import { PostModel } from '@libs/types/commons';
 import Link from 'next/link';
 import { useContext, useMemo } from 'react';
 
-export function PostRecommendation() {
+export interface PostRecommendationProps {
+  // 현재 보고 있는 글. 이 글과의 유사도로 추천 목록을 만든다.
+  currentPost: PostModel;
+}
+
+export function PostRecommendation({ currentPost }: PostRecommendationProps) {
+  // 전체 글 목록은 레이아웃 컨텍스트에 이미 있어 추가 fetch가 필요 없다.
   const { posts } = useContext(MainLayoutContext);
 
-  const recommendedPosts = useMemo(() => {
-    const ids = Constants.recommendation.postIds;
-    return ids
-      .map((id) => posts.find((p) => p.id === id))
-      .filter((p): p is NonNullable<typeof p> => p !== undefined);
-  }, [posts]);
+  // 태그 겹침 + 같은 시리즈 가중치로 상위 4개를 산출한다(현재 글 제외).
+  const recommendedPosts = useMemo(
+    () => recommendPosts(currentPost, posts, 4),
+    [currentPost, posts],
+  );
 
+  // 접점 있는 글이 하나도 없으면 섹션 자체를 숨긴다.
   if (recommendedPosts.length === 0) {
     return null;
   }
