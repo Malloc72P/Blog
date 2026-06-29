@@ -135,7 +135,7 @@
       padding-top: 8px;
       padding-bottom: 12px;
       // 본문 14px 기준 가독 line-height. 폰트가 12→14px로 커졌는데 22px에 머물러
-      // 줄간격 비율이 좁아졌던 것을 데스크톱(28px/16px≈1.75)과 같은 비율로 복원한다.
+      // 줄간격 비율이 1.57로 좁아졌던 것을, 데스크톱 비율(28px/16px≈1.75)에 근접하게 복원한다(25/14≈1.79).
       line-height: 25px;
       font-size: 14px; // 모바일 가독성을 위해 12px에서 14px로 상향
       word-break: keep-all;
