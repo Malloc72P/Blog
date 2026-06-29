@@ -1,5 +1,16 @@
 @import 'tailwindcss';
 
+/* === 디자인 토큰 (#94) ===
+   의미 기반 색 토큰의 단일 출처. 컴포넌트는 bg-[var(--color-brand)] 형태의
+   arbitrary 유틸리티로 참조한다(이 프로젝트의 Turbopack+v4 빌드에서 @theme는
+   유틸리티를 생성하지 않아, 코드베이스가 이미 쓰는 arbitrary value 방식으로 통일). */
+:root {
+  /* 브랜드 액센트(인디고). 활성 칩·현재 시리즈·포커스 링 등에 절제 있게 적용한다. */
+  --color-brand: #6366f1;
+  /* 다크 서피스 단일 토큰. 헤더·드롭다운·사이드바·뱃지의 검정 계열(black/gray-900/950)을 통일한다. */
+  --color-ink: #0a0a0a;
+}
+
 html,
 body {
   height: 100%;

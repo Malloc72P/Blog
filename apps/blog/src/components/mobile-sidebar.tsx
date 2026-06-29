@@ -130,7 +130,7 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
         {/* ------------------------------------------------------ */}
         {/* SIDEBAR HEADER */}
         {/* ------------------------------------------------------ */}
-        <div className="flex items-center px-5 h-[60px] bg-black shrink-0">
+        <div className="flex items-center px-5 h-[60px] bg-[var(--color-ink)] shrink-0">
           <MainHeaderLogo />
           <span className="grow"></span>
 

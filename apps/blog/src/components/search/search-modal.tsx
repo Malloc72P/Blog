@@ -93,7 +93,7 @@ export function SearchModal() {
   return (
     // 배경 오버레이(클릭 시 닫힘)
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 px-4 pt-[12vh]"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-[var(--color-ink)]/50 px-4 pt-[12vh]"
       onClick={close}
     >
       {/* 모달 본체(내부 클릭은 닫힘 전파 차단) */}
@@ -171,7 +171,7 @@ export function SearchModal() {
                 >
                   <div className="flex items-center gap-2">
                     {doc.series && (
-                      <span className="shrink-0 rounded bg-black px-1.5 py-0.5 text-[11px] text-white">
+                      <span className="shrink-0 rounded bg-[var(--color-ink)] px-1.5 py-0.5 text-[11px] text-white">
                         {doc.series}
                       </span>
                     )}

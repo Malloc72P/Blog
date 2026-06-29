@@ -15,7 +15,7 @@ export interface ShareButtonsProps {
 const buttonClass = classNames(
   'flex items-center justify-center p-2.5 rounded-md text-gray-500',
   'hover:text-black hover:bg-gray-100 active:bg-gray-200',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]',
 );
 
 export function ShareButtons({ url, title }: ShareButtonsProps) {
