@@ -23,9 +23,6 @@
     padding-bottom: 24px;
     line-height: 28px;
     word-break: keep-all;
-    // 데스크톱에서 한 줄이 지나치게 길어지지 않도록 가독 권장 폭(약 70자)으로 제한한다.
-    // 코드블록/이미지/표는 아래에서 풀폭을 유지하므로 영향받지 않는다.
-    max-width: 70ch;
   }
 
   ul,
@@ -137,10 +134,11 @@
     p {
       padding-top: 8px;
       padding-bottom: 12px;
-      line-height: 22px;
+      // 본문 14px 기준 가독 line-height. 폰트가 12→14px로 커졌는데 22px에 머물러
+      // 줄간격 비율이 좁아졌던 것을 데스크톱(28px/16px≈1.75)과 같은 비율로 복원한다.
+      line-height: 25px;
       font-size: 14px; // 모바일 가독성을 위해 12px에서 14px로 상향
       word-break: keep-all;
-      max-width: none; // 모바일은 화면이 좁아 측정폭 제한이 불필요하므로 해제
     }
 
     ul,
