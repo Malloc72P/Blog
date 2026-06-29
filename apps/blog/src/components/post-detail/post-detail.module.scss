@@ -62,14 +62,11 @@
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 
-  pre {
-    border-radius: 8px;
-  }
-
   // === shiki(rehype-pretty-code) 빌드타임 하이라이팅 코드블록 ===
   // 이전 Prism 구현이 인라인으로 주던 패딩/스크롤/라인넘버를 CSS로 대체한다.
   // 배경색·문법 색은 shiki가 pre/span에 인라인 style로 주입한다.
   pre {
+    border-radius: 8px;
     // 가로로 긴 코드는 잘리지 않고 스크롤되도록 한다.
     overflow-x: auto;
     // Prism 기본 패딩과 유사한 여백을 코드 영역에 준다(복사 버튼과 겹치지 않도록 우측은 본문 패딩으로 충분).
@@ -184,9 +181,16 @@
     }
 
     // ```로 감싸진 코드 블록
+    // 가로 패딩은 데스크탑과 동일하게 [data-line]이 담당하므로 pre는 세로 패딩만 둔다.
+    // (과거 Prism 인라인 스타일을 덮으려던 !important / 가로 12px 잔재 제거)
     pre {
-      padding: 16px 12px !important;
+      padding: 16px 0;
       font-size: 14px; // 모바일에서 코드 한 줄 노출량/가독성 개선을 위해 12px에서 14px로 상향
+
+      // 좁은 화면에선 코드 본문 가로 들여쓰기를 12px로 줄여 한 줄 노출량을 늘린다.
+      [data-line] {
+        padding: 0 12px;
+      }
     }
 
     table {
