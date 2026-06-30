@@ -5,6 +5,7 @@ import { DropdownMenu } from './dropdown-menu';
 import { SeriesModel, TagModel } from '@libs/types/commons';
 import { MobileSidebar } from './mobile-sidebar';
 import { SearchButton } from './search';
+import { ThemeToggle } from './theme-toggle';
 
 export interface MainHeaderProps {
   seriesList: SeriesModel[];
@@ -26,7 +27,8 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
 
         <span className="grow"></span>
 
-        {/* === SEARCH BUTTON (모든 화면 크기에서 노출) === */}
+        {/* === 테마 토글 + 검색 (모든 화면 크기에서 노출) === */}
+        <ThemeToggle className="text-white" />
         <SearchButton className="mr-5 text-white" />
 
         {/* === HEADER >= MD: RIGHT SECTION === */}

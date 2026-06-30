@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* dark: 유틸리티가 OS 설정이 아니라 html.dark 클래스를 따르게 한다(클래스 기반 테마 토글). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* === 디자인 토큰 (#94, #120) ===
    Tailwind v4 @theme로 의미 기반 색 토큰을 정의한다. 각 토큰은 bg-brand/text-ink/
    border-border 등 깔끔한 유틸리티로 생성되며, :root에 CSS 변수로도 노출된다.
@@ -12,14 +15,52 @@
   /* 다크 서피스 단일 토큰. 헤더·드롭다운·사이드바·뱃지의 검정 계열(black/gray-900/950)을 통일한다. */
   --color-ink: #0a0a0a;
   /* 중립 구조색. 값은 기존 Tailwind gray와 동일해 시각 변화 없이 단일 출처로 모은다. */
-  --color-surface-muted: #f9fafb; /* gray-50: 카드 배경 */
+  --color-surface: #ffffff; /* 페이지·카드 기본 배경 */
+  --color-surface-muted: #f9fafb; /* gray-50: 옅은 카드 배경 */
   --color-border: #e5e7eb; /* gray-200: 카드/모달 경계 */
   --color-border-subtle: #f3f4f6; /* gray-100: 옅은 구분선 */
+}
+
+/* === 다크 테마 (#90) ===
+   Tailwind v4 유틸은 var(--color-*)를 참조하므로, html.dark에서 색 변수만 덮어쓰면
+   컴포넌트 변경 없이 전체가 전환된다. 텍스트 그레이(400~900)는 밝게, 배경 그레이(50~200)는
+   어둡게 뒤집는다. 항상 어두운 헤더(ink)·흰 텍스트(text-white)는 별도 토큰이라 그대로 유지된다. */
+.dark {
+  /* 시맨틱 surface */
+  --color-surface: #0f1014;
+  --color-surface-muted: #17181d;
+  /* 배경 그레이(라이트 배경 → 다크) */
+  --color-gray-50: #17181d;
+  --color-gray-100: #1f2026;
+  --color-gray-200: #2a2b32;
+  /* 텍스트 그레이(어두운 글자 → 밝은 글자) */
+  --color-gray-400: #6e7079;
+  --color-gray-500: #8b8d96;
+  --color-gray-600: #a6a8b1;
+  --color-gray-700: #c4c6cd;
+  --color-gray-800: #d9dade;
+  --color-gray-900: #e9eaed;
+  --color-black: #e9eaed; /* text-black → 밝게 */
+  /* 경계 */
+  --color-border: #2a2b32;
+  --color-border-subtle: #232429;
+  /* 브랜드: 다크 배경에서 비텍스트 액센트(포커스 링)는 살짝 밝게 */
+  --color-brand: #818cf8;
+  /* 본문 링크(blue) — 다크에서 밝게 */
+  --color-blue-600: #93b4ff;
+  --color-blue-700: #a8c3ff;
+  --color-blue-800: #c2d5ff;
 }
 
 html,
 body {
   height: 100%;
+}
+
+/* 페이지 전체 배경/기본 글자색을 토큰에 연결해 테마 전환 시 함께 바뀌게 한다. */
+body {
+  background-color: var(--color-surface);
+  color: var(--color-gray-900);
 }
 
 /* 동작 줄이기(prefers-reduced-motion) 설정 시 전역 트랜지션/애니메이션/부드러운 스크롤을 사실상 비활성화한다.

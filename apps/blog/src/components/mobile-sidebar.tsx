@@ -118,7 +118,7 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
         className={classNames(
           // 모바일 브라우저 주소창 높이를 반영하도록 100vh 대신 100dvh를 사용한다.
           // md:hidden — 데스크톱 너비에서는 패널이 열린 채 남지 않도록 숨긴다.
-          'h-[100dvh] w-full bg-white z-50 fixed top-0 right-0 md:hidden',
+          'h-[100dvh] w-full bg-surface z-50 fixed top-0 right-0 md:hidden',
           // 헤더는 고정하고 콘텐츠 영역만 스크롤시키기 위해 세로 flex 컬럼으로 구성한다.
           'flex flex-col',
           // 전이는 가로 슬라이드(transform)로 한정한다. transition-all이면 dvh 높이 변화까지
