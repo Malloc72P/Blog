@@ -1,10 +1,11 @@
 @import 'tailwindcss';
 
-/* === 디자인 토큰 (#94) ===
-   의미 기반 색 토큰의 단일 출처. 컴포넌트는 bg-[var(--color-brand)] 형태의
-   arbitrary 유틸리티로 참조한다(이 프로젝트의 Turbopack+v4 빌드에서 @theme는
-   유틸리티를 생성하지 않아, 코드베이스가 이미 쓰는 arbitrary value 방식으로 통일). */
-:root {
+/* === 디자인 토큰 (#94, #120) ===
+   Tailwind v4 @theme로 의미 기반 색 토큰을 정의한다. 각 토큰은 bg-brand/text-ink/
+   border-border 등 깔끔한 유틸리티로 생성되며, :root에 CSS 변수로도 노출된다.
+   (#94에서 @theme가 안 된다고 본 것은 빌드 산출물의 minify된 값(#00ff00→#0f0)을
+    minify 전 문자열로 grep한 오진이었음 — #120에서 정정하고 arbitrary value를 제거함) */
+@theme {
   /* 브랜드 액센트(인디고) 스케일. */
   --color-brand: #6366f1; /* 비텍스트 액센트(포커스 링 등) */
   --color-brand-strong: #4f46e5; /* 브랜드 위 흰 텍스트용 — 대비 AA(6.3:1) 확보 */

@@ -50,7 +50,7 @@ export function CopyButton({ getContent }: CopyButtonProps) {
         // p-3로 키워 터치 타겟을 약 44px 확보(아이콘 20px + 패딩 24px).
         'absolute right-5 top-5 p-3 rounded-md opacity-80 hover:opacity-90 active:opacity-100',
         // 키보드 포커스 시 시각적 표시(focus-visible ring)로 접근성을 높인다.
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
         classes.copyBtn
       )}
       onClick={handleCopy}

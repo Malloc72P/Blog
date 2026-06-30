@@ -93,7 +93,7 @@ export function SearchModal() {
   return (
     // 배경 오버레이(클릭 시 닫힘)
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-[var(--color-ink)]/50 px-4 pt-[12vh]"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-ink/50 px-4 pt-[12vh]"
       onClick={close}
     >
       {/* 모달 본체(내부 클릭은 닫힘 전파 차단) */}
@@ -107,7 +107,7 @@ export function SearchModal() {
         onKeyDown={onKeyDown}
       >
         {/* 검색 입력 영역 */}
-        <div className="flex items-center gap-3 border-b border-[var(--color-border)] px-4">
+        <div className="flex items-center gap-3 border-b border-border px-4">
           <IconSearch className="h-5 w-5 shrink-0 text-gray-400" />
           <input
             ref={inputRef}
@@ -165,13 +165,13 @@ export function SearchModal() {
                   onClick={close}
                   onMouseEnter={() => setActiveIndex(idx)}
                   className={classNames(
-                    'block border-b border-[var(--color-border-subtle)] px-4 py-3',
+                    'block border-b border-border-subtle px-4 py-3',
                     idx === activeIndex ? 'bg-gray-100' : 'bg-white',
                   )}
                 >
                   <div className="flex items-center gap-2">
                     {doc.series && (
-                      <span className="shrink-0 rounded bg-[var(--color-ink)] px-1.5 py-0.5 text-[11px] text-white">
+                      <span className="shrink-0 rounded bg-ink px-1.5 py-0.5 text-[11px] text-white">
                         {doc.series}
                       </span>
                     )}
