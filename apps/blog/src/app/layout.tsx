@@ -75,9 +75,16 @@ export const metadata = {
  * 폰트 설정 및 공통 메타데이터 설정은 이곳에서 한다.
  */
 export default async function RootLayout({ children }: PropsWithChildren) {
+  // 테마 스크립트가 하이드레이션 전에 html.class를 바꾸므로 suppressHydrationWarning으로 className 불일치 경고를 억제한다.
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
+        {/* 테마 깜빡임(FOUC) 방지: paint 전에 localStorage/시스템 설정으로 html.dark를 결정한다. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}`,
+          }}
+        />
         <link rel="icon" type="image/x-icon" href="/favicon.ico"></link>
         {/* <link rel="preconnect" href="https://fonts.googleapis.com" /> */}
         {/* <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" /> */}

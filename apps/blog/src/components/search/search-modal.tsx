@@ -102,7 +102,7 @@ export function SearchModal() {
         role="dialog"
         aria-modal="true"
         aria-label="포스트 검색"
-        className="w-full max-w-[640px] overflow-hidden rounded-xl bg-white shadow-2xl"
+        className="w-full max-w-[640px] overflow-hidden rounded-xl bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
@@ -166,7 +166,7 @@ export function SearchModal() {
                   onMouseEnter={() => setActiveIndex(idx)}
                   className={classNames(
                     'block border-b border-border-subtle px-4 py-3',
-                    idx === activeIndex ? 'bg-gray-100' : 'bg-white',
+                    idx === activeIndex ? 'bg-gray-100' : 'bg-surface',
                   )}
                 >
                   <div className="flex items-center gap-2">
