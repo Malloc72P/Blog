@@ -26,25 +26,26 @@
    컴포넌트 변경 없이 전체가 전환된다. 텍스트 그레이(400~900)는 밝게, 배경 그레이(50~200)는
    어둡게 뒤집는다. 항상 어두운 헤더(ink)·흰 텍스트(text-white)는 별도 토큰이라 그대로 유지된다. */
 .dark {
-  /* 시맨틱 surface */
-  --color-surface: #0f1014;
-  --color-surface-muted: #17181d;
-  /* 배경 그레이(라이트 배경 → 다크) */
-  --color-gray-50: #17181d;
-  --color-gray-100: #1f2026;
-  --color-gray-200: #2a2b32;
+  /* 디스코드풍 다크: 완전 검정 대신 블루그레이 톤으로 눈의 피로를 줄인다. */
+  --color-surface: #2b2d31; /* 페이지/패널 배경 */
+  --color-surface-muted: #313338; /* 카드(살짝 밝게 — elevated) */
+  --color-ink: #1e1f22; /* 헤더/드롭다운 — 페이지보다 한 단계 어두운 톤 */
+  /* 배경 그레이(라이트→다크). 표면보다 밝게 두어 카드·칩·디바이더가 묻히지 않게 한다. */
+  --color-gray-50: #313338;
+  --color-gray-100: #383b41;
+  --color-gray-200: #41434a; /* 디바이더/얕은 경계 — 배경 대비 또렷하게 */
   /* 텍스트 그레이(어두운 글자 → 밝은 글자) */
-  --color-gray-400: #6e7079;
-  --color-gray-500: #8b8d96;
-  --color-gray-600: #a6a8b1;
-  --color-gray-700: #c4c6cd;
-  --color-gray-800: #d9dade;
-  --color-gray-900: #e9eaed;
-  --color-black: #e9eaed; /* text-black → 밝게 */
-  /* 경계 */
-  --color-border: #2a2b32;
-  --color-border-subtle: #232429;
-  /* 브랜드: 다크 배경에서 비텍스트 액센트(포커스 링)는 살짝 밝게 */
+  --color-gray-400: #82868f;
+  --color-gray-500: #9a9ea7;
+  --color-gray-600: #b8bcc4;
+  --color-gray-700: #c7ccd1;
+  --color-gray-800: #dbdee1;
+  --color-gray-900: #f2f3f5;
+  --color-black: #f2f3f5; /* text-black → 밝게 */
+  /* 경계 — 배경보다 확실히 밝게 해서 묻히지 않게 한다. */
+  --color-border: #4a4d54;
+  --color-border-subtle: #3a3d44;
+  /* 브랜드: 비텍스트 액센트(포커스 링)는 살짝 밝게(블러플 톤) */
   --color-brand: #818cf8;
   /* 본문 링크(blue) — 다크에서 밝게 */
   --color-blue-600: #93b4ff;

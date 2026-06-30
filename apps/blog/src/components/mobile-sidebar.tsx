@@ -199,7 +199,7 @@ function SidebarSection({ title, items, onClick }: SidebarSectionProps) {
     <div className="sidebar-section">
       <div className="pb-3 text-lg">
         <p className="pb-1">{title}</p>
-        <Divider color="bg-gray-500" />
+        <Divider />
       </div>
 
       <ul className="space-y-2">
