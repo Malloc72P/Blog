@@ -16,15 +16,16 @@ interface ThemeToggleProps {
  * 현재 상태를 읽어 아이콘만 맞춘다.
  */
 export function ThemeToggle({ className }: ThemeToggleProps) {
+  // aria-label(스크린리더 전용)만 상태로 관리한다. 보이는 아이콘은 아래 CSS(dark:)로 토글해
+  // 첫 프레임부터 html.dark와 일치시킨다(아이콘 플래시 없음).
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
-    // 서버/첫 렌더는 light로 그리고, 마운트 후 실제 html.dark 상태로 보정한다.
     setDark(document.documentElement.classList.contains('dark'));
   }, []);
 
   const toggle = () => {
-    const next = !dark;
+    const next = !document.documentElement.classList.contains('dark');
     setDark(next);
     document.documentElement.classList.toggle('dark', next);
     try {
@@ -49,7 +50,9 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
         className,
       )}
     >
-      {dark ? <IconSun className="h-5 w-5" /> : <IconMoon className="h-5 w-5" />}
+      {/* 라이트일 때 달(다크로 전환), 다크일 때 해(라이트로 전환). html.dark 클래스로 CSS 토글. */}
+      <IconMoon aria-hidden className="h-5 w-5 block dark:hidden" />
+      <IconSun aria-hidden className="h-5 w-5 hidden dark:block" />
     </button>
   );
 }

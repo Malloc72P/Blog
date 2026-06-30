@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* dark: 유틸리티가 OS 설정이 아니라 html.dark 클래스를 따르게 한다(클래스 기반 테마 토글). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* === 디자인 토큰 (#94, #120) ===
    Tailwind v4 @theme로 의미 기반 색 토큰을 정의한다. 각 토큰은 bg-brand/text-ink/
    border-border 등 깔끔한 유틸리티로 생성되며, :root에 CSS 변수로도 노출된다.
