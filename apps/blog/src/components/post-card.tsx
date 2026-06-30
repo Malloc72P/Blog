@@ -35,7 +35,7 @@ export function PostCard({ post, showSeriesBadge = true }: PostCardProps) {
       key={post.route}
       onClick={onCardClick}
       // hover 시 배경/보더/포인터로 카드 전체가 클릭 가능함을 시각적으로 알린다.
-      className="px-3 py-3 mb-[30px] rounded-lg border border-transparent cursor-pointer transition-all duration-200 hover:bg-[var(--color-surface-muted)] hover:border-[var(--color-border)]"
+      className="px-3 py-3 mb-[30px] rounded-lg border border-transparent cursor-pointer transition-all duration-200 hover:bg-surface-muted hover:border-border"
     >
       {/* === POST TITLE AND LINK === */}
       {/* 제목 Link는 키보드 포커스/새 탭 열기 등 접근성을 위해 실제 <a>로 유지한다. */}

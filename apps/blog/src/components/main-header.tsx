@@ -17,7 +17,7 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
       className={classNames(
         'blog-main-header',
         'relative z-50',
-        'bg-[var(--color-ink)] text-white',
+        'bg-ink text-white',
         'h-[60px] md:h-[128px]',
       )}
     >

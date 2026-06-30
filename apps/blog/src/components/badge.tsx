@@ -29,7 +29,7 @@ export function Badge({ href, children, onClick, color = 'secondary', active }: 
         'md:px-[12px] md:py-[6px]',
         'whitespace-nowrap',
         color === 'primary'
-          ? 'bg-[var(--color-brand-strong)] text-white'
+          ? 'bg-brand-strong text-white'
           : 'bg-gray-100 text-gray-700',
         'hover:brightness-95 active:brightness-90',
       )}
