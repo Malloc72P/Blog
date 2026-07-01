@@ -4,9 +4,10 @@ import classNames from 'classnames';
 import { IconSearch, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { createPortal } from 'react-dom';
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearch } from './search-context';
-import { useBodyScrollLock } from '@hooks/use-body-scroll-lock';
+import { useModalA11y } from '@hooks/use-modal-a11y';
 
 export function SearchModal() {
   const { isOpen, close, status, search } = useSearch();
@@ -14,8 +15,12 @@ export function SearchModal() {
   const [query, setQuery] = useState(''); // 입력 질의
   const [activeIndex, setActiveIndex] = useState(0); // 키보드 활성 항목
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null); // 포커스 트랩 대상 컨테이너
   const activeItemRef = useRef<HTMLLIElement>(null); // 현재 활성 결과 항목
+
+  // 배경(body) 스크롤 잠금 + 배경 콘텐츠 inert 격리를 공용 훅으로 일원화한다(#106).
+  // dialogRef는 document.body에 포털로 렌더되는 최상위(오버레이) 요소를 가리키며
+  // Tab 포커스 트랩의 스캔 범위로도 재사용한다.
+  const { mounted, dialogRef: containerRef } = useModalA11y(isOpen);
 
   // 질의가 바뀔 때마다 결과 재계산(status는 콜백에서 참조하지 않아 의존성에서 제외)
   const results = useMemo(() => search(query), [search, query]);
@@ -32,9 +37,6 @@ export function SearchModal() {
     };
   }, [isOpen]);
 
-  // 모달이 열린 동안 배경 스크롤 잠금(공용 훅으로 일원화)
-  useBodyScrollLock(isOpen);
-
   // 질의가 바뀌면 활성 인덱스 초기화
   useEffect(() => {
     setActiveIndex(0);
@@ -45,7 +47,9 @@ export function SearchModal() {
     activeItemRef.current?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex]);
 
-  if (!isOpen) return null;
+  // isOpen이 true가 될 수 있는 시점은 항상 하이드레이션 이후(사용자 클릭)이므로
+  // !mounted는 사실상 도달하지 않지만, portal 사용 시 SSR 안전을 위해 명시적으로 가드한다.
+  if (!isOpen || !mounted) return null;
 
   const keyword = query.trim();
 
@@ -90,15 +94,17 @@ export function SearchModal() {
     }
   };
 
-  return (
-    // 배경 오버레이(클릭 시 닫힘)
+  return createPortal(
+    // document.body에 직접 포털로 렌더한다. 그래야 useModalA11y가 이 오버레이를 제외한
+    // body의 다른 모든 자식(헤더·본문 등)에 inert를 적용해 배경을 완전히 격리할 수 있다(#106).
+    // 배경 오버레이(클릭 시 닫힘)이자 dialogRef가 가리키는 포털 최상위 요소.
     <div
+      ref={containerRef}
       className="fixed inset-0 z-[100] flex items-start justify-center bg-ink/50 px-4 pt-[12vh]"
       onClick={close}
     >
       {/* 모달 본체(내부 클릭은 닫힘 전파 차단) */}
       <div
-        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-label="포스트 검색"
@@ -186,6 +192,7 @@ export function SearchModal() {
           </ul>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MainHeaderLogo, MainHeaderProps } from './main-header';
 import { IconMenu2, IconX } from '@tabler/icons-react';
 import classNames from 'classnames';
@@ -8,7 +9,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { PageLinkMap } from '@libs/page-link-map';
 import { Divider } from './divider';
-import { useBodyScrollLock } from '@hooks/use-body-scroll-lock';
+import { useModalA11y } from '@hooks/use-modal-a11y';
 
 // MainHeaderProps와 동일한 props를 받으므로 빈 인터페이스 대신 타입 별칭으로 둔다.
 export type MobileSidebarProps = MainHeaderProps;
@@ -20,7 +21,6 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
   const panelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   // 사용자가 명시적으로(닫기 버튼/Esc) 닫을 때만 트리거로 포커스를 되돌리기 위한 플래그.
   const restoreFocusRef = useRef(false);
 
@@ -30,9 +30,9 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
     setOpen(false);
   };
 
-  // 사이드바가 열린 동안 배경(body) 스크롤을 잠근다.
-  // 잠그지 않으면 사이드바 뒤의 본문이 함께 스크롤되어 동작이 어색해진다.
-  useBodyScrollLock(open);
+  // 배경(body) 스크롤 잠금 + 배경 콘텐츠 inert 격리를 공용 훅으로 일원화한다(#106).
+  // mounted는 document.body로의 portal 렌더 가능 시점(SSR 이후)을 가리킨다.
+  const { mounted, dialogRef: panelRef } = useModalA11y(open);
 
   // 데스크톱(md, 768px 이상) 너비로 넓어지면 모바일 사이드바를 닫는다.
   // 닫지 않으면 트리거가 숨겨진 채 패널이 남고, 위 스크롤 잠금도 해제되지 않는다.
@@ -105,78 +105,85 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
       {/* ------------------------------------------------------ */}
       {/* SIDEBAR BODY */}
       {/* ------------------------------------------------------ */}
-      <div
-        ref={panelRef}
-        id={panelId}
-        role="dialog"
-        aria-label="사이트 메뉴"
-        // 배경을 inert로 만들지 않으므로 aria-modal은 선언하지 않는다(보조기술에 잘못된 약속을 피함).
-        // 키보드 사용자에게는 Tab 포커스 트랩 + 배경 스크롤 잠금으로 모달처럼 동작한다.
-        // 닫힌 동안에는 inert로 패널 내부 요소를 포커스/스크린리더에서 제외한다.
-        inert={!open}
-        onKeyDown={onKeyDown}
-        className={classNames(
-          // 모바일 브라우저 주소창 높이를 반영하도록 100vh 대신 100dvh를 사용한다.
-          // md:hidden — 데스크톱 너비에서는 패널이 열린 채 남지 않도록 숨긴다.
-          'h-[100dvh] w-full bg-surface z-50 fixed top-0 right-0 md:hidden',
-          // 헤더는 고정하고 콘텐츠 영역만 스크롤시키기 위해 세로 flex 컬럼으로 구성한다.
-          'flex flex-col',
-          // 전이는 가로 슬라이드(transform)로 한정한다. transition-all이면 dvh 높이 변화까지
-          // 애니메이션되어 iOS 주소창 접힘 시 패널 높이가 늘었다 줄었다 하는 잔상이 생긴다.
-          'transition-transform duration-300',
-          open ? 'translate-x-0' : 'translate-x-full'
-        )}
-      >
-        {/* ------------------------------------------------------ */}
-        {/* SIDEBAR HEADER */}
-        {/* ------------------------------------------------------ */}
-        <div className="flex items-center px-5 h-[60px] bg-ink shrink-0">
-          <MainHeaderLogo />
-          <span className="grow"></span>
-
-          {/* ------------------------------------------------------ */}
-          {/* SIDEBAR CLOSE BUTTON */}
-          {/* ------------------------------------------------------ */}
-          {/* 탭 영역 확대를 위해 닫기 버튼에 패딩(p-2.5)을 더한다(아이콘 크기는 유지). */}
-          <button
-            type="button"
-            ref={closeButtonRef}
-            aria-label="메뉴 닫기"
-            className="flex items-center cursor-pointer p-2.5"
-            onClick={closeSidebar}
+      {/* document.body에 직접 포털로 렌더한다. 그래야 useModalA11y가 이 패널을 제외한
+          body의 다른 모든 자식(헤더·본문 등)에 inert를 적용해 배경을 완전히 격리할 수 있다(#106).
+          mounted 이전(SSR)에는 document가 없으므로 렌더하지 않는다. */}
+      {mounted &&
+        createPortal(
+          <div
+            ref={panelRef}
+            id={panelId}
+            role="dialog"
+            aria-modal="true"
+            aria-label="사이트 메뉴"
+            // 배경 전체가 inert로 격리되므로 aria-modal="true"가 실제 동작과 일치한다(#106).
+            // 닫힌 동안에는 inert로 패널 내부 요소를 포커스/스크린리더에서 제외한다.
+            inert={!open}
+            onKeyDown={onKeyDown}
+            className={classNames(
+              // 모바일 브라우저 주소창 높이를 반영하도록 100vh 대신 100dvh를 사용한다.
+              // md:hidden — 데스크톱 너비에서는 패널이 열린 채 남지 않도록 숨긴다.
+              'h-[100dvh] w-full bg-surface z-50 fixed top-0 right-0 md:hidden',
+              // 헤더는 고정하고 콘텐츠 영역만 스크롤시키기 위해 세로 flex 컬럼으로 구성한다.
+              'flex flex-col',
+              // 전이는 가로 슬라이드(transform)로 한정한다. transition-all이면 dvh 높이 변화까지
+              // 애니메이션되어 iOS 주소창 접힘 시 패널 높이가 늘었다 줄었다 하는 잔상이 생긴다.
+              'transition-transform duration-300',
+              open ? 'translate-x-0' : 'translate-x-full',
+            )}
           >
-            <IconX aria-hidden className="w-5 h-5" />
-          </button>
-        </div>
+            {/* ------------------------------------------------------ */}
+            {/* SIDEBAR HEADER */}
+            {/* ------------------------------------------------------ */}
+            <div className="flex items-center px-5 h-[60px] bg-ink shrink-0">
+              <MainHeaderLogo />
+              <span className="grow"></span>
 
-        {/* ------------------------------------------------------ */}
-        {/* SIDEBAR CONTENT */}
-        {/* ------------------------------------------------------ */}
-        {/* flex-1로 남은 높이를 모두 차지하고, 넘치는 태그 목록은 overflow-y-auto로 스크롤시킨다. */}
-        {/* overscroll-contain: 끝단에서 스크롤이 배경 문서로 전파(체이닝)되거나 iOS 러버밴딩되는 것을 막는다. */}
-        {/* 마지막 항목이 화면 끝에 붙지 않도록 하단 패딩(pb-10)을 둔다. */}
-        <div className="flex-1 overflow-y-auto overscroll-contain pt-10 pb-10 text-black px-5 space-y-10">
-          <SidebarSection
-            onClick={onLinkClick}
-            title="Series"
-            items={seriesList.map((series) => ({
-              id: series.id,
-              label: series.title,
-              href: PageLinkMap.series.landing(series.id),
-            }))}
-          />
+              {/* ------------------------------------------------------ */}
+              {/* SIDEBAR CLOSE BUTTON */}
+              {/* ------------------------------------------------------ */}
+              {/* 탭 영역 확대를 위해 닫기 버튼에 패딩(p-2.5)을 더한다(아이콘 크기는 유지). */}
+              <button
+                type="button"
+                ref={closeButtonRef}
+                aria-label="메뉴 닫기"
+                className="flex items-center cursor-pointer p-2.5"
+                onClick={closeSidebar}
+              >
+                <IconX aria-hidden className="w-5 h-5" />
+              </button>
+            </div>
 
-          <SidebarSection
-            onClick={onLinkClick}
-            title="Tags"
-            items={tags.map((tag) => ({
-              id: tag.id,
-              label: tag.id,
-              href: PageLinkMap.tags.landing(tag.id),
-            }))}
-          />
-        </div>
-      </div>
+            {/* ------------------------------------------------------ */}
+            {/* SIDEBAR CONTENT */}
+            {/* ------------------------------------------------------ */}
+            {/* flex-1로 남은 높이를 모두 차지하고, 넘치는 태그 목록은 overflow-y-auto로 스크롤시킨다. */}
+            {/* overscroll-contain: 끝단에서 스크롤이 배경 문서로 전파(체이닝)되거나 iOS 러버밴딩되는 것을 막는다. */}
+            {/* 마지막 항목이 화면 끝에 붙지 않도록 하단 패딩(pb-10)을 둔다. */}
+            <div className="flex-1 overflow-y-auto overscroll-contain pt-10 pb-10 text-black px-5 space-y-10">
+              <SidebarSection
+                onClick={onLinkClick}
+                title="Series"
+                items={seriesList.map((series) => ({
+                  id: series.id,
+                  label: series.title,
+                  href: PageLinkMap.series.landing(series.id),
+                }))}
+              />
+
+              <SidebarSection
+                onClick={onLinkClick}
+                title="Tags"
+                items={tags.map((tag) => ({
+                  id: tag.id,
+                  label: tag.id,
+                  href: PageLinkMap.tags.landing(tag.id),
+                }))}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
