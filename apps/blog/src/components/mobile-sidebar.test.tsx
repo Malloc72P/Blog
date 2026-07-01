@@ -51,7 +51,7 @@ describe('MobileSidebar', () => {
   });
 
   it('태그가 많아도 모든 태그가 렌더되고, 스크롤 가능한 콘텐츠 영역에 담긴다', () => {
-    const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
 
     // 모든 태그가 DOM에 존재한다(잘려서 사라지지 않는다).
     tags.forEach((tag) => {
@@ -59,8 +59,9 @@ describe('MobileSidebar', () => {
     });
 
     // 콘텐츠 영역이 세로 스크롤(overflow-y-auto)을 갖고, 모든 태그가 그 안에 담겨 있다.
+    // 패널이 document.body에 포털로 렌더되므로(#106) RTL container가 아닌 document에서 찾는다.
     // (jsdom에는 레이아웃이 없어 실제 스크롤 동작 자체는 검증 불가하며, 구조만 보장한다.)
-    const scrollArea = container.querySelector('.overflow-y-auto');
+    const scrollArea = document.querySelector('.overflow-y-auto');
     expect(scrollArea).not.toBeNull();
     // non-null assertion 대신 타입 가드로 좁힌다.
     if (!scrollArea) throw new Error('scroll area not found');
@@ -93,10 +94,12 @@ describe('MobileSidebar', () => {
   });
 
   it('닫힌 동안 패널이 inert이고, 열면 inert가 해제된다', () => {
-    const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
 
     // role=dialog 패널은 닫혀 있어도 DOM에 존재하므로 querySelector로 직접 잡는다.
-    const panel = container.querySelector('[role="dialog"]');
+    // 패널이 document.body에 포털로 렌더되므로(#106) RTL container가 아닌 document에서 찾는다.
+    // RTL의 role 쿼리(getByRole)는 inert 요소를 접근성 트리에서 제외해 찾지 못하므로 raw DOM 쿼리를 쓴다.
+    const panel = document.querySelector('[role="dialog"]');
     expect(panel).not.toBeNull();
     if (!panel) throw new Error('panel not found');
 
@@ -106,6 +109,20 @@ describe('MobileSidebar', () => {
     // 열기 → inert 해제
     openSidebar();
     expect(panel).not.toHaveAttribute('inert');
+  });
+
+  it('열리면 배경(다른 body 자식)에 inert를 적용하고, 닫히면 해제한다(#106)', () => {
+    // RTL의 render container는 document.body의 직계 자식으로 붙는다 —
+    // 포털로 렌더되는 사이드바 패널과는 별개의 "배경" 역할을 한다.
+    const { container } = render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    expect(container).not.toHaveAttribute('inert');
+
+    openSidebar();
+    expect(container).toHaveAttribute('inert');
+
+    closeSidebar();
+    expect(container).not.toHaveAttribute('inert');
   });
 
   it('열면 닫기 버튼으로 포커스가 이동하고, 닫으면 트리거로 복귀한다', () => {
