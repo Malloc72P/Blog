@@ -20,6 +20,11 @@ export default async function LandingPage() {
       continue;
     }
 
+    // 랜딩 페이지(최신글 통합 피드)에서 제외할 시리즈. 시리즈 자체 페이지(/posts/{id})는 영향받지 않는다.
+    if (Constants.series.excludedFromLatestIds.includes(series.id)) {
+      continue;
+    }
+
     const seriesPost = await findPosts({
       seriesId: series.id,
     });

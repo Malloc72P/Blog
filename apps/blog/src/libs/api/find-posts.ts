@@ -21,7 +21,13 @@ export async function findPosts(
   posts = posts.filter((post) => !post.frontMatter.isSeriesLanding);
 
   // 시리즈 필터링
-  if (seriesId && seriesId !== Constants.series.latestId) {
+  if (seriesId === Constants.series.latestId) {
+    // '최신글' 통합 피드(/posts/latest)에서는 설정된 시리즈를 제외한다.
+    // seriesId가 없는 호출(전체 글 목록·태그·사이트맵 등)은 영향받지 않는다.
+    posts = posts.filter(
+      (post) => !Constants.series.excludedFromLatestIds.includes(post.frontMatter.series ?? ''),
+    );
+  } else if (seriesId) {
     posts = posts.filter((post) => post.frontMatter.series === seriesId);
   }
 
