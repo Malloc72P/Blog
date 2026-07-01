@@ -116,6 +116,8 @@ export function parseFrontmatterMetadata(
 }
 
 // 작은따옴표/큰따옴표/백틱 중 어떤 것으로 감싸도 값을 추출한다(#99: 따옴표 종류 보강).
+// 값 내부에 이스케이프된 같은 종류 따옴표(예: "it's")가 있으면 그 지점에서 잘린다.
+// 정규식 파서의 알려진 한계이며, 현재 실제 frontmatter 값에는 해당 사례가 없어 의도적으로 다루지 않는다.
 function extractStringField(body: string, field: string): string | null {
   const regex = new RegExp(`${field}:\\s*(['"\`])([^'"\`]*)\\1`);
   return body.match(regex)?.[2] ?? null;
