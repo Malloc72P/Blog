@@ -90,6 +90,7 @@ export const metadata = frontmatter({
 - `isolation: isolate`
 - `will-change`에 위 속성 중 하나를 지정했을 때
 - `contain: layout`, `paint`, `strict`, `content`
+- `container-type`이 `size` 또는 `inline-size`일 때 (컨테이너 쿼리)
 - flex/grid 컨테이너의 자식이면서 `z-index`가 `auto`가 아닐 때
 
 목록이 길지만 요점은 하나입니다. `transform`으로 애니메이션을 걸거나, `opacity`로 페이드를 주거나, `filter`로 그림자를 넣는 **평범한 스타일이 조용히 맥락을 만든다**는 것입니다. 그래서 "분명 `z-index`만 만졌는데 안 된다" 싶을 때는, 대체로 조상 어딘가에 이런 속성이 하나 껴 있습니다.
