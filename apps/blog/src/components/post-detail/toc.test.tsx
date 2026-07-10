@@ -54,12 +54,5 @@ describe('Toc', () => {
     expect(onFragIdChanged).toHaveBeenCalledTimes(2);
   });
 
-  it('진입 시 URL 해시가 있으면 "#"를 제거한 id로 딥링크 스크롤을 시도한다', () => {
-    const onFragIdChanged = jest.fn();
-    window.history.replaceState(null, '', '#intro');
-
-    render(<Toc toc={toc} activeId="" onFragIdChanged={onFragIdChanged} />);
-
-    expect(onFragIdChanged).toHaveBeenCalledWith({ fragId: 'intro' });
-  });
+  // 해시 딥링크 스크롤은 PostDetail로 승격되어(#85 리뷰) post-detail.test.tsx에서 검증한다.
 });

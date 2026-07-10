@@ -4,21 +4,31 @@ import { useBodyScrollLock } from './use-body-scroll-lock';
 // 여러 모달이 동시에 열릴 수 있다(예: 사이드바가 열린 채 Cmd+K로 검색을 열 때).
 // "누가 어떤 요소를 inert로 만들었는지" 참조 카운트로 추적해, 먼저 열린 모달이 표시해 둔
 // inert를 나중에 닫히는 모달이 실수로 지우지 않게 한다(useBodyScrollLock과 동일한 패턴).
-const inertRefCounts = new Map<Element, number>();
+// hadInert: 첫 마킹 시점에 이미 inert였는지(예: 닫힌 시트 래퍼에 React가 부여한 inert)를
+// 기억해, 해제 시 이 훅이 부여하지 않은 inert까지 지우지 않게 한다(#85 리뷰).
+const inertRefCounts = new Map<Element, { count: number; hadInert: boolean }>();
 
 function markInert(el: Element) {
-  const count = inertRefCounts.get(el) ?? 0;
-  if (count === 0) el.setAttribute('inert', '');
-  inertRefCounts.set(el, count + 1);
+  const entry = inertRefCounts.get(el);
+  if (!entry) {
+    // 첫 마킹: 원래 inert 여부를 스냅샷한 뒤 inert를 부여한다(이미 있으면 사실상 no-op).
+    inertRefCounts.set(el, { count: 1, hadInert: el.hasAttribute('inert') });
+    el.setAttribute('inert', '');
+    return;
+  }
+  entry.count += 1;
 }
 
 function unmarkInert(el: Element) {
-  const count = inertRefCounts.get(el) ?? 0;
-  if (count <= 1) {
+  const entry = inertRefCounts.get(el);
+  // 마킹된 적 없는 요소는 건드리지 않는다(외부에서 부여한 inert 보호).
+  if (!entry) return;
+  if (entry.count <= 1) {
     inertRefCounts.delete(el);
-    el.removeAttribute('inert');
+    // 원래부터(React 등 외부에서) inert였던 요소는 속성을 그대로 남긴다.
+    if (!entry.hadInert) el.removeAttribute('inert');
   } else {
-    inertRefCounts.set(el, count - 1);
+    entry.count -= 1;
   }
 }
 

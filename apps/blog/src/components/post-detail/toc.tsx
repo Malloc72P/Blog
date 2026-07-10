@@ -1,7 +1,6 @@
 'use client';
 
 import classNames from 'classnames';
-import { useEffect } from 'react';
 
 /** 목차 한 항목. 본문 헤딩에서 수집한 id/텍스트/레벨을 담는다. */
 export interface TocItem {
@@ -14,23 +13,18 @@ export interface TocProps {
   toc: TocItem[];
   activeId: string;
   onFragIdChanged: (param: { fragId: string }) => void;
+  /** 컨테이너 클래스 오버라이드. 모바일 바텀시트(#85)처럼 사이드 패널 폭이 맞지 않는 곳에서 사용한다. */
+  className?: string;
 }
 
-export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
-  // 진입 시 URL 해시가 있으면 해당 섹션으로 한 번 스크롤한다(딥링크).
-  // getElementById와 형식을 맞추기 위해 '#'를 제거한 값을 넘긴다.
-  // onFragIdChanged는 부모에서 매 렌더 새로 생성되므로 의존성에서 제외(마운트 1회만 실행).
-  useEffect(() => {
-    const hash = window.location.hash.slice(1);
-    if (hash) {
-      onFragIdChanged({ fragId: hash });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+/* 기본 컨테이너: 폭을 240px로 두어 xl(1280px) 거터 안에 들어가 가로 스크롤이 생기지 않게 한다. */
+const defaultClassName = 'w-[240px] mt-[200px]';
 
+export function Toc({ toc, activeId, onFragIdChanged, className = defaultClassName }: TocProps) {
+  // 해시 딥링크 스크롤은 이 컴포넌트가 데스크톱 패널·모바일 시트 두 곳에 마운트되면서
+  // 중복 실행되던 것을 PostDetail(1곳)로 승격했다(#85 리뷰). 여기서는 렌더만 담당한다.
   return (
-    /* 폭을 240px로 두어 xl(1280px) 거터 안에 들어가 가로 스크롤이 생기지 않게 한다. */
-    <div className="w-[240px] mt-[200px]">
+    <div className={className}>
       <ol className="flex flex-col gap-4 p-4 text-sm">
         {toc.map((item) => (
           <li
