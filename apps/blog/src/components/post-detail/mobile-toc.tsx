@@ -62,12 +62,33 @@ export function MobileToc({ toc, activeId, onFragIdChanged }: MobileTocProps) {
     }
   }, [open]);
 
-  // Esc로 닫고, Tab은 시트 내부에 가둔다(포커스 트랩 — mobile-sidebar와 동일 패턴).
+  // role=dialog + aria-modal 선언에 맞게 Esc는 포커스 위치와 무관하게 동작해야 한다(WAI-ARIA dialog 패턴).
+  // 시트의 비인터랙티브 영역(헤더 제목·패딩) 클릭으로 포커스가 body로 빠지면 래퍼의 onKeyDown이
+  // 이벤트를 받지 못하므로, 열려 있는 동안 document 레벨에서 Esc를 수신한다(#85 리뷰).
+  useEffect(() => {
+    if (!open) return;
+    const onDocumentKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeSheet();
+      }
+    };
+    document.addEventListener('keydown', onDocumentKeyDown);
+    return () => document.removeEventListener('keydown', onDocumentKeyDown);
+  }, [open]);
+
+  // 시트가 열리면 현재 활성 항목(aria-current)을 시트 스크롤 영역 안으로 노출한다(#85 핵심 요구).
+  // 목차가 길어 내부 스크롤이 생기는 글에서도 열자마자 자기 위치가 보이게 한다.
+  // block: 'nearest'라 이미 보이는 경우에는 움직이지 않는다.
+  useEffect(() => {
+    if (!open) return;
+    dialogRef.current
+      ?.querySelector('[aria-current="location"]')
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [open, dialogRef]);
+
+  // Tab을 시트 내부에 가두는 포커스 트랩(mobile-sidebar와 동일 패턴).
+  // Esc 닫기는 위 document 레벨 리스너가 전담한다(여기서도 처리하면 중복 호출).
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape') {
-      closeSheet();
-      return;
-    }
     if (e.key === 'Tab') {
       const sheet = dialogRef.current;
       if (!sheet) return;
@@ -122,8 +143,7 @@ export function MobileToc({ toc, activeId, onFragIdChanged }: MobileTocProps) {
           mounted 이전(SSR)에는 document가 없으므로 렌더하지 않는다. */}
       {mounted &&
         createPortal(
-          // 시트를 항상 마운트해 두고 transform으로만 열고 닫는다(mobile-sidebar와 동일).
-          // 매번 마운트하면 Toc의 해시 딥링크 효과가 시트를 열 때마다 재실행되는 부작용이 있다.
+          // 시트를 항상 마운트해 두고 transform으로만 열고 닫는다(mobile-sidebar와 동일 — 전이 애니메이션 유지).
           // 닫힌 동안에는 inert로 내부 요소를 포커스/스크린리더에서 제외한다.
           <div ref={dialogRef} inert={!open} onKeyDown={onKeyDown} className="xl:hidden">
             {/* 배경 딤 오버레이. 클릭하면 닫힌다. 닫힌 동안에는 클릭을 가로채지 않도록 pointer-events를 끈다. */}
@@ -171,16 +191,15 @@ export function MobileToc({ toc, activeId, onFragIdChanged }: MobileTocProps) {
               {/* overscroll-contain: 끝단에서 스크롤이 배경 문서로 전파되는 것을 막는다. */}
               <div className="flex-1 overflow-y-auto overscroll-contain px-2 py-2 text-black">
                 <Toc
-                  className="w-full"
+                  // 터치 전용 시트이므로 링크에 세로 패딩(py-2)을 줘 탭 타깃 높이를 확보한다(#85 리뷰).
+                  // 패딩만큼 벌어지는 시각적 간격은 항목 간 gap을 줄여(gap-1) 보정한다.
+                  className="w-full [&_ol]:gap-1 [&_a]:py-2"
                   toc={toc}
                   activeId={activeId}
                   onFragIdChanged={(param) => {
                     // 항목 선택 시 시트를 닫고 나서 부모의 스크롤 이동을 그대로 위임한다.
-                    // Toc의 해시 딥링크 효과가 마운트 시(시트가 닫힌 상태)에도 호출하므로,
-                    // 열려 있을 때만 닫아 포커스 복원 플래그가 잘못 세팅되지 않게 한다.
-                    if (open) {
-                      closeSheet();
-                    }
+                    // (닫힌 시트는 inert라 클릭이 불가능하므로 열림 여부는 따로 확인하지 않는다.)
+                    closeSheet();
                     onFragIdChanged(param);
                   }}
                 />

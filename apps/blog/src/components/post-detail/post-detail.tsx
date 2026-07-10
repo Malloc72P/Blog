@@ -92,6 +92,17 @@ export function PostDetail({ children, series, post }: PostDetailProps) {
     setToc(items);
   }, [children]);
 
+  // 진입 시 URL 해시가 있으면 해당 섹션으로 1회 스크롤한다(딥링크).
+  // 원래 Toc 내부 effect였지만 Toc가 데스크톱 패널·모바일 시트 두 곳에 마운트되면서
+  // 중복 실행되어, 헤딩 id 부여가 끝나는 이곳(위 effect 다음, 같은 커밋)으로 승격했다(#85 리뷰).
+  useEffect(() => {
+    // getElementById와 형식을 맞추기 위해 '#'를 제거한 값을 넘긴다.
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      scrollToHeading({ fragId: hash });
+    }
+  }, []);
+
   useEffect(() => {
     const container = window;
 
