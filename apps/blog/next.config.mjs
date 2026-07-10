@@ -33,6 +33,10 @@ const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   pageExtensions: ['js', 'jsx', 'ts', 'tsx', 'md', 'mdx'],
+  images: {
+    // AVIF를 우선 협상해 지원 브라우저에서 전송량을 더 줄이고, 미지원 브라우저는 WebP로 폴백한다.
+    formats: ['image/avif', 'image/webp'],
+  },
   // 모노레포에서 워크스페이스 루트 자동 추론으로 인한 경고를 막기 위해 Turbopack 루트를 워크스페이스 루트로 고정한다
   turbopack: {
     root: workspaceRoot,
