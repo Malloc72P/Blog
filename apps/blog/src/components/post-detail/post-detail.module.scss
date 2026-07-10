@@ -1,4 +1,12 @@
 .postDetail {
+  // === 타입 스케일 토큰 (#95) ===
+  // 흩어진 px 하드코딩을 토큰으로 모아 h1 > h2 > h3 > 본문 위계가 항상 유지되게 한다.
+  // 모바일 값은 하단 미디어쿼리에서 같은 토큰만 덮어쓴다.
+  --post-h1-size: 32px;
+  --post-h2-size: 24px;
+  --post-h3-size: 20px; // 본문(16px)과 같아 위계가 없던 16px에서 한 단계 상향
+  --post-body-size: 16px;
+
   h1,
   h2,
   h3 {
@@ -7,21 +15,25 @@
   }
 
   h1 {
-    font-size: 32px;
+    font-size: var(--post-h1-size);
   }
 
   h2 {
-    font-size: 24px;
+    font-size: var(--post-h2-size);
   }
 
   h3 {
-    font-size: 16px;
+    font-size: var(--post-h3-size);
   }
 
   p {
     padding-top: 16px;
     padding-bottom: 24px;
-    line-height: 28px;
+    // 한글 본문 가독성을 위해 28px(비율 1.75)에서 1.8로 상향(#95).
+    // unitless 비율이라 모바일 본문 14px에서도 같은 비율(약 25.2px)로 스케일되어
+    // #118에서 복원한 모바일 줄간격(25px, 약 1.79)의 의도를 그대로 계승한다.
+    line-height: 1.8;
+    font-size: var(--post-body-size);
     word-break: keep-all;
   }
 
@@ -112,6 +124,13 @@
   }
 
   @media only screen and (max-width: 800px) {
+    // 모바일 타입 스케일(#95): 기존 h2 16px·h3 14px가 본문 14px과 겹쳐 위계가 사라졌던 것을,
+    // 본문 14px 기준으로 h3까지 최소 한 단계(2px 이상) 차이가 유지되도록 토큰만 덮어쓴다.
+    --post-h1-size: 24px;
+    --post-h2-size: 20px;
+    --post-h3-size: 16px;
+    --post-body-size: 14px;
+
     h1,
     h2,
     h3 {
@@ -119,32 +138,17 @@
       padding: 10px 0;
     }
 
-    h1 {
-      font-size: 24px;
-    }
-
-    h2 {
-      font-size: 16px;
-    }
-
-    h3 {
-      font-size: 14px;
-    }
-
     p {
       padding-top: 8px;
       padding-bottom: 12px;
-      // 본문 14px 기준 가독 line-height. 폰트가 12→14px로 커졌는데 22px에 머물러
-      // 줄간격 비율이 1.57로 좁아졌던 것을, 데스크톱 비율(28px/16px≈1.75)에 근접하게 복원한다(25/14≈1.79).
-      line-height: 25px;
-      font-size: 14px; // 모바일 가독성을 위해 12px에서 14px로 상향
-      word-break: keep-all;
+      // 폰트 크기는 --post-body-size(14px) 토큰이, 줄간격은 상단의 unitless 1.8이 담당한다.
+      // (#118에서 복원한 25px≈1.79 비율은 1.8 비율 상속으로 그대로 유지된다)
     }
 
     ul,
     ol {
       padding: 0;
-      font-size: 14px; // 본문 폰트와 통일해 12px에서 14px로 상향
+      font-size: var(--post-body-size); // 본문 폰트와 통일 (12px→14px 상향 이력, #95에서 토큰화)
     }
 
     li {
@@ -192,7 +196,7 @@
     }
 
     table {
-      font-size: 14px; // 본문 폰트와 통일해 12px에서 14px로 상향
+      font-size: var(--post-body-size); // 본문 폰트와 통일 (12px→14px 상향 이력, #95에서 토큰화)
     }
 
     th,
