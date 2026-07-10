@@ -9,6 +9,7 @@ import { PostModel, SeriesModel, TagModel } from '@libs/types/commons';
 import classNames from 'classnames';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 import classes from './post-detail.module.scss';
+import { MobileToc } from './mobile-toc';
 import { Toc, TocItem } from './toc';
 import { PostNavigator, PostNavigatorPlaceholder } from './post-navigator';
 import { PostRecommendation } from './post-recommendation';
@@ -155,6 +156,19 @@ export function PostDetail({ children, series, post }: PostDetailProps) {
     // toc가 채워진 뒤 핸들러가 최신 목차를 참조하도록 의존성에 toc를 둔다.
   }, [toc]);
 
+  // 목차 항목 클릭 시 해당 헤딩으로 스크롤한다. 데스크톱 ToC와 모바일 바텀시트 ToC가 공유한다(#85).
+  const scrollToHeading = ({ fragId }: { fragId: string }) => {
+    const targetEl = document.getElementById(fragId);
+
+    if (!targetEl) {
+      return;
+    }
+
+    // 동작 줄이기(prefers-reduced-motion) 설정 시 부드러운 스크롤 대신 즉시 이동한다.
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    targetEl.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+  };
+
   return (
     <ArticleContainer
       jsonLd={<PostJsonLd post={post} series={series} />}
@@ -162,25 +176,17 @@ export function PostDetail({ children, series, post }: PostDetailProps) {
         /* TOC 패널은 폭이 고정(w-[240px])이라 거터가 충분히 넓은 xl(1280px) 이상에서만 노출한다.
            lg(1024px)에서는 거터가 좁아 패널이 뷰포트를 넘겨 가로 스크롤을 유발하므로 제외한다. */
         <div className="post-detail-toc-container justify-center sticky top-0 left-0 hidden xl:flex">
-          <Toc
-            toc={toc}
-            activeId={activeTocId}
-            onFragIdChanged={({ fragId }) => {
-              const targetEl = document.getElementById(fragId);
-
-              if (!targetEl) {
-                return;
-              }
-
-              // 동작 줄이기(prefers-reduced-motion) 설정 시 부드러운 스크롤 대신 즉시 이동한다.
-              const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-              targetEl.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
-            }}
-          />
+          <Toc toc={toc} activeId={activeTocId} onFragIdChanged={scrollToHeading} />
         </div>
       }
     >
       <section>
+        {/* ------------------------------------------------------ */}
+        {/* MOBILE TOC (xl 미만 전용: 플로팅 버튼 + 바텀시트) */}
+        {/* ------------------------------------------------------ */}
+        {/* 데스크톱 ToC 패널(right)이 hidden xl:flex라 1280px 미만에서 사라지므로 대체 UI를 둔다(#85). */}
+        <MobileToc toc={toc} activeId={activeTocId} onFragIdChanged={scrollToHeading} />
+
         {/* ------------------------------------------------------ */}
         {/* POST DETAIL BODY */}
         {/* ------------------------------------------------------ */}

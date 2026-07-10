@@ -14,9 +14,14 @@ export interface TocProps {
   toc: TocItem[];
   activeId: string;
   onFragIdChanged: (param: { fragId: string }) => void;
+  /** 컨테이너 클래스 오버라이드. 모바일 바텀시트(#85)처럼 사이드 패널 폭이 맞지 않는 곳에서 사용한다. */
+  className?: string;
 }
 
-export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
+/* 기본 컨테이너: 폭을 240px로 두어 xl(1280px) 거터 안에 들어가 가로 스크롤이 생기지 않게 한다. */
+const defaultClassName = 'w-[240px] mt-[200px]';
+
+export function Toc({ toc, activeId, onFragIdChanged, className = defaultClassName }: TocProps) {
   // 진입 시 URL 해시가 있으면 해당 섹션으로 한 번 스크롤한다(딥링크).
   // getElementById와 형식을 맞추기 위해 '#'를 제거한 값을 넘긴다.
   // onFragIdChanged는 부모에서 매 렌더 새로 생성되므로 의존성에서 제외(마운트 1회만 실행).
@@ -29,8 +34,7 @@ export function Toc({ toc, activeId, onFragIdChanged }: TocProps) {
   }, []);
 
   return (
-    /* 폭을 240px로 두어 xl(1280px) 거터 안에 들어가 가로 스크롤이 생기지 않게 한다. */
-    <div className="w-[240px] mt-[200px]">
+    <div className={className}>
       <ol className="flex flex-col gap-4 p-4 text-sm">
         {toc.map((item) => (
           <li
