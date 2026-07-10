@@ -93,6 +93,20 @@ describe('MobileSidebar', () => {
     expect(document.body.style.overflow).not.toBe('hidden');
   });
 
+  it('포커스가 패널 밖(body)으로 빠져도 Esc로 닫힌다(WAI-ARIA dialog 패턴)', () => {
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    openSidebar();
+    expect(document.body.style.overflow).toBe('hidden');
+
+    // 패널의 비인터랙티브 영역(헤더 제목·패딩) 클릭으로 포커스가 body로 떨어진 상황을 재현한다.
+    // 이때 keydown 타깃은 body라 패널 래퍼까지 버블링되지 않으므로 document 리스너가 받아야 한다.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(screen.getByRole('button', { name: '메뉴 열기' })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
   it('닫힌 동안 패널이 inert이고, 열면 inert가 해제된다', () => {
     render(<MobileSidebar seriesList={seriesList} tags={tags} />);
 

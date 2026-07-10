@@ -55,16 +55,27 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
     }
   }, [open]);
 
+  // role=dialog + aria-modal 선언에 맞게 Esc는 포커스 위치와 무관하게 동작해야 한다(WAI-ARIA dialog 패턴).
+  // 패널의 비인터랙티브 영역(헤더 제목·패딩) 클릭으로 포커스가 body로 빠지면 래퍼의 onKeyDown이
+  // 이벤트를 받지 못하므로, 열려 있는 동안 document 레벨에서 Esc를 수신한다(#132 리뷰).
+  useEffect(() => {
+    if (!open) return;
+    const onDocumentKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeSidebar();
+      }
+    };
+    document.addEventListener('keydown', onDocumentKeyDown);
+    return () => document.removeEventListener('keydown', onDocumentKeyDown);
+  }, [open]);
+
   const onLinkClick = () => {
     setOpen(false);
   };
 
-  // Esc로 닫고, Tab은 패널 내부에 가둔다(포커스 트랩).
+  // Tab은 패널 내부에 가둔다(포커스 트랩).
+  // Esc 닫기는 위 document 레벨 리스너가 전담한다(여기서도 처리하면 중복 호출).
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape') {
-      closeSidebar();
-      return;
-    }
     if (e.key === 'Tab') {
       const panel = panelRef.current;
       if (!panel) return;
