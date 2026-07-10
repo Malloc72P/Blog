@@ -30,7 +30,11 @@ export function Badge({ href, children, onClick, color = 'secondary', active }: 
         'whitespace-nowrap',
         color === 'primary'
           ? 'bg-brand-strong text-white'
-          : 'bg-gray-100 text-gray-700',
+          : // secondary(태그 뱃지·비활성 시리즈 칩): 다크에서만 얇은 인셋 링으로 보강한다.
+            // - 링은 box-shadow 기반이라 레이아웃에 영향이 없어 라이트 모드는 100% 그대로 유지된다(border는 칩이 2px 커짐).
+            // - dark:ring-white/10: 다크 배경(#2b2d31)과 명도차가 작아 묻히던 칩을 살짝 띄워 준다.
+            // - dark:hover:ring-brand(#818cf8 인디고): hover 시 링이 인디고로 물들어 '눌러지는 링크'임을 알린다(라이트 hover는 기존 brightness 유지).
+            'bg-gray-100 text-gray-700 dark:ring-1 dark:ring-inset dark:ring-white/10 dark:hover:ring-brand',
         'hover:brightness-95 active:brightness-90',
       )}
     >
