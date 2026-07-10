@@ -29,7 +29,8 @@ export function Badge({ href, children, onClick, color = 'secondary', active }: 
         'md:px-[12px] md:py-[6px]',
         'whitespace-nowrap',
         color === 'primary'
-          ? 'bg-brand-strong text-white'
+          ? // 활성/primary 강조: 무채색 채움(테마별 반전으로 라이트는 근검정+흰 텍스트, 다크는 근백색+어두운 텍스트) — 검정 헤더와 한 시스템으로 통일.
+            'bg-gray-900 text-surface'
           : // secondary(태그 뱃지·비활성 시리즈 칩): 다크에서만 얇은 인셋 링으로 보강한다.
             // - 링은 box-shadow 기반이라 레이아웃에 영향이 없어 라이트 모드는 100% 그대로 유지된다(border는 칩이 2px 커짐).
             // - dark:ring-white/10: 다크 배경(#2b2d31)과 명도차가 작아 묻히던 칩을 살짝 띄워 준다.
