@@ -5,17 +5,18 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Constants } from '@libs/constants';
 
-// Noto Sans KR을 서브셋으로 최적화
-// - 한글 기본 2,350자만 포함 (전체 11,172자 대신)
-// - 폰트 크기: 76KB → ~20KB로 감소
-// - swap: 폰트 로딩 중에도 텍스트 표시
 // OS별 한글 렌더링 편차를 없애기 위해 활성화(#95). next/font는 빌드타임에 셀프호스트하므로
 // 런타임에 fonts.googleapis.com으로 나가는 요청(preconnect 포함)이 필요 없다.
+// subsets는 프리로드 대상(latin woff2)만 지정한다 — next/font의 Noto_Sans_KR에는 'korean'
+// 서브셋이 없어, 한글 글리프는 unicode-range 슬라이스(다수의 woff2)로 필요한 만큼 온디맨드
+// 로드된다. 따라서 첫 방문 시 한글은 폴백→스왑(FOUT)이 발생하며, 아래 display/adjustFontFallback
+// 조합으로 로딩 중 표시와 스왑 시 CLS를 완화한다.
 const font = Noto_Sans_KR({
-  weight: ['400', '700'], // 필요한 weight만 로드
+  // 실사용 weight만 로드: 400(본문)·500(font-medium 강조)·700(헤딩/볼드).
+  // 600은 th(post-detail.module.scss) 한 곳뿐이라 로드하지 않고 700 상향 매칭을 감수한다.
+  weight: ['400', '500', '700'],
   subsets: ['latin'],
   display: 'swap', // 폰트 로딩 중에도 텍스트 즉시 표시
-  variable: '--font-noto-sans-kr',
   preload: true,
   fallback: ['system-ui', '-apple-system', 'sans-serif'],
   adjustFontFallback: true, // CLS 방지
