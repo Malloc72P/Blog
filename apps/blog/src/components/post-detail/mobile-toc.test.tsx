@@ -101,6 +101,26 @@ describe('MobileToc', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('상위 모달로 포커스가 이동하면 Esc는 시트를 닫지 않고 양보한다(모달 스택 규약)', () => {
+    render(<MobileToc toc={toc} activeId="" onFragIdChanged={() => {}} />);
+
+    const trigger = screen.getByRole('button', { name: '목차 열기' });
+    fireEvent.click(trigger);
+
+    // 시트 위에 검색 모달이 떠 포커스가 시트 밖 인터랙티브 요소로 이동한 상황을 재현한다.
+    // (검색 모달은 Cmd+K window 리스너로 열려 inert의 영향을 받지 않는다.)
+    const outsideInput = document.createElement('input');
+    document.body.appendChild(outsideInput);
+    outsideInput.focus();
+
+    // Esc → 최상위(검색) 모달이 전담해야 하므로 시트는 열린 채로 남는다.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    document.body.removeChild(outsideInput);
+  });
+
   it('배경 딤 오버레이 클릭 시 닫힌다', () => {
     render(<MobileToc toc={toc} activeId="" onFragIdChanged={() => {}} />);
 
