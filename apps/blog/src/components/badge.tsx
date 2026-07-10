@@ -29,7 +29,8 @@ export function Badge({ href, children, onClick, color = 'secondary', active }: 
         'md:px-[12px] md:py-[6px]',
         'whitespace-nowrap',
         color === 'primary'
-          ? 'bg-brand-strong text-white'
+          ? // 활성/primary 강조: 무채색 채움(테마별 반전으로 라이트는 근검정+흰 텍스트, 다크는 근백색+어두운 텍스트) — 검정 헤더와 한 시스템으로 통일.
+            'bg-gray-900 text-surface'
           : 'bg-gray-100 text-gray-700',
         'hover:brightness-95 active:brightness-90',
       )}
