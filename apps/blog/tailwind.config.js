@@ -10,7 +10,6 @@ export default {
     extend: {
       fontFamily: {
         sans: ['system-ui', 'sans-serif'],
-        // sans: ['var(--font-noto-sans-kr)', 'system-ui', 'sans-serif'],
       },
     },
   },
