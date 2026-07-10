@@ -107,6 +107,30 @@ describe('MobileSidebar', () => {
     expect(document.body.style.overflow).not.toBe('hidden');
   });
 
+  it('상위 모달로 포커스가 이동하면 Esc는 사이드바를 닫지 않고 양보한다(모달 스택 규약)', () => {
+    render(<MobileSidebar seriesList={seriesList} tags={tags} />);
+
+    openSidebar();
+    expect(document.body.style.overflow).toBe('hidden');
+
+    // 사이드바 위에 검색 모달이 떠 포커스가 패널 밖 인터랙티브 요소로 이동한 상황을 재현한다.
+    // (검색 모달은 Cmd+K window 리스너로 열려 inert의 영향을 받지 않는다.)
+    const outsideInput = document.createElement('input');
+    document.body.appendChild(outsideInput);
+    outsideInput.focus();
+
+    // Esc → 최상위(검색) 모달이 전담해야 하므로 사이드바는 열린 채로 남는다.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(screen.getByRole('button', { name: '메뉴 열기' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(document.body.style.overflow).toBe('hidden');
+
+    document.body.removeChild(outsideInput);
+  });
+
   it('닫힌 동안 패널이 inert이고, 열면 inert가 해제된다', () => {
     render(<MobileSidebar seriesList={seriesList} tags={tags} />);
 

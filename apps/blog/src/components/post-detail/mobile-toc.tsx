@@ -68,13 +68,20 @@ export function MobileToc({ toc, activeId, onFragIdChanged }: MobileTocProps) {
   useEffect(() => {
     if (!open) return;
     const onDocumentKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeSheet();
-      }
+      if (e.key !== 'Escape') return;
+      // 다중 모달 스택에서 Esc는 최상위 모달만 닫아야 한다(WAI-ARIA dialog 규약).
+      // 포커스가 이 시트 밖의 다른 인터랙티브 요소(예: 시트 위에 Cmd+K로 띄운 검색 모달 입력)에
+      // 있으면 그 상위 모달이 Esc를 전담하도록 양보한다. 포커스가 body(비인터랙티브)로 빠진
+      // 경우엔 계속 시트를 닫는다.
+      const sheet = dialogRef.current;
+      const active = document.activeElement;
+      if (active && active !== document.body && sheet && !sheet.contains(active)) return;
+      closeSheet();
     };
     document.addEventListener('keydown', onDocumentKeyDown);
     return () => document.removeEventListener('keydown', onDocumentKeyDown);
-  }, [open]);
+    // dialogRef는 안정적인 ref라 재등록을 유발하지 않지만, 커스텀 훅 반환값이라 exhaustive-deps가 요구한다.
+  }, [open, dialogRef]);
 
   // 시트가 열리면 현재 활성 항목(aria-current)을 시트 스크롤 영역 안으로 노출한다(#85 핵심 요구).
   // 목차가 길어 내부 스크롤이 생기는 글에서도 열자마자 자기 위치가 보이게 한다.
