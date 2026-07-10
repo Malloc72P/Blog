@@ -5,8 +5,8 @@ export function IntroduceCard() {
   return (
     <div className="rounded-md border border-border-subtle flex relative shadow-md mt-7.5 md:mt-15 break-keep">
       {/* === INTRODUCE CARD LEFT Bar === */}
-      {/* 브랜드 액센트 바. 두 모드 모두에서 의도적인 강조로 보이도록 brand 토큰을 쓴다. */}
-      <div className="w-2 md:w-4.25 h-full bg-brand absolute left-0 top-0"></div>
+      {/* 무채색 강조 바(테마별 반전으로 두 모드 모두 대비 확보 — 라이트는 근검정, 다크는 근백색). 헤더 잉크와 통일. */}
+      <div className="w-2 md:w-4.25 h-full bg-gray-900 absolute left-0 top-0"></div>
 
       {/* === INTRODUCE CARD Right SECTION === */}
       <div className={classNames('flex flex-col', 'pl-5 py-4 pr-6', 'md:pl-11.5 md:py-5 md:pr-6')}>
