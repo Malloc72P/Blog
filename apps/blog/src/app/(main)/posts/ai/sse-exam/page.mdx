@@ -1,4 +1,5 @@
 import { frontmatter } from '@libs/frontmatter';
+import { PostVideo } from '@components/post-detail/post-video';
 
 export const metadata = frontmatter({
   title: 'ChatGPT처럼 AI 채팅 메시지 스트리밍하기(Server-Sent Events)',
@@ -283,7 +284,12 @@ const onClick = async () => {
 잘 보시면 reader.read()에서 await가 걸려있습니다. 해당 메서드가 비동기라, 서버에서 청크를 보낼 때까지 이벤트 루프의 다른 태스크를 처리합니다.
 따라서 해당 코드로 인해 화면이 블로킹 될 일은 없습니다.
 
-![SSE 방식으로 메시지를 조각 단위로 받고 이를 출력하는 화면](/sse-exam.gif)
+<PostVideo
+  src="/sse-exam.mp4"
+  caption="SSE 방식으로 메시지를 조각 단위로 받고 이를 출력하는 화면"
+  width={642}
+  height={416}
+/>
 
 ### 개발자 도구에서 Network 요청 확인해보기.
 
