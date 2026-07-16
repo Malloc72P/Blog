@@ -1,0 +1,481 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '여러 번 리턴하는 함수: TypeScript 비동기 제너레이터로 SSE 소비와 메인 스레드 양보까지',
+  description:
+    '값을 여러 번 내놓는 async generator의 동작 원리를 yield와 next()의 메커니즘으로 분해하고, SSE 스트림 소비와 렌더링을 막지 않는 무거운 계산 처리에 적용해 봅니다.',
+  seriesId: 'frontend',
+  postId: 'async-generator',
+  tags: ['Typescript', 'JavaScript', '비동기', 'async generator', '이벤트루프'],
+  date: '2026-07-16 21:00',
+});
+
+저는 예전에 [SSE로 AI 메시지를 스트리밍하는 실습](/posts/ai/sse-exam)을 하면서, `reader.read()` 루프 안에 청크 파싱과 화면 갱신 코드가 뒤엉킨 클릭 핸들러를 작성했습니다.
+잘 동작했지만, 파싱 로직을 다른 화면에서 재사용하려고 보니 손댈 곳이 마땅치 않았습니다. 파싱과 소비가 한 덩어리였기 때문이죠.
+그때 "값을 **여러 번** 리턴하는 함수가 있으면 딱 좋겠는데"라는 생각을 했고, 그 생각에 정확히 들어맞는 문법이 이미 있다는 걸 알게 됐습니다. 바로 **비동기 제너레이터**(async generator)입니다.
+
+이번 포스트에서는 비동기 제너레이터가 어떤 메커니즘으로 값을 여러 번 내놓는지 분해해 보고, SSE 스트림 소비와 "렌더링을 막지 않는 무거운 계산"이라는 두 가지 실전 상황에 적용해 보겠습니다.
+
+---
+
+## 비동기 제너레이터: 여러 번 리턴하는 함수
+
+### 일반 함수는 한 번만 리턴한다
+
+당연한 이야기부터 시작하겠습니다. 일반 함수는 `return`을 만나는 순간 끝납니다. 결과를 여러 개 돌려주고 싶으면 배열에 전부 담아서 **한 번에** 리턴해야 합니다.
+
+```typescript
+function getTokens(): string[] {
+  // 세 개의 값을 돌려주고 싶어도, 배열에 담아 한 번에 리턴하는 수밖에 없다
+  return ['첫 번째', '두 번째', '세 번째'];
+}
+```
+
+전부 모아서 한 번에 주는 게 문제없는 경우도 많습니다. 하지만 "값이 준비되는 대로 하나씩 받아서 바로 처리하고 싶은" 상황이라면 이 구조가 발목을 잡습니다.
+SSE 스트리밍이 정확히 그런 경우죠. 마지막 토큰까지 기다렸다가 한 번에 받으면 스트리밍의 의미가 없으니까요.
+
+저는 이 차이를 **한상차림과 코스 요리**에 비유하면 이해가 쉬웠습니다.
+
+- **일반 함수**는 한상차림입니다. 모든 요리가 완성될 때까지 기다렸다가, 한 상에 전부 차려서 내옵니다.
+- **제너레이터**는 코스 요리입니다. 요리가 준비되는 대로 한 접시씩 내오고, 손님이 접시를 비우면 다음 요리를 준비합니다.
+
+### function*: 제너레이터 함수
+
+비동기 제너레이터로 가기 전에, 동기 버전인 **제너레이터 함수**부터 보겠습니다. `function` 뒤에 별표(`*`)를 붙이고, `return` 대신 `yield`로 값을 내놓습니다.
+
+```typescript
+function* getTokens() {
+  yield '첫 번째'; // 값을 내놓고 멈춤. 함수가 끝난 게 아니다!
+  yield '두 번째';
+  yield '세 번째';
+  return '끝'; // return도 가능하지만, 순회에는 포함되지 않는다
+}
+
+const gen = getTokens(); // 이 시점에는 함수 본문이 한 줄도 실행되지 않는다
+
+console.log(gen.next()); // { value: '첫 번째', done: false }
+console.log(gen.next()); // { value: '두 번째', done: false }
+console.log(gen.next()); // { value: '세 번째', done: false }
+console.log(gen.next()); // { value: '끝', done: true } ← return 값은 done: true와 함께 온다
+```
+
+일반 함수와 다른 점이 두 가지 보입니다.
+
+1. **호출해도 본문이 실행되지 않습니다.** 대신 `next()` 메서드를 가진 **제너레이터 객체**가 반환됩니다.
+2. `next()`를 호출하면 **다음 `yield`를 만날 때까지만** 실행하고 멈춥니다. 값은 `{ value, done }` 형태로 감싸져 나옵니다.
+
+`yield`는 "값을 내놓고 일시 정지"입니다. 함수의 지역 변수와 실행 위치가 그대로 보존된 채 멈춰 있다가, 소비자가 `next()`를 다시 호출하면 멈췄던 지점부터 이어서 실행됩니다.
+코스 요리 비유로 돌아가면, 주방(제너레이터)은 접시 하나를 내놓고 나서 손님이 다음 요리를 요청할 때까지 대기하는 셈입니다.
+
+매번 `next()`를 부르는 건 번거로우니, 보통은 `for...of`로 순회합니다.
+
+```typescript
+for (const token of getTokens()) {
+  console.log(token); // '첫 번째', '두 번째', '세 번째'
+}
+// return 값인 '끝'은 done: true와 함께 오기 때문에 순회에 포함되지 않는다
+```
+
+### async function*: Promise를 여러 번 내놓는 함수
+
+그런데 SSE 토큰처럼 "**기다려야** 얻을 수 있는 값"을 하나씩 내놓으려면 어떻게 해야 할까요?
+동기 제너레이터로 표현하려면 Promise를 `yield`하고 소비자가 일일이 `await`하는 우회가 필요합니다.
+
+이 패턴을 언어 차원에서 문법으로 지원하는 것이 `async`와 `function*`을 합친 **비동기 제너레이터 함수**입니다. 본문에서 `await`와 `yield`를 함께 쓸 수 있습니다.
+
+```typescript
+// 매개변수 ms만큼 대기하는 함수 (외부 API의 지연시간을 시뮬레이션)
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function* streamTokens() {
+  const tokens = ['안녕하세요, ', '저는 ', 'AI ', '어시스턴트입니다.'];
+
+  for (const token of tokens) {
+    await sleep(100); // 토큰이 준비되는 데 시간이 걸리는 상황
+    yield token; // 준비된 토큰을 하나씩 내놓는다
+  }
+}
+```
+
+소비하는 쪽은 `for`와 `of` 사이에 `await`를 끼워 넣은 **`for await...of`** 문법을 사용합니다.
+
+```typescript
+async function main() {
+  for await (const token of streamTokens()) {
+    console.log(token); // 100ms 간격으로 하나씩 출력된다
+  }
+}
+
+main();
+```
+
+전부 모일 때까지 기다렸다가 배열로 받는 게 아니라, **토큰이 준비될 때마다 루프 본문이 한 번씩 실행**됩니다.
+
+여기서 꼭 짚고 싶은 특징이 하나 있습니다. 제너레이터는 **풀(pull) 방식**으로 동작합니다.
+`yield`에서 멈춘 제너레이터는 소비자가 다음 값을 요청(`next()` 호출)하기 전까지 **절대 스스로 진행하지 않습니다.** 로그를 심어서 확인해 보겠습니다.
+
+```typescript
+async function* courseMeal() {
+  console.log('주방: 전채 준비 시작');
+  yield '전채';
+  console.log('주방: 메인 준비 시작'); // 손님이 다음 요리를 요청해야 실행된다
+  yield '메인';
+}
+
+async function main() {
+  const gen = courseMeal();
+
+  console.log(await gen.next()); // 주방: 전채 준비 시작 → { value: '전채', done: false }
+  console.log('손님: 전채를 먹는 중...');
+  console.log(await gen.next()); // 주방: 메인 준비 시작 → { value: '메인', done: false }
+}
+
+main();
+```
+
+```text
+주방: 전채 준비 시작
+{ value: '전채', done: false }
+손님: 전채를 먹는 중...
+주방: 메인 준비 시작
+{ value: '메인', done: false }
+```
+
+손님이 전채를 먹는 동안 주방은 메인 요리를 만들지 않고 기다립니다.
+소비자가 처리하는 속도에 맞춰 생산 속도가 자연스럽게 조절되는 구조라서, 소비자가 감당 못 할 만큼 값이 쏟아지는 문제가 애초에 생기지 않습니다.
+
+### for await...of의 정체: 비동기 이터레이션 프로토콜
+
+`for await...of`가 마법처럼 보이지만, 실제로는 단순한 규약 위에서 동작합니다.
+
+- 비동기 제너레이터 함수를 호출하면 반환되는 객체에는 `Symbol.asyncIterator` 메서드가 있습니다. 이 규약을 따르는 객체를 **비동기 이터러블**이라고 부릅니다.
+- 그 객체의 `next()`는 `{ value, done }`을 **Promise로 감싸서** 반환합니다.
+- `for await...of`는 반복마다 `next()`를 호출하고, 반환된 Promise를 `await`한 뒤, `done`이 `true`면 루프를 끝냅니다.
+
+`for await...of`가 내부적으로 하는 일을 손으로 풀어 보면 대략 이렇습니다.
+
+```typescript
+async function main() {
+  // for await...of가 하는 일을 수동으로 재현한 코드
+  const iterator = streamTokens()[Symbol.asyncIterator]();
+
+  while (true) {
+    const { value, done } = await iterator.next(); // 다음 값이 준비될 때까지 대기
+
+    if (done) break; // 제너레이터가 끝나면 루프 종료
+
+    console.log(value);
+  }
+}
+```
+
+이전 SSE 포스트에서 `reader.read()`를 `while (true)` 루프로 돌리며 `done`을 검사했던 코드, 기억하시나요? 구조가 완전히 똑같습니다.
+`for await...of`는 그 패턴을 언어 차원에서 문법으로 만들어 준 것뿐입니다.
+
+### TypeScript 타입: AsyncGenerator&lt;T, TReturn, TNext&gt;
+
+TypeScript에서 비동기 제너레이터의 타입은 `AsyncGenerator<T, TReturn, TNext>`로 표기합니다. 타입 매개변수가 세 개나 되지만, 각각의 역할은 명확합니다.
+
+```typescript
+async function* countdown(from: number): AsyncGenerator<number, string, void> {
+  for (let i = from; i > 0; i--) {
+    await sleep(1000);
+    yield i; // T = number: yield로 내놓는 값의 타입
+  }
+  return '발사!'; // TReturn = string: return 값의 타입
+}
+```
+
+- **T**: `yield`로 내놓는 값의 타입. `for await...of`에서 받는 값이 이 타입으로 추론됩니다.
+- **TReturn**: `return` 값의 타입. `done: true`일 때의 `value` 타입입니다.
+- **TNext**: 소비자가 `next(인자)`로 **제너레이터 안에 넣어주는 값**의 타입입니다.
+
+세 번째 매개변수 `TNext`가 낯설 수 있는데, 사실 `yield`는 값을 내놓기만 하는 게 아니라 **받을 수도** 있습니다. `next()`에 인자를 넘기면 그 값이 멈춰 있던 `yield` 표현식의 결과가 됩니다.
+
+```typescript
+// 값을 받을 때마다 누적 합계를 돌려주는 제너레이터
+async function* accumulator(): AsyncGenerator<number, void, number> {
+  let total = 0;
+
+  while (true) {
+    const added = yield total; // next(인자)로 넘긴 값이 yield 표현식의 결과가 된다
+    total += added;
+  }
+}
+
+async function main() {
+  const acc = accumulator();
+
+  console.log(await acc.next()); // { value: 0, done: false } ← 첫 호출의 인자는 무시된다
+  console.log(await acc.next(10)); // { value: 10, done: false }
+  console.log(await acc.next(5)); // { value: 15, done: false }
+}
+```
+
+대부분의 경우에는 값을 내놓기만 하므로 `AsyncGenerator<string, void, void>`처럼 뒤의 두 매개변수를 `void`로 두면 됩니다.
+참고로 리턴 타입 표기를 생략해도 TypeScript가 본문을 보고 알아서 추론해 주기 때문에, 명시가 필수는 아닙니다.
+
+---
+
+## SSE 스트림을 비동기 제너레이터로 소비하기
+
+기초를 다졌으니 실전으로 가겠습니다. 첫 번째 활용처는 서두에서 말한 SSE 스트림 소비입니다.
+
+[이전 SSE 포스트](/posts/ai/sse-exam)의 클라이언트 코드는 클릭 핸들러 안에서 `reader.read()` 루프, 청크 디코딩, `data:` 라인 파싱, 화면 갱신을 전부 처리했습니다.
+이 중에서 "SSE 응답을 읽고 파싱해서 토큰을 만들어 내는" 부분만 비동기 제너레이터로 분리해 보겠습니다.
+
+```typescript
+// libs/read-sse.ts
+// SSE 응답을 파싱해서 토큰을 하나씩 yield하는 비동기 제너레이터
+export async function* readSSE(url: string): AsyncGenerator<string, void, void> {
+  const response = await fetch(url);
+
+  // 타입 가드: body가 null이면 스트림을 읽을 수 없다
+  if (!response.body) {
+    throw new Error('응답 바디가 없습니다.');
+  }
+
+  const reader = response.body.getReader(); // 스트림을 청크 단위로 읽는 reader
+  const decoder = new TextDecoder();
+  let buffer = ''; // 청크 경계에서 잘린 메시지를 보관하는 버퍼
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read(); // 다음 청크가 도착할 때까지 대기
+
+      if (done) break;
+
+      // stream: true 옵션으로 청크 경계에서 잘린 멀티바이트 문자를 안전하게 처리
+      buffer += decoder.decode(value, { stream: true });
+
+      // 이 서버는 메시지를 빈 줄(\n\n)로 구분해 보낸다
+      const messages = buffer.split('\n\n');
+      // 마지막 조각은 아직 완성되지 않았을 수 있으므로 버퍼에 남겨 둔다
+      buffer = messages.pop() ?? '';
+
+      for (const message of messages) {
+        // data 라인이 아니거나 종료 신호면 건너뛴다
+        if (!message.startsWith('data: ') || message === 'data: [DONE]') continue;
+
+        const { text } = JSON.parse(message.slice(6)) as { text: string };
+        yield text; // 파싱이 끝난 토큰을 하나씩 내놓는다
+      }
+    }
+  } finally {
+    // 소비자가 루프를 중간에 벗어나도 여기가 실행되어 연결이 정리된다
+    await reader.cancel();
+  }
+}
+```
+
+한 청크에 여러 메시지가 담겨 오거나, 반대로 메시지 하나가 두 청크에 걸쳐 잘려 오는 경우까지 버퍼로 처리하는, 나름 손이 가는 로직입니다.
+분리하는 김에 원래 코드에 없던 처리도 보강했습니다. 이전 포스트의 코드는 메시지 하나가 두 청크에 걸쳐 잘려 오면 `JSON.parse`가 실패할 수 있었는데, `buffer`와 `stream: true` 옵션으로 그 경우까지 처리했습니다.
+`try...finally`도 그중 하나입니다. 소비자가 `for await...of`를 `break`나 예외로 중간에 벗어나면 제너레이터의 `return()`이 호출되어 멈춰 있던 `yield` 지점에서 함수가 종료되는데,
+이때도 `finally`는 실행되므로 SSE 연결이 열린 채 방치되지 않습니다. "생성 중단" 버튼처럼 스트림을 도중에 끊는 기능을 생각하면 필요한 처리죠.
+
+> 참고로 이 파서는 이전 포스트 서버의 형식(`data: ` + JSON + `\n\n`)에 맞춘 단순화 버전입니다.
+> SSE 스펙상 줄 끝은 `\r\n`도 허용되고 `data:` 뒤의 공백도 선택 사항이라, 다른 서버에 붙일 때는 `split(/\r?\n\r?\n/)` 같은 보강이 필요합니다.
+
+그런데 이 복잡함이 전부 제너레이터 안에 갇혔기 때문에, 소비하는 쪽 코드는 이렇게 줄어듭니다.
+
+```tsx
+// app/page.tsx
+const onClick = async () => {
+  // 토큰이 도착할 때마다 루프가 한 번씩 돌면서 화면을 갱신한다
+  for await (const token of readSSE('/api')) {
+    setMessage((prev) => prev + token);
+  }
+};
+```
+
+이전 포스트의 클릭 핸들러와 비교해 보면 차이가 확실합니다. `getReader`, `TextDecoder`, `split('\n\n')` 같은 저수준 코드가 전부 사라지고,
+"토큰을 하나씩 받아서 화면에 붙인다"라는 **의도만** 남았습니다. 파싱 로직은 이제 어느 화면에서든 `for await...of` 한 줄로 재사용할 수 있고, 파싱만 떼어내서 테스트하기도 쉬워졌습니다.
+
+앞서 본 풀 방식의 성질도 이어집니다. 물론 생산자가 원격 서버라서 서버가 보내는 원시 데이터 자체는 읽기 전까지 스트림 내부 버퍼에 쌓이지만,
+파싱을 소비 속도에 맞춰 미루기 때문에 파싱된 토큰이 처리도 못 한 채 쌓이는 상황은 구조적으로 발생하지 않습니다.
+
+콜백을 넘기는 방식(`readSSE(url, onToken)`)으로도 분리 자체는 가능합니다. 다만 그 경우 흐름의 주도권이 생산자 쪽으로 넘어갑니다.
+제너레이터는 소비자가 `for await...of`로 흐름을 쥐고 있어서, 조건에 따라 `break`로 중단하거나 토큰 처리 사이에 다른 로직을 자유롭게 끼워 넣을 수 있다는 점이 다릅니다.
+
+---
+
+## 무거운 계산, 렌더링을 막지 않고 처리하기
+
+두 번째 활용처는 조금 의외의 영역입니다. **시간이 오래 걸리는 무거운 계산을 화면 멈춤 없이 처리**하는 데에도 비동기 제너레이터를 쓸 수 있습니다.
+
+### 긴 루프는 왜 화면을 얼리는가
+
+먼저 문제 상황부터 재현하겠습니다. 10만 개의 데이터에 무거운 계산을 돌리는 코드입니다.
+
+```typescript
+// 예시용 무거운 계산 (실제로는 이미지 필터링, 대량 데이터 변환 등이 여기 해당)
+function heavyCalculation(item: number): number {
+  let result = item;
+  for (let i = 0; i < 10_000; i++) {
+    result = Math.sqrt(result * result + i); // CPU를 사용하는 반복 계산
+  }
+  return result;
+}
+
+const items = Array.from({ length: 100_000 }, (_, i) => i); // 10만 개의 데이터
+
+// 이 한 줄이 실행되는 동안 화면 전체가 얼어붙는다
+const results = items.map(heavyCalculation);
+```
+
+이 `map`이 도는 몇 초 동안 버튼 클릭도, CSS 애니메이션도, 스크롤도 전부 멈춥니다. 이유는 두 가지 규칙으로 설명됩니다.
+
+- 하나는 [이벤트 루프 포스트](/posts/frontend/event-loop)에서 다룬 대로, 동기 작업이 끝나기 전에는 콜스택에 아무것도 끼어들 수 없다는 것입니다. 위 `map`은 하나의 거대한 동기 작업으로, 끝날 때까지 콜스택을 점유합니다.
+- 다른 하나는 이 글에서 새로 추가할 규칙입니다. 브라우저의 **렌더링(스타일 계산, 레이아웃, 페인트)은 태스크와 태스크 사이에서만** 일어날 수 있습니다. 태스크가 끝나지 않으니 렌더링은 차례를 얻지 못합니다.
+
+이벤트 루프 포스트의 민원 창구 비유를 다시 가져오면, 창구 직원이 "서류 10만 장을 다 처리할 때까지 아무도 못 옵니다"라고 버티는 상황입니다.
+뒤에 줄 선 민원인(클릭 이벤트, 렌더링)은 하염없이 기다릴 수밖에 없죠.
+
+해결의 방향은 자연스럽게 나옵니다. **서류를 몇백 장씩 끊어 처리하고, 그 사이사이에 잠깐 자리를 비켜 주면 됩니다.** 그리고 "작업을 쪼개서 중간중간 멈춘다"는 이 요구사항, 어딘가 익숙하지 않나요? 정확히 제너레이터가 하는 일입니다.
+
+### 함정: await만으로는 양보가 되지 않는다
+
+그런데 여기에 정말 빠지기 쉬운 함정이 하나 있습니다. 저도 처음에 "async 함수로 만들고 중간에 `await`를 넣으면 되겠지"라고 생각했다가 당했던 부분입니다.
+
+```typescript
+// 주의: 이렇게 하면 화면은 여전히 얼어붙는다
+async function processAll(items: number[]): Promise<number[]> {
+  const results: number[] = [];
+
+  for (const [index, item] of items.entries()) {
+    results.push(heavyCalculation(item));
+
+    if (index % 1_000 === 0) {
+      await Promise.resolve(); // 마이크로태스크 경계일 뿐, 렌더링은 끼어들 수 없다
+    }
+  }
+
+  return results;
+}
+```
+
+`await Promise.resolve()`는 함수를 잠시 멈추긴 하지만, 이어지는 코드를 **마이크로태스크 큐**에 넣습니다.
+[이벤트 루프 포스트](/posts/frontend/event-loop)에서 본 규칙을 떠올려 보면, 마이크로태스크 큐는 **빌 때까지 전부** 처리된 후에야 다음으로 넘어갑니다.
+렌더링이 끼어들 수 있는 태스크 경계에 도달하기 전에 마이크로태스크로 등록된 다음 청크가 곧바로 실행되어 버리므로, 브라우저 입장에서는 여전히 쉴 틈이 없습니다.
+
+"그럼 이전 SSE 포스트의 `await reader.read()`는 왜 화면을 안 얼렸지?"라는 의문이 들 수 있습니다.
+그 경우는 실제로 기다릴 일이 있는, 즉 아직 pending인 Promise를 `await`했기 때문입니다. 기다리는 동안 현재 태스크가 끝나므로 그 사이에 렌더링이 돌 수 있습니다.
+문제가 되는 건 위 코드처럼 **이미 이행된 Promise를 `await`할 때**입니다. 이때는 마이크로태스크로 곧장 이어져 태스크 경계가 생기지 않습니다.
+
+같은 이유로, **`for await...of`로 소비한다는 사실만으로는 렌더링에 양보가 되지 않습니다.** 각 반복이 만드는 것도 마이크로태스크 경계일 뿐이기 때문입니다.
+양보는 반드시 **태스크(매크로태스크) 경계**로 해야 합니다. 가장 간단한 도구가 `setTimeout(0)`입니다.
+
+```typescript
+// 태스크 경계를 만들어 이벤트 루프에 양보하는 함수
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0); // 매크로태스크 경계 → 이 사이에 렌더링이 끼어들 수 있다
+  });
+}
+```
+
+`setTimeout`의 콜백은 매크로태스크 큐로 들어가므로, 그 앞에서 현재 태스크가 일단 끝납니다. 브라우저는 태스크와 태스크 사이의 이 틈에 밀려 있던 렌더링과 사용자 입력을 처리할 수 있습니다.
+
+> `setTimeout`은 중첩 깊이가 5를 넘으면 최소 지연이 4ms로 강제되는 클램핑 규칙이 있어서, 양보 지점이 아주 많아지면 이 4ms가 누적될 수 있습니다.
+> 더 정밀한 제어가 필요하다면 클램핑이 없는 `MessageChannel`이나, 이 용도를 위해 설계된 `scheduler.yield()`(2026년 기준 Chrome/Edge 129+, Firefox 142+ 지원, Safari 미지원)를 사용할 수 있습니다. 이 글에서는 가장 보편적인 `setTimeout` 방식으로 진행합니다.
+
+### 청크 단위로 처리하는 비동기 제너레이터
+
+이제 재료가 모였습니다. "작업을 청크로 쪼개고(제너레이터), 청크 사이마다 태스크 경계로 양보(`yieldToEventLoop`)"를 조합하면 됩니다.
+
+```typescript
+// 작업을 청크 단위로 쪼개 처리하고, 청크 사이마다 이벤트 루프에 양보하는 비동기 제너레이터
+async function* processInChunks<T, R>(
+  items: T[],
+  processItem: (item: T) => R,
+  chunkSize = 200,
+): AsyncGenerator<R[], void, void> {
+  for (let start = 0; start < items.length; start += chunkSize) {
+    const chunk = items.slice(start, start + chunkSize); // 이번에 처리할 청크
+    const results = chunk.map(processItem); // 청크 하나는 동기적으로 처리한다
+
+    yield results; // 청크 처리 결과를 내놓는다
+
+    await yieldToEventLoop(); // 다음 청크로 넘어가기 전, 렌더링에 기회를 준다
+  }
+}
+```
+
+소비하는 쪽 코드입니다. 같은 스레드에서 돌기 때문에 진행률 표시 같은 DOM 갱신을 루프 안에서 자유롭게 할 수 있습니다.
+
+```typescript
+// 진행률을 화면에 표시하는 함수
+function updateProgress(percent: number): void {
+  const bar = document.querySelector<HTMLElement>('#progress');
+
+  if (bar) {
+    bar.style.width = `${percent}%`; // DOM 접근 — 웹 워커에서는 불가능한 일
+  }
+}
+
+async function runHeavyJob() {
+  const results: number[] = [];
+
+  for await (const chunkResults of processInChunks(items, heavyCalculation)) {
+    results.push(...chunkResults); // 청크 결과를 모은다
+    updateProgress((results.length / items.length) * 100); // 중간중간 진행률 갱신
+  }
+
+  console.log('완료:', results.length);
+}
+```
+
+이렇게 바꾸면 계산이 도는 동안에도 진행률 바가 부드럽게 차오르고, 버튼 클릭도 정상적으로 동작합니다.
+청크 하나(200건)를 처리하는 데 걸리는 시간만큼만 콜스택을 점유하고 곧바로 양보하기 때문에, 렌더링이 몇 초씩 밀리는 일이 사라지는 겁니다.
+
+`chunkSize`는 조절 포인트입니다. 60fps 기준으로 한 프레임의 예산은 약 16ms이므로, 청크 하나의 처리 시간이 그 안팎에 들어오도록 잡으면 체감이 매끄럽습니다.
+실제로 제 컴퓨터에서 위의 `heavyCalculation`을 재 보니 1,000건짜리 청크 하나가 약 50ms로 예산을 훌쩍 넘겨서, 기본값을 200으로 잡았습니다.
+너무 작게 잡으면 양보 오버헤드(태스크 전환)가 커지고, 너무 크게 잡으면 다시 버벅임이 생기니, 실제 데이터로 측정해 보고 정하는 걸 권합니다.
+
+---
+
+## 공정한 비교: 웹 워커 vs 비동기 제너레이터 양보
+
+무거운 계산 이야기가 나오면 빠질 수 없는 게 **웹 워커**(Web Worker)입니다. 사실 "메인 스레드를 지킨다"는 목적만 보면 웹 워커가 더 확실한 방법입니다. 두 방식을 과장 없이 비교해 보겠습니다.
+
+| 관점 | 웹 워커 | 비동기 제너레이터 + 양보 |
+| --- | --- | --- |
+| 실행 위치 | 별도 스레드 (진짜 병렬) | 메인 스레드 (협조적 양보) |
+| 메인 스레드 CPU 부담 | 거의 없음 | 총 계산량은 그대로, 잘게 나눠 실행할 뿐 |
+| DOM API 접근 | 불가능 | 가능 |
+| 데이터 전달 | `postMessage` 구조화 복제 비용 (대용량이면 부담) | 없음 (같은 메모리 공간) |
+| 도입 비용 | 별도 파일 + 메시지 프로토콜 설계 | 함수 하나 |
+
+먼저 웹 워커의 확실한 강점입니다. 계산이 **아예 다른 스레드**에서 돌기 때문에 메인 스레드는 완전히 자유롭습니다.
+제너레이터 방식은 어디까지나 메인 스레드가 일을 "잘게 나눠서" 하는 것이라 CPU 사용 총량이 줄지 않고,
+항목 하나의 계산 자체가 수십 ms를 넘는다면 청크를 아무리 잘게 쪼개도 그 한 건이 도는 동안에는 프레임이 밀립니다. 이런 작업이라면 웹 워커가 정답입니다.
+
+대신 웹 워커에는 뚜렷한 제약이 있습니다.
+
+- **DOM API에 접근할 수 없습니다.** 계산 중간중간 화면을 갱신해야 한다면, 매번 `postMessage`로 메인 스레드에 결과를 넘겨서 처리해야 합니다.
+- `postMessage`로 주고받는 데이터는 **구조화 복제**(structured clone)를 거칩니다. 크기가 큰 객체라면 복제 비용 자체가 부담이 될 수 있습니다. (`ArrayBuffer` 같은 일부 타입은 Transferable로 복사 없이 소유권만 넘길 수 있긴 합니다.)
+- 워커 파일 분리, 메시지 타입 설계, 에러 전파 처리 등 도입 비용이 제법 듭니다.
+
+그래서 저는 이렇게 기준을 잡고 있습니다.
+
+- **수 초 이상 걸리는 순수 계산이고, 중간 결과로 DOM을 만질 필요가 없다** → 웹 워커. 메인 스레드를 확실하게 지키는 방법입니다.
+- **작업이 자연스럽게 쪼개지고, 중간중간 DOM 갱신(진행률, 부분 렌더링)이 필요하거나, 워커를 도입할 정도의 규모는 아니다** → 비동기 제너레이터 + 양보. 함수 하나로 끝나는 가벼운 해법입니다.
+
+둘은 경쟁 관계라기보다 담당 구간이 다른 도구에 가깝습니다. 상황에 맞는 쪽을 꺼내 쓰면 됩니다.
+
+---
+
+## 정리
+
+- **제너레이터 함수**(`function*`)는 `yield`로 값을 여러 번 내놓을 수 있는 함수입니다. 호출 시 본문이 실행되는 대신 제너레이터 객체가 반환되고, `next()`가 호출될 때마다 다음 `yield`까지 실행됩니다.
+- **비동기 제너레이터**(`async function*`)는 여기에 `await`를 더한 것으로, "기다려야 얻을 수 있는 값"을 하나씩 내놓을 수 있습니다. 소비는 `for await...of`로 합니다.
+- 제너레이터는 **풀 방식**입니다. `yield`에서 멈춘 뒤 소비자가 `next()`를 호출해야 이어서 실행되므로, 소비 속도에 생산 속도가 자연스럽게 맞춰집니다.
+- TypeScript 타입은 `AsyncGenerator<T, TReturn, TNext>`로, 각각 yield 값 / return 값 / next()로 넣어주는 값의 타입입니다.
+- **SSE 소비**에 적용하면 파싱 로직을 제너레이터 안에 가두고, 소비자는 `for await...of`로 토큰만 받아 쓰는 깔끔한 구조가 됩니다.
+- **무거운 계산**은 청크로 쪼개고 사이사이에 양보하면 렌더링을 막지 않고 처리할 수 있습니다. 단, 양보는 `await Promise.resolve()` 같은 **마이크로태스크가 아니라** `setTimeout(0)` 같은 **태스크 경계**로 해야 합니다. 렌더링은 태스크 사이에서만 일어나기 때문입니다.
+- 웹 워커는 진짜 병렬이라 메인 스레드를 확실히 지키지만 DOM 접근이 안 되고 도입 비용이 있습니다. 제너레이터 양보는 가볍고 DOM을 만질 수 있지만 CPU 총량은 그대로입니다. 작업의 성격에 맞춰 고르면 됩니다.
+
+"함수는 한 번만 리턴한다"는 당연한 상식에 별표 하나(`*`)로 예외를 만드는 문법이라, 처음엔 낯설지만 한번 손에 익으면 스트리밍류 코드가 눈에 띄게 단정해집니다.
+긴 글 읽어주셔서 감사합니다!
