@@ -1,0 +1,313 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'TypeScript 조건부 타입과 infer: ReturnType·Parameters·Awaited를 직접 만들며 이해하기',
+  description:
+    '`T extends U ? X : Y` 조건부 타입과 infer로 타입의 일부를 꺼내는 원리를 분해하고, 내장 ReturnType·Parameters·Awaited를 직접 구현하며 분배 조건부 타입까지 한 편에 정리합니다.',
+  seriesId: 'frontend',
+  postId: 'ts-conditional-types',
+  tags: ['Typescript', '조건부타입', 'infer', 'ReturnType', '타입시스템'],
+  date: '2026-07-23 21:00',
+});
+
+라이브러리나 동료의 코드를 읽다 보면 `type Result = ReturnType<typeof handler>` 같은 줄을 만납니다. 저는 이런 코드를 볼 때마다 결과 타입이 무엇인지는 대충 짐작하면서도, "대체 이게 안에서 어떻게 계산되는 거지?"라는 물음은 늘 넘겨버렸습니다. `ReturnType`이 어떤 마법으로 함수에서 반환 타입만 쏙 뽑아내는지 설명해 보라고 하면 막막했거든요.
+
+사실 이 "마법"의 정체는 두 가지 문법의 조합입니다. **조건부 타입**과 **infer**입니다. 그리고 놀랍게도 우리는 이미 이 조합을 슬쩍 써본 적이 있습니다. [제네릭 글](/posts/frontend/ts-generics)의 마지막 `groupBy` 예제에서 반환 타입을 `T[K] extends PropertyKey ? Record<T[K], T[]> : never`라고 적었는데, 이 `? :`가 바로 조건부 타입이었습니다.
+
+이번 글에서는 `ReturnType`, `Parameters`, `Awaited` 같은 내장 유틸리티 타입을 **직접 만들어 보며** 조건부 타입과 infer가 어떻게 동작하는지, 그리고 이들이 유니온을 만났을 때 벌어지는 **분배 조건부 타입**까지 한 편에 정리해 보겠습니다.
+
+---
+
+## 조건부 타입: 타입 세계의 삼항 연산자
+
+저는 조건부 타입을 **값 세계의 삼항 연산자를 타입 세계로 그대로 옮긴 것**으로 이해하면 편했습니다. 우리가 매일 쓰는 삼항 연산자를 떠올려 봅시다.
+
+```typescript
+// 값 세계: 조건이 참이면 앞, 거짓이면 뒤를 돌려준다.
+const label = age >= 20 ? '성인' : '미성년';
+```
+
+**조건부 타입(Conditional Type)**은 이 `조건 ? 참 : 거짓` 구조를 타입에 그대로 가져옵니다. 다른 점은 조건 자리에 `extends`가 들어간다는 것뿐입니다.
+
+```typescript
+// 타입 세계: T가 string이면 true, 아니면 false라는 '타입'을 돌려준다.
+type IsString<T> = T extends string ? true : false;
+
+type A = IsString<'hello'>; // A: true
+type B = IsString<42>; // B: false
+```
+
+`IsString`은 타입을 입력받아 다른 타입을 돌려주는 작은 함수처럼 동작합니다. `'hello'`를 넣으면 `true` 타입이, `42`를 넣으면 `false` 타입이 나옵니다. 값이 아니라 **타입을 계산해서 반환**한다는 점만 빼면 삼항 연산자와 읽는 법이 똑같습니다.
+
+앞서 언급한 `groupBy`의 반환 타입도 같은 눈으로 다시 보면 "`T[K]`가 객체 키가 될 수 있는 타입이면 `Record<...>`를, 아니면 `never`를 돌려줘라"는 한 줄의 조건 분기였던 셈입니다.
+
+### extends는 상속이 아니라 "할당할 수 있는가"를 묻는다
+
+여기서 가장 많이 오해하는 지점이 `extends`입니다. 조건부 타입의 `extends`는 클래스 상속과 아무 관계가 없습니다. **`T extends U`는 "`T` 값을 `U` 자리에 넣을 수 있는가", 즉 "`T`가 `U`의 부분집합인가"를 묻는 질문**입니다.
+
+타입을 [값의 집합으로 보는 관점](/posts/frontend/ts-never-unknown)을 가져오면 방향이 분명해집니다. `'a'`는 "문자열 `a` 하나만 담긴 집합"이고, `string`은 "모든 문자열의 집합"입니다. 작은 집합은 큰 집합에 속하지만 그 반대는 아닙니다.
+
+```typescript
+// '더 좁은' 리터럴은 '더 넓은' string에 할당할 수 있다 → 참.
+type C = 'a' extends string ? 'yes' : 'no'; // C: 'yes'
+
+// 반대로 '넓은' string을 '좁은' 'a' 자리에는 넣을 수 없다 → 거짓.
+type D = string extends 'a' ? 'yes' : 'no'; // D: 'no'
+```
+
+`extends`를 상속처럼 "string이 더 크니까 참이겠지"라고 읽으면 방향을 정반대로 이해하게 됩니다. **좁은 타입 → 넓은 타입만 참**이라는 것이 핵심입니다.
+
+> 한 가지 짚어둘 점은, 여기서의 `extends`는 [제네릭 제약](/posts/frontend/ts-generics)의 `extends`(예: `<T extends { length: number }>`)와 키워드만 같을 뿐 쓰임이 다릅니다. 제약의 `extends`는 "타입 파라미터가 이 조건을 만족해야 한다"는 **입력 검사**이고, 조건부 타입의 `extends`는 "이 조건이 참이냐"를 물어 **분기를 결정**합니다. 문맥으로 구분하면 됩니다.
+
+---
+
+## infer: 패턴에서 타입을 꺼내 담기
+
+조건부 타입이 "참이냐 거짓이냐"만 판단한다면 활용도가 제한적입니다. 진짜 강력해지는 순간은 **infer**와 만날 때입니다. infer는 `extends` 오른쪽의 패턴 안에 **구멍을 뚫고, 매칭된 자리의 타입을 이름 붙여 꺼내오는** 도구입니다.
+
+정규식의 캡처 그룹에 익숙하다면 그 비유가 가장 정확합니다. `/(\d+)-(\w+)/`에서 괄호 `( )`가 "여기 매칭된 부분을 따로 뽑아줘"라는 표시이듯, `infer`도 타입 패턴에서 "이 위치에 걸린 타입을 변수로 뽑아줘"라는 표시입니다.
+
+배열에서 요소 타입을 꺼내는 예제로 감을 잡아 봅시다.
+
+```typescript
+// T가 "무언가의 배열"이면, 그 무언가(요소 타입)를 E로 뽑아 돌려준다.
+type ElementType<T> = T extends (infer E)[] ? E : T;
+
+type E1 = ElementType<string[]>; // E1: string  (string[]의 요소 → string)
+type E2 = ElementType<number>; // E2: number  (배열이 아니면 그대로 T)
+```
+
+`T extends (infer E)[]`는 "`T`가 어떤 배열 모양에 들어맞는가"를 물으면서, 동시에 그 배열의 요소 자리를 `E`라는 이름으로 포획합니다. `string[]`을 넣으면 패턴이 매칭되고 `E`는 `string`으로 채워집니다. `number`처럼 배열이 아니면 매칭에 실패해 거짓 분기로 갑니다.
+
+infer에는 두 가지 규칙만 기억하면 됩니다.
+
+- **infer는 `extends`의 오른쪽 패턴 안에서만** 쓸 수 있습니다.
+- **infer로 뽑은 변수는 참(true) 분기에서만** 사용할 수 있습니다. 매칭에 성공했을 때만 꺼낼 것이 생기기 때문입니다.
+
+그리고 **구멍의 위치만 바꾸면 전혀 다른 것을 꺼내는 도구**가 됩니다. 튜플의 맨 앞 요소를 꺼내려면 구멍을 맨 앞에 두면 됩니다.
+
+```typescript
+// 튜플의 첫 요소 자리에 구멍을 뚫어 H로 뽑는다. 나머지는 관심 없으므로 ...unknown[]로 흘려보낸다.
+type First<T> = T extends [infer H, ...unknown[]] ? H : never;
+
+type F1 = First<[1, 2, 3]>; // F1: 1
+type F2 = First<[]>; // F2: never  (빈 튜플엔 첫 요소가 없다)
+```
+
+이 "구멍의 위치를 옮긴다"는 감각이, 다음에 만들 유틸리티 타입들의 전부입니다.
+
+---
+
+## 내장 유틸리티 타입을 직접 만들어 보기
+
+이제 조건부 타입과 infer를 조립해, 앞에서 마법처럼 보였던 `ReturnType`을 직접 만들어 보겠습니다. 세 유틸리티는 모두 "함수 타입의 어느 위치에 구멍을 뚫느냐"의 변주입니다.
+
+### ReturnType: 반환 위치에서 꺼내기
+
+먼저 문제 상황부터. 함수의 반환 타입만 손으로 뽑아내려고 하면 마땅한 방법이 없습니다. infer는 바로 이 "패턴 안의 특정 위치를 꺼내는" 일을 합니다. 함수 타입에서 **반환 위치에 구멍을 뚫으면** 됩니다.
+
+```typescript
+// T가 "어떤 인자든 받아 무언가를 반환하는 함수"에 들어맞으면,
+// 그 반환 위치의 타입을 R로 뽑아 돌려준다.
+type MyReturnType<T extends (...args: any[]) => any> =
+  T extends (...args: any[]) => infer R ? R : never;
+
+function createUser() {
+  return { id: 1, name: 'claude' };
+}
+
+// 반환 위치만 R로 뽑혔다.
+type User = MyReturnType<typeof createUser>; // User: { id: number; name: string }
+```
+
+인자 자리는 `(...args: any[])`로 뭉뚱그려 흘려보내고, 반환 자리에만 `infer R`을 심었습니다. 그래서 `createUser`의 반환값 타입인 `{ id: number; name: string }`만 정확히 뽑힙니다. `typeof createUser`는 함수 "값"에서 함수 "타입"을 얻는 문법입니다.
+
+이렇게 만든 `MyReturnType`은 표준 라이브러리의 `ReturnType`과 동일하게 동작합니다.
+
+```typescript
+// 직접 만든 것과 내장 유틸리티의 결과가 같다.
+type Std = ReturnType<typeof createUser>; // Std: { id: number; name: string }
+```
+
+> 참고로 실제 `lib.es5.d.ts`의 정의는 거짓 분기가 `never`가 아니라 `any`입니다(`... ? R : any`). 다만 타입 파라미터가 `T extends (...args: any) => any`로 이미 "함수"임을 강제받기 때문에, 거짓 분기에 닿을 일은 사실상 없습니다. `never`든 `any`든 유효한 입력에서는 결과가 같습니다.
+
+### Parameters: 인자 위치에서 꺼내기
+
+`Parameters`는 `ReturnType`의 거울쌍입니다. 이번엔 반환이 아니라 **인자 위치에 구멍을 뚫습니다**. 다른 점은, 인자는 여러 개일 수 있으므로 하나의 타입이 아니라 **튜플을 통째로** 뽑아온다는 것입니다.
+
+```typescript
+// 인자 목록 전체를 P라는 튜플로 뽑는다.
+type MyParameters<T extends (...args: any[]) => any> =
+  T extends (...args: infer P) => any ? P : never;
+
+function greet(name: string, age: number): void {}
+
+// 인자 목록이 튜플로 뽑혔다.
+type GreetParams = MyParameters<typeof greet>; // GreetParams: [name: string, age: number]
+```
+
+반환 위치에 `infer R`을 두면 `ReturnType`, 인자 위치에 `infer P`를 두면 `Parameters`. **구멍의 위치만 좌우로 옮겼을 뿐** 뼈대는 완전히 같습니다. 이 대칭이 눈에 들어오면 infer 기반 유틸리티가 훨씬 만만해집니다.
+
+> 같은 `infer` 이름을 여러 위치에 두면 어떻게 될까요? 함수 **인자** 자리는 반공변(contravariant) 위치라, 같은 이름으로 여러 개를 캡처하면 유니온이 아니라 **교집합**으로 합쳐집니다. 예를 들어 `(a: infer U, b: infer U) => void`에 `(a: string, b: number) => void`를 넣으면 `U`는 `string & number`, 즉 `never`가 됩니다. 남의 타입 유틸에서 "왜 갑자기 never가 나오지?" 싶을 때 이 규칙이 원인일 때가 많습니다.
+
+### Awaited: 재귀로 껍질을 끝까지 벗기기
+
+마지막은 조금 더 까다로운 `Awaited`입니다. `await`는 `Promise`를 풀어 안의 값을 꺼내는데, 그 타입 버전이 `Awaited`입니다. 순진하게 접근하면 이렇게 쓸 것입니다.
+
+```typescript
+// Promise 안의 값을 한 번 꺼낸다.
+type NaiveAwaited<T> = T extends Promise<infer V> ? V : T;
+
+type N1 = NaiveAwaited<Promise<string>>; // N1: string  (여기까진 잘 된다)
+type N2 = NaiveAwaited<Promise<Promise<number>>>; // N2: Promise<number>  (한 겹만 벗겨졌다!)
+```
+
+문제는 `Promise<Promise<number>>`처럼 중첩된 경우입니다. `infer V`는 껍질을 **딱 한 겹만** 벗기기 때문에 안쪽에 `Promise<number>`가 그대로 남습니다. 반면 실제 `await`는 값이 또 `Promise`면 계속 풀어서 끝까지 평탄화합니다.
+
+이 "끝까지"를 표현하려면 **재귀 조건부 타입**이 필요합니다. 껍질을 한 겹 벗긴 뒤, 그 결과를 **자기 자신에게 다시 넣으면** 됩니다.
+
+```typescript
+// 한 겹 벗긴 V가 또 Promise일 수 있으니, 자기 자신을 다시 호출해 끝까지 벗긴다.
+type MyAwaited<T> = T extends Promise<infer V> ? MyAwaited<V> : T;
+
+type R1 = MyAwaited<Promise<string>>; // R1: string
+type R2 = MyAwaited<Promise<Promise<number>>>; // R2: number  (재귀로 두 겹 다 벗겼다)
+type R3 = MyAwaited<boolean>; // R3: boolean  (Promise가 아니면 그대로)
+```
+
+핵심은 참 분기의 `MyAwaited<V>`입니다. `Promise`를 한 겹 벗겨 `V`를 얻으면, `V`가 또 `Promise`인지 검사하러 자기 자신으로 되돌아갑니다. 더 벗길 껍질이 없을 때 비로소 거짓 분기로 빠져나옵니다.
+
+> 실제 표준 `Awaited`는 여기서 한 걸음 더 나아갑니다. `Promise` 타입뿐 아니라 `then` 메서드를 가진 객체(thenable) 전반을 다루기 위해, 패턴이 `Promise<infer V>`가 아니라 `{ then(onfulfilled: infer F, ...): any }` 형태로 되어 있습니다. 원리(패턴 매칭 + infer + 재귀)는 우리가 만든 것과 동일합니다.
+
+### 정말 표준과 같을까: 컴파일러로 증명하기
+
+"직접 만든 게 내장과 같다"는 주장을 눈으로만 확인하고 넘어가긴 아쉽습니다. 두 타입이 **정확히 같은지**를 컴파일러에게 물어볼 수 있습니다.
+
+```typescript
+// 두 타입이 완전히 동일할 때만 true가 되는 헬퍼.
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+
+// T가 true가 아니면 이 줄 자체가 컴파일 에러가 난다.
+type Expect<T extends true> = T;
+
+// MyReturnType과 표준 ReturnType이 같은 타입임을 컴파일 타임에 단언한다.
+type _t1 = Expect<Equal<MyReturnType<typeof createUser>, ReturnType<typeof createUser>>>;
+
+// MyParameters도 표준과 동일.
+type _t2 = Expect<Equal<MyParameters<typeof greet>, Parameters<typeof greet>>>;
+```
+
+`Expect<Equal<...>>`는 두 타입이 다르면 **컴파일 자체가 실패**합니다. 위 코드가 오류 없이 통과한다는 것은 곧, 우리가 만든 유틸리티가 내장과 동일하다는 것을 컴파일러가 보장해 준다는 뜻입니다. 이 글의 예제들은 모두 이 방식으로 검증했습니다.
+
+---
+
+## 분배 조건부 타입: 유니온을 하나씩 훑는다
+
+지금까지는 단일 타입만 넣었습니다. 그런데 조건부 타입에 **유니온**을 넣으면, 값 세계의 삼항 연산자에는 없는 독특한 일이 벌어집니다. 다음 결과를 예상해 봅시다.
+
+```typescript
+// T를 배열로 감싸는 단순한 조건부 타입.
+type ToArray<T> = T extends unknown ? T[] : never;
+
+// string | number를 넣으면 결과는?
+type Arr = ToArray<string | number>;
+```
+
+`(string | number)[]`를 예상했다면 틀렸습니다. 실제 결과는 이렇습니다.
+
+```typescript
+type Arr = ToArray<string | number>; // Arr: string[] | number[]  ← 통짜 배열이 아니다!
+```
+
+유니온이 **멤버별로 쪼개져** 각각 조건부 타입을 통과한 뒤, 결과가 다시 유니온으로 합쳐집니다. 즉 `ToArray<string> | ToArray<number>` = `string[] | number[]`가 됩니다. 이것이 **분배 조건부 타입(Distributive Conditional Type)**입니다. 배열의 `map`을 떠올리면 정확합니다. **유니온의 각 멤버에 조건부를 적용하고, 그 결과를 다시 유니온으로 모으는** 동작입니다.
+
+한 가지 오해를 미리 막아두면, 분배는 "유니온이라서" 일어나는 게 아니라 **유니온이 벌거벗은 타입 파라미터(naked type parameter)를 통해 들어와서** 일어납니다. 위처럼 `T`가 조건부 왼쪽에 홀로 놓여야 스위치가 켜집니다. `T`를 다른 것으로 감싸면 스위치가 꺼지는데, 이건 잠시 뒤에 활용합니다.
+
+### Exclude를 직접 만들어 보기
+
+분배가 실무 도구가 되는 대표 사례가 `Exclude`입니다. 유니온에서 특정 멤버만 빼내는 유틸리티인데, **분배 + never의 성질**만으로 세 줄이면 만들어집니다.
+
+```typescript
+// 각 멤버가 U에 할당 가능하면 never로 지우고, 아니면 그대로 남긴다.
+type MyExclude<T, U> = T extends U ? never : T;
+
+type Colors = 'red' | 'green' | 'blue';
+
+type NotRed = MyExclude<Colors, 'red'>; // NotRed: 'green' | 'blue'
+```
+
+동작을 한 멤버씩 풀어 보면 이렇습니다. 유니온의 각 멤버가 분배되어 개별적으로 검사됩니다.
+
+- `'red' extends 'red'` → 참 → `never` (지워짐)
+- `'green' extends 'red'` → 거짓 → `'green'` (남음)
+- `'blue' extends 'red'` → 거짓 → `'blue'` (남음)
+
+결과를 다시 유니온으로 합치면 `never | 'green' | 'blue'`인데, [유니온에서 `never`는 흡수되어 사라지므로](/posts/frontend/ts-never-unknown) `'green' | 'blue'`만 남습니다. 이 `MyExclude`는 내장 `Exclude`와 완전히 같습니다. 방향을 뒤집어 "매칭되는 것만 남기면" 그대로 `Extract`가 됩니다.
+
+```typescript
+// 참 분기와 거짓 분기를 뒤집으면 Extract가 된다.
+type MyExtract<T, U> = T extends U ? T : never;
+
+type OnlyRed = MyExtract<Colors, 'red' | 'yellow'>; // OnlyRed: 'red'
+```
+
+### never는 왜 조용히 사라질까, 그리고 분배 끄기
+
+분배에는 초심자를 자주 무는 함정이 하나 있습니다. `never`를 벌거벗은 타입 파라미터로 넣으면, 결과가 **통째로 사라집니다**.
+
+```typescript
+// never는 '멤버가 0개인 유니온'이다. 분배할 멤버가 없으니 결과도 0개 → never.
+type A = ToArray<never>; // A: never  (never[]가 아니다!)
+```
+
+`never`는 값의 집합으로 보면 **빈 집합**입니다. 분배는 "멤버를 하나씩 돌리는" 동작인데 돌릴 멤버가 하나도 없으니, 결과 역시 텅 빈 채로 증발해 `never`가 됩니다. 그래서 "이 타입이 `never`인가?"를 판별하려고 순진하게 조건부를 쓰면 절대 참 분기를 타지 못합니다.
+
+```typescript
+// 함정: never를 넣으면 분배로 증발해 참/거짓 어느 쪽도 제대로 타지 못한다.
+type IsNeverWrong<T> = T extends never ? 'yes' : 'no';
+type W = IsNeverWrong<never>; // W: never  ('yes'도 'no'도 아니다!)
+```
+
+해결책이 앞에서 예고한 **분배 끄기**입니다. 타입 파라미터를 `[T]`처럼 튜플로 한 겹 감싸면, `T`가 더 이상 벌거벗은 상태가 아니게 되어 분배가 꺼집니다. 그러면 유니온(과 `never`)을 **한 덩어리로** 판정합니다.
+
+```typescript
+// [T]로 감싸 분배를 끈다. 이제 never도 하나의 타입으로 통째 비교된다.
+type IsNever<T> = [T] extends [never] ? 'yes' : 'no';
+type OK = IsNever<never>; // OK: 'yes'  (제대로 감지된다)
+```
+
+같은 입력이라도 분배 여부에 따라 결과가 확연히 달라지는 것을 표로 정리하면 이렇습니다.
+
+| 입력 | 분배 켜짐 `T extends U` | 분배 꺼짐 `[T] extends [U]` |
+| ---- | ---------------------- | -------------------------- |
+| `ToArray<string \| number>` | `string[] \| number[]` | `(string \| number)[]` |
+| `never` 감지 | `never` (감지 실패) | `'yes'` (감지 성공) |
+
+> 비슷한 함정이 `boolean`에도 있습니다. `boolean`은 내부적으로 `true | false` 유니온이라, `T extends true ? 'Y' : 'N'`에 `boolean`을 넣으면 한쪽이 아니라 `'Y' | 'N'` 양쪽이 모두 나옵니다. 정확히 `true` 하나만 걸러내려면 마찬가지로 `[T] extends [true]`로 분배를 꺼야 합니다.
+
+---
+
+## 정리
+
+이번 글에서는 조건부 타입과 infer로 내장 유틸리티 타입을 직접 만들어 보며, 타입이 어떻게 "계산"되는지 살펴봤습니다.
+
+| 개념 | 한 줄 요약 |
+| ---- | --------- |
+| 조건부 타입 `T extends U ? X : Y` | 타입 세계의 삼항 연산자. `extends`는 "할당 가능한가"를 묻는다 |
+| `infer` | `extends` 패턴에 구멍을 뚫어, 매칭된 자리의 타입을 이름 붙여 꺼낸다 |
+| `ReturnType` · `Parameters` | 함수 타입의 반환/인자 위치에 infer를 심어 뽑아낸다 |
+| `Awaited` | 재귀 조건부 타입으로 중첩 `Promise`를 끝까지 벗긴다 |
+| 분배 조건부 타입 | 벌거벗은 타입 파라미터에 유니온이 오면 멤버별로 적용 후 다시 합친다 |
+| `[T] extends [U]` | 튜플로 감싸 분배를 끄고, 유니온을 한 덩어리로 판정한다 |
+
+- 조건부 타입의 `extends`는 상속이 아니라 **좁은 타입 → 넓은 타입** 방향의 할당 가능성 판정입니다.
+- infer는 "구멍의 위치만 바꾸면" 반환·인자·요소·`Promise` 등 무엇이든 꺼내는 도구가 됩니다.
+- 유니온은 벌거벗은 타입 파라미터를 통해 들어올 때만 분배되며, `never`는 빈 유니온이라 분배 시 증발합니다.
+- 분배가 방해가 될 땐 `[T] extends [U]`로 끄고, 필요할 땐 그대로 활용합니다.
+
+## 마치며
+
+조건부 타입과 infer를 알기 전에는 `ReturnType<typeof fn>` 같은 코드가 컴파일러 내부의 블랙박스처럼 느껴졌습니다. 지금은 "함수 타입에서 반환 위치에 구멍을 뚫어 뽑는 세 줄짜리 조건부 타입"으로 읽힙니다. 타입도 결국 **입력을 받아 결과를 계산하는 작은 함수**라는 관점이 생기니, 라이브러리의 난해한 타입 정의를 읽는 것도 한결 덜 부담스러워졌습니다.
+
+[타입 좁히기 글](/posts/frontend/ts-type-narrowing)과 나란히 두면 대비가 재미있습니다. 값의 세계에서는 `if`와 `typeof`로 타입을 좁혀 나가고, 타입의 세계에서는 `extends`로 분기하고 infer로 꺼냅니다. 결이 닮은 두 도구를 양쪽에 하나씩 갖춘 셈입니다. 긴 글 읽어주셔서 감사합니다.
