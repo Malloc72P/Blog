@@ -3,7 +3,7 @@ import { frontmatter } from '@libs/frontmatter';
 export const metadata = frontmatter({
   title: 'package.json exports로 진입점 설계하기: 조건부 진입점과 서브패스, 그리고 내가 깨뜨린 것들',
   description:
-    'main 하나로 버티던 패키지에 exports를 도입하며 겪은 것들을 정리합니다. import/require/types 조건부 진입점, CSS·데이터 파일 서브패스, 패턴 서브패스의 확장자 함정까지 Node로 직접 확인한 결과를 담았습니다.',
+    'main 하나로 버티던 패키지에 exports를 도입하며 겪은 것들을 정리합니다. import/require/types 조건부 진입점, CSS·데이터 파일 서브패스, 패턴 서브패스의 확장자 함정까지 직접 재현해 확인한 결과를 담았습니다.',
   seriesId: 'frontend',
   postId: 'package-json-exports',
   tags: ['Node.js', 'package.json', 'exports', 'ESM', '라이브러리'],
@@ -14,7 +14,7 @@ export const metadata = frontmatter({
 
 그런데 컴포넌트와 함께 CSS 파일, 그리고 지도 데이터(GeoJSON)까지 같이 배포해야 하는 패키지를 만들면서 상황이 달라졌습니다. 소비하는 쪽에서 CSS를 못 불러오고, 타입은 잡혔다 안 잡혔다 하고, 어떤 경로는 되는데 어떤 경로는 "그런 건 없다"며 튕겼습니다. 원인은 하나였습니다. **패키지의 문을 어디까지 열어둘지 제대로 설계하지 않은 것**이었습니다.
 
-이번 글에서는 `exports` 필드로 진입점을 설계하는 방법을, 제가 실제로 깨뜨렸던 지점들과 함께 정리해 보겠습니다. 글에 나오는 동작은 모두 Node로 직접 확인한 결과입니다.
+이번 글에서는 `exports` 필드로 진입점을 설계하는 방법을, 제가 실제로 깨뜨렸던 지점들과 함께 정리해 보겠습니다. 글에 나오는 동작은 작은 패키지를 만들어 Node와 TypeScript로 하나씩 재현해 본 결과입니다.
 
 ---
 
@@ -222,6 +222,7 @@ import 'my-lib/styles.css';
 
 ```javascript
 // 'korea'가 *에 대입되어 ./dist/geojson/korea.json으로 해석된다.
+// (JSON을 가져올 때 붙이는 with 구문은 Node 22 기준입니다.)
 import data from 'my-lib/geojson/korea' with { type: 'json' };
 console.log(data.type); // 'FeatureCollection'
 ```
@@ -260,7 +261,7 @@ require.resolve('my-lib/geojson/korea.json');
 | 패턴 서브패스 | `*`에 대입되는 방식이라, 확장자를 어디에 둘지 일관되게 정해야 한다 |
 
 - `exports`는 진입점 설정이면서 동시에 **캡슐화 도구**입니다. 내부 파일을 잠가야 내부 구조를 바꿀 자유가 생깁니다.
-- 조건은 키 이름이 아니라 **적힌 순서**로 매칭됩니다. `types`는 맨 위, `default`는 맨 아래가 안전합니다.
+- 조건은 이름만 맞으면 되는 게 아니라, **적힌 순서**대로 훑어 처음 들어맞는 하나만 쓰입니다. `types`는 맨 위, `default`는 맨 아래가 안전합니다.
 - CSS나 데이터처럼 JS가 아닌 파일도 서브패스로 정식 진입점을 만들어 줄 수 있습니다.
 - 패턴 서브패스에서 확장자를 값 쪽에 숨기면, 소비자가 확장자를 붙이는 순간 `.json.json` 같은 경로가 만들어집니다.
 
