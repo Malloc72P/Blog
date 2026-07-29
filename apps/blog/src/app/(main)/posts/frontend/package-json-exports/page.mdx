@@ -1,0 +1,272 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'package.json exports로 진입점 설계하기: 조건부 진입점과 서브패스, 그리고 내가 깨뜨린 것들',
+  description:
+    'main 하나로 버티던 패키지에 exports를 도입하며 겪은 것들을 정리합니다. import/require/types 조건부 진입점, CSS·데이터 파일 서브패스, 패턴 서브패스의 확장자 함정까지 직접 재현해 확인한 결과를 담았습니다.',
+  seriesId: 'frontend',
+  postId: 'package-json-exports',
+  tags: ['Node.js', 'package.json', 'exports', 'ESM', '라이브러리'],
+  date: '2026-07-29 21:00',
+});
+
+라이브러리를 만들어 배포하기 전까지, 저에게 `package.json`의 진입점 설정은 `main` 필드 한 줄이 전부였습니다. 빌드 결과물 경로를 적어두면 다들 알아서 잘 가져다 썼으니까요.
+
+그런데 컴포넌트와 함께 CSS 파일, 그리고 지도 데이터(GeoJSON)까지 같이 배포해야 하는 패키지를 만들면서 상황이 달라졌습니다. 소비하는 쪽에서 CSS를 못 불러오고, 타입은 잡혔다 안 잡혔다 하고, 어떤 경로는 되는데 어떤 경로는 "그런 건 없다"며 튕겼습니다. 원인은 하나였습니다. **패키지의 문을 어디까지 열어둘지 제대로 설계하지 않은 것**이었습니다.
+
+이번 글에서는 `exports` 필드로 진입점을 설계하는 방법을, 제가 실제로 깨뜨렸던 지점들과 함께 정리해 보겠습니다. 글에 나오는 동작은 작은 패키지를 만들어 Node와 TypeScript로 하나씩 재현해 본 결과입니다.
+
+---
+
+## main만 있던 시절: 문을 다 열어둔 가게
+
+저는 패키지의 진입점 설정을 **가게의 진열대와 창고**에 비유하면 이해가 편했습니다. `main`은 "우리 가게 정문은 여기입니다"라고 간판을 다는 것에 가깝습니다. 문제는 간판만 달았을 뿐, **창고 문은 잠그지 않았다**는 점입니다.
+
+`main`만 있는 패키지를 하나 만들어 보겠습니다.
+
+```json
+{
+  "name": "my-lib",
+  "version": "1.0.0",
+  "main": "./dist/index.cjs"
+}
+```
+
+이 패키지를 소비하는 쪽에서, 안내한 적 없는 내부 파일을 직접 가져와 봅니다.
+
+```javascript
+// 정문으로 들어오기 — 의도한 사용법이다.
+const m = require('my-lib');
+console.log(m.flavor); // 'CommonJS 빌드'
+
+// 창고로 바로 들어오기 — 안내한 적 없는 내부 구현 파일이다.
+const internal = require('my-lib/src/internal.js');
+console.log(internal.secret); // '내부 구현입니다'  ← 그냥 통과된다
+```
+
+`main`에 적지 않은 경로인데도 아무 저항 없이 열립니다. `main`은 "기본 진입점이 무엇인지" 알려줄 뿐, **나머지 파일에 대한 접근을 막지는 않기** 때문입니다. 패키지 안의 모든 파일이 사실상 공개 API인 셈입니다.
+
+이게 왜 문제가 되냐면, 소비하는 쪽이 `my-lib/src/internal.js`에 의존하기 시작하는 순간 그 파일이 곧 계약이 되기 때문입니다. 내부 구조를 정리하려고 폴더 이름 하나만 바꿔도 남의 코드가 깨집니다. 리팩토링할 자유를 잃는 것입니다.
+
+---
+
+## exports를 켜는 순간, 나머지는 잠긴다
+
+`exports` 필드는 여기에 정반대의 규칙을 가져옵니다. **진열대에 올린 것만 팔고, 나머지는 창고에 넣고 잠그는 것**입니다.
+
+```json
+{
+  "name": "my-lib",
+  "version": "1.0.0",
+  "main": "./dist/index.cjs",
+  "exports": {
+    ".": "./dist/index.cjs"
+  }
+}
+```
+
+`"."`은 패키지 이름 자체(`my-lib`)로 들어오는 기본 진입점을 뜻합니다. 이제 아까와 똑같이 내부 파일을 가져와 보면 결과가 달라집니다.
+
+```javascript
+require('my-lib/src/internal.js');
+// Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: Package subpath './src/internal.js'
+// is not defined by "exports" in .../node_modules/my-lib/package.json
+```
+
+`exports`를 선언하는 순간, **거기 적히지 않은 모든 경로는 차단**됩니다. 파일이 실제로 존재하는지와 무관합니다. 디스크에 멀쩡히 있어도 진열대에 없으면 없는 것입니다.
+
+저는 이 성질을 "옵트인 방식의 캡슐화"로 이해했습니다. `main`이 "막지 않으면 다 열림"이었다면, `exports`는 "열지 않으면 다 막힘"입니다. 기본값이 반대로 뒤집힌 것이고, 덕분에 내부 구조를 마음 놓고 바꿀 수 있게 됩니다.
+
+> 한 가지 주의할 점은, 이 차단이 `package.json` 자신에게도 적용된다는 것입니다. `require('my-lib/package.json')`도 똑같이 `ERR_PACKAGE_PATH_NOT_EXPORTED`로 막힙니다. 패키지 버전을 읽어가는 도구들이 종종 이 경로를 쓰기 때문에, 필요하다면 `"./package.json": "./package.json"`을 명시적으로 열어줘야 합니다.
+
+[모노레포 글](/posts/frontend/monorepo)에서 "의존성 패키지의 파일이 노출되지 않을 때 `main`, `types`, `exports` 필드를 확인하라"고 적었던 적이 있는데, 그때 말한 상황이 정확히 이 차단입니다.
+
+---
+
+## 조건부 exports: 한 패키지, 여러 진입점
+
+여기서부터가 `exports`의 진짜 쓸모입니다. `exports`의 값에는 경로 문자열 대신 **객체**를 줄 수 있고, 그러면 "누가 어떻게 가져가느냐"에 따라 다른 파일을 내줄 수 있습니다. 같은 가게인데 손님에 따라 다른 진열대로 안내하는 셈입니다.
+
+```json
+{
+  "name": "my-lib",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  }
+}
+```
+
+`import`로 가져가면 ESM 빌드를, `require`로 가져가면 CommonJS 빌드를 내줍니다. 실제로 확인해 보면 이렇습니다.
+
+```javascript
+// ESM으로 가져간 경우
+import lib from 'my-lib';
+console.log(lib.flavor); // 'ESM 빌드'
+
+// CommonJS로 가져간 경우
+console.log(require('my-lib').flavor); // 'CommonJS 빌드'
+```
+
+한 패키지가 두 모듈 시스템을 동시에 지원하는, 이른바 **듀얼 패키지**가 이렇게 만들어집니다. [Jest 설정 글](/posts/frontend/jest-testing)에서 `"type": "module"` 하나 때문에 씨름했던 걸 떠올려 보면, 소비자마다 모듈 형식이 제각각인 현실에서 이 분기가 왜 필요한지 와닿습니다.
+
+### 조건은 위에서부터 순서대로 매칭된다
+
+여기서 처음 발을 헛디뎠습니다. 조건 이름들이 객체의 키라서 순서는 상관없을 거라 생각했는데, **완전히 틀렸습니다**. Node는 조건을 **적힌 순서대로 훑다가 처음 들어맞는 것 하나를 쓰고 멈춥니다.**
+
+`default`는 "아무 조건에나 들어맞는" 만능 키입니다. 이걸 맨 위에 두면 어떻게 될까요?
+
+```json
+{
+  "exports": {
+    ".": {
+      "default": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    }
+  }
+}
+```
+
+```javascript
+import lib from 'my-lib';
+console.log(lib.flavor); // 'CommonJS 빌드'  ← import인데 CJS가 나왔다
+```
+
+`import`로 가져왔는데도 CommonJS 빌드가 나옵니다. 위에 있는 `default`가 먼저 들어맞아 버렸고, 아래 `import`는 아예 읽히지도 않은 것입니다. **`default`는 항상 맨 마지막**에 두어야 하는 이유입니다.
+
+이 규칙을 한 줄로 정리하면 "구체적인 조건일수록 위로, 포괄적인 조건일수록 아래로"입니다.
+
+### types 조건을 맨 위에 두는 이유
+
+TypeScript용 `types` 조건에도 같은 순서 규칙이 적용됩니다. 그리고 이쪽 사고는 조금 더 조용히 일어납니다.
+
+`types`를 아래에 두고, `import`가 가리키는 `index.mjs` 옆에 낡은 선언 파일(`index.d.mts`)이 남아 있는 상황을 만들어 봤습니다.
+
+```json
+{
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    }
+  }
+}
+```
+
+```typescript
+import { flavor } from 'my-lib';
+const s: string = flavor;
+// error TS2322: Type 'number' is not assignable to type 'string'.
+```
+
+`types`에 적어둔 `index.d.ts`는 `flavor`를 `string`으로 선언하고 있는데, 실제로는 위에서 먼저 매칭된 `import` 조건 옆의 낡은 `index.d.mts`(`number` 선언)가 쓰였습니다. **어느 선언 파일이 이기는지를 조건의 순서가 결정한 것**입니다. `types`를 맨 위로 올리자 의도한 선언이 적용되고 에러도 사라졌습니다.
+
+```json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  }
+}
+```
+
+> 다만 "`types`를 위에 두지 않으면 무조건 타입을 못 찾는다"는 흔한 설명은 조금 거칠었습니다. 실제로 확인해 보니 TypeScript는 먼저 매칭된 조건에서 **선언 파일을 찾지 못하면 다음 조건으로 넘어가** 결국 `types`를 찾아냅니다. 그러니까 위 사고는 "타입을 못 찾아서"가 아니라 **"엉뚱한 선언 파일을 먼저 찾아서"** 생긴 것입니다. 어느 쪽이든 결론은 같습니다. 폴백에 기대지 말고 `types`를 맨 위에 두는 편이 안전합니다.
+
+---
+
+## 서브패스: CSS와 데이터 파일도 진입점이다
+
+패키지가 내보내는 것이 JavaScript뿐이라면 `"."` 하나로 충분합니다. 하지만 제가 만들던 패키지는 스타일시트와 GeoJSON 데이터도 함께 배포해야 했습니다. 이런 것들은 **서브패스(subpath)**로 따로 문을 내줍니다.
+
+```json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./styles.css": "./dist/styles.css"
+  }
+}
+```
+
+키가 소비자가 쓰는 경로, 값이 실제 파일 위치입니다. 이제 `my-lib/styles.css`로 스타일을 가져올 수 있습니다.
+
+```javascript
+// 소비하는 쪽에서 쓰는 경로
+import 'my-lib/styles.css';
+```
+
+여기서 눈여겨볼 점은 **바깥에 보여주는 경로와 내부 실제 경로를 분리**할 수 있다는 것입니다. 소비자는 `my-lib/styles.css`라는 깔끔한 경로만 알면 되고, 내부에서 `dist/`를 `build/`로 바꾸더라도 `exports`의 값만 고치면 소비자 코드는 그대로입니다. 진열대의 상품명과 창고의 선반 번호를 따로 관리하는 셈입니다.
+
+### 패턴 서브패스와 확장자 함정
+
+데이터 파일이 수십 개라면 하나씩 다 적을 수는 없습니다. 이럴 때 `*`를 쓰는 **패턴 서브패스**를 씁니다.
+
+```json
+{
+  "exports": {
+    "./geojson/*": "./dist/geojson/*.json"
+  }
+}
+```
+
+`*` 자리에 들어온 문자열이 그대로 값 쪽 `*`에 대입됩니다. 그래서 이렇게 동작합니다.
+
+```javascript
+// 'korea'가 *에 대입되어 ./dist/geojson/korea.json으로 해석된다.
+// (JSON을 가져올 때 붙이는 with 구문은 Node 22 기준입니다.)
+import data from 'my-lib/geojson/korea' with { type: 'json' };
+console.log(data.type); // 'FeatureCollection'
+```
+
+그런데 제가 여기서 두 번째로 발을 헛디뎠습니다. 값 쪽에 `.json`을 붙여뒀다는 사실을 잊고, 소비하는 쪽에서 습관대로 확장자를 붙여 적은 것입니다.
+
+```javascript
+require.resolve('my-lib/geojson/korea.json');
+// Error: Cannot find module '.../dist/geojson/korea.json.json'
+```
+
+`korea.json`이 통째로 `*`에 대입되면서 `korea.json.json`이라는 경로가 만들어졌습니다. 에러 메시지의 `.json.json`을 보고서야 원인을 알았습니다.
+
+이건 문법 오류가 아니라 **설계 선택의 문제**입니다. 두 방식 중 하나로 일관되게 정하면 됩니다.
+
+| 매핑 | 소비자가 쓰는 경로 | 특징 |
+| ---- | ----------------- | ---- |
+| `"./geojson/*": "./dist/geojson/*.json"` | `my-lib/geojson/korea` | 경로가 짧지만, 확장자를 붙이면 깨진다 |
+| `"./geojson/*": "./dist/geojson/*"` | `my-lib/geojson/korea.json` | 확장자를 그대로 쓰므로 에디터 자동완성과 잘 맞는다 |
+
+저는 두 번째를 택했습니다. 확장자가 드러나는 편이 소비자 입장에서 덜 헷갈리고, 무엇보다 에디터가 실제 파일명을 그대로 제안해 주기 때문입니다. 확장자를 감추는 첫 번째 방식은 짧아서 예뻐 보이지만, 자동완성이 만들어 준 경로가 오히려 깨지는 상황을 만듭니다.
+
+---
+
+## 정리
+
+이번 글에서는 `exports` 필드로 패키지의 진입점을 설계하는 과정을, 실제로 깨뜨렸던 지점들과 함께 정리했습니다.
+
+| 개념 | 한 줄 요약 |
+| ---- | --------- |
+| `main` | 기본 진입점만 안내한다. 나머지 파일은 막지 않는다 |
+| `exports` | 적어둔 경로만 열리고, 나머지는 전부 차단된다 |
+| 조건부 진입점 | `import`·`require`·`types`로 소비 방식에 따라 다른 파일을 내준다 |
+| 조건 순서 | 위에서부터 처음 들어맞는 하나만 쓰인다. `default`는 맨 아래 |
+| 서브패스 | 바깥에 보여줄 경로와 내부 실제 경로를 분리해 매핑한다 |
+| 패턴 서브패스 | `*`에 대입되는 방식이라, 확장자를 어디에 둘지 일관되게 정해야 한다 |
+
+- `exports`는 진입점 설정이면서 동시에 **캡슐화 도구**입니다. 내부 파일을 잠가야 내부 구조를 바꿀 자유가 생깁니다.
+- 조건은 이름만 맞으면 되는 게 아니라, **적힌 순서**대로 훑어 처음 들어맞는 하나만 쓰입니다. `types`는 맨 위, `default`는 맨 아래가 안전합니다.
+- CSS나 데이터처럼 JS가 아닌 파일도 서브패스로 정식 진입점을 만들어 줄 수 있습니다.
+- 패턴 서브패스에서 확장자를 값 쪽에 숨기면, 소비자가 확장자를 붙이는 순간 `.json.json` 같은 경로가 만들어집니다.
+
+## 마치며
+
+`exports`를 도입하기 전에는 패키지를 "파일을 담아 보내는 상자" 정도로 생각했습니다. 지금은 "무엇을 공개할지 내가 결정하는 인터페이스"에 가깝게 봅니다. 진열대에 올릴 것을 고르는 일이 곧 API를 설계하는 일이었던 셈입니다.
+
+그리고 이번에 확인하면서 얻은 게 하나 더 있습니다. "`types`를 맨 위에 둬라" 같은 규칙을 그대로 외워 쓰다가, 실제로 재현해 보니 이유가 제가 알던 것과 달랐습니다. 결론은 같아도 **왜 그런지를 직접 확인해 두면 다음에 비슷한 문제를 만났을 때 훨씬 빨리 원인을 찾게 됩니다.** 긴 글 읽어주셔서 감사합니다.
