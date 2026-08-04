@@ -32,17 +32,17 @@ DB도 그대로, Prisma 코드도 그대로였는데 실행 환경만 서버리�
 
 레스토랑에 비유하면 이렇습니다.
 상시 서버는 홀 하나에 웨이터 팀(풀) 하나를 두고 손님을 돌려가며 응대합니다.
-반면 서버리스는 손님이 몰리면 **손님마다 전용 주방을 통째로 하나씩 새로 짓는** 구조입니다. 주방마다 수도관(커넥션)을 따로 끌어오니, 손님이 늘수록 수도관이 기하급수로 늘어납니다.
+반면 서버리스는 손님이 몰리면 **손님마다 전용 주방을 통째로 하나씩 새로 짓는** 구조입니다. 주방마다 수도관(커넥션)을 따로 끌어오니, 손님이 늘수록 수도관도 그만큼 곧장 늘어납니다.
 
-수치로 보면 감이 더 확실합니다.
+수치로 보면 감이 더 잘 잡힙니다.
 
-- Prisma의 기본 커넥션 풀 크기는 `num_physical_cpus * 2 + 1`입니다. Lambda처럼 vCPU가 1\~2개인 작은 환경이면 인스턴스당 풀이 **3\~5개** 정도가 됩니다.
+- Prisma의 기본 커넥션 풀 크기는 `num_physical_cpus * 2 + 1`입니다(driver adapter 없이 쓰는 클래식 `PrismaClient` 기준). Lambda처럼 vCPU가 1\~2개인 작은 환경이면 인스턴스당 풀이 **3\~5개** 정도가 됩니다.
 - 여기서 트래픽이 몰려 **동시 실행 인스턴스가 200개**가 됐다고 해봅시다.
 - DB가 보는 커넥션은 `200 인스턴스 × 5 = 1000개`입니다.
 - 그런데 PostgreSQL의 기본 `max_connections`는 보통 **100** 언저리(그중 일부는 superuser 예약)입니다.
 
 결과는 뻔합니다. 100자리밖에 없는 주차장에 1000대가 몰려오니 `too many connections`로 거절당하는 거죠.
-핵심은 **인스턴스 수 × 인스턴스당 풀 크기**라는 곱셈이 서버리스에서 갑자기 폭발한다는 데 있습니다. 이 곱셈의 두 항을 각각 줄여 나가는 게 앞으로의 해결 순서입니다.
+핵심은 **인스턴스 수 × 인스턴스당 풀 크기**라는 곱셈이 서버리스에서 갑자기 폭발한다는 데 있습니다. 앞으로의 해결 순서는 이 곱셈의 두 항을 각각 줄이되, 그 사이에 곱셈 모델(`인스턴스 수 × 풀 크기`)이 실제로 성립하도록 클라이언트를 재사용하는 단계를 끼워 넣는 것입니다.
 
 ---
 
@@ -66,6 +66,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 ```
+
+**Prisma 7을 쓴다면 이 부분이 달라집니다.** Prisma 7부터는 관계형 DB도 [driver adapter](https://www.prisma.io/docs/orm/overview/databases/database-drivers)가 기본이라, `connection_limit` URL 파라미터가 사라지고 풀 크기를 어댑터 쪽에서 잡습니다. PostgreSQL이면 `@prisma/adapter-pg`의 `max`가 위 `connection_limit`에 해당하고, `PrismaClient`도 어댑터를 넘겨 만듭니다.
+
+```typescript
+// Prisma 7 + driver adapter
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+
+// connection_limit=1 대신 어댑터의 max로 풀 크기를 1로 잡는다.
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+  max: 1,
+});
+
+export const prisma = new PrismaClient({ adapter });
+```
+
+어댑터를 쓰면 기본 풀 크기도 앞서 본 `num_physical_cpus * 2 + 1`이 아니라 드라이버 기본값(pg는 10)을 따릅니다. 그러니 서버리스에서는 위처럼 `max`를 직접 낮춰 주는 게 중요합니다. 이어지는 예제들은 클래식 `PrismaClient`(v6 계열) 기준이며, Prisma 7에서는 `new PrismaClient()`를 `new PrismaClient({ adapter })`로 바꿔 읽으면 됩니다.
 
 여기서 "풀을 크게 잡아야 성능이 좋은 것 아닌가?" 하는 의문이 들 수 있습니다.
 맞습니다. 다만 그건 **상시 서버 이야기**입니다. 서버리스에서는 방향이 정반대인데, 이유는 실행 모델에 있습니다.
@@ -112,9 +130,12 @@ export const handler: APIGatewayProxyHandler = async () => {
 };
 ```
 
+위 `handler.ts`는 raw AWS Lambda 예시입니다. Next.js에는 이렇게 직접 작성하는 핸들러가 없는데, 여기서 말하는 '핸들러 바깥'은 Next.js에서는 **모듈 최상단**(예: `lib/prisma.ts`)에 해당합니다.
+모듈 최상단도 컨테이너가 뜰 때 한 번만 평가되므로, 바로 아래에서 볼 `globalThis` 싱글턴은 개발 중 HMR 누수를 막는 것을 넘어 프로덕션에서도 그대로 '핸들러 바깥 재사용' 역할을 합니다.
+
 한 가지 과장하지 말아야 할 점이 있습니다.
 핸들러 바깥 초기화가 재사용을 보장하는 건 **어디까지나 warm invocation에서**입니다.
-cold start는 정의상 새 컨테이너라서, cold start가 일어날 때마다 새 `PrismaClient`가 새로 생깁니다.
+cold start는 정의상 새 컨테이너라서, cold start가 일어날 때마다 `PrismaClient`가 새로 생깁니다.
 그러니 이 패턴은 "커넥션이 늘어나는 속도를 늦춰 주는" 것이지, 인스턴스 폭증 자체를 막아 주는 마법은 아닙니다. 그 부분은 3단계에서 다룹니다.
 
 ### 개발 중 HMR로 인한 클라이언트 누수 막기 (globalThis 패턴)
@@ -207,7 +228,7 @@ DB까지 Prisma가 관리해 주길 원한다면, 커넥션 풀링이 내장된 
 저도 처음엔 그렇게 했습니다. 그런데 이건 **서버리스에서 오히려 해로운** 처방입니다. 이유가 두 가지입니다.
 
 **첫째, 커넥션 재수립 비용이 큽니다.**
-DB 커넥션 하나를 여는 데는 TCP 핸드셰이크, TLS 협상, 인증 같은 과정이 매번 듭니다.
+DB 커넥션 하나를 여는 데는 TCP 핸드셰이크, TLS 협상, 인증 같은 과정을 매번 거쳐야 합니다.
 매 요청 끝에 `$disconnect()`로 닫아 버리면, 다음 요청은 warm invocation이라 컨테이너를 재사용할 수 있는데도 커넥션은 처음부터 다시 열어야 합니다. 애써 확보한 warm 재사용의 이점을 스스로 걷어차는 셈이죠.
 
 **둘째, freeze/thaw 모델과 정면으로 어긋납니다.**
@@ -219,7 +240,7 @@ DB 커넥션 하나를 여는 데는 TCP 핸드셰이크, TLS 협상, 인증 같
 freeze된 컨테이너가 플랫폼에 의해 회수될 때, 앱이 `$disconnect()`를 부를 기회 없이 사라지면 DB 쪽에는 잠깐 idle 커넥션이 남을 수 있습니다.
 하지만 이건 매 요청 `$disconnect()`로 풀 문제가 아니라, **DB나 풀러의 idle timeout에 맡길 문제**입니다.
 
-- PostgreSQL이라면 `idle_in_transaction_session_timeout` 같은 설정으로 방치된 커넥션을 서버가 알아서 정리하게 둡니다.
+- PostgreSQL 14 이상이라면 `idle_session_timeout` 설정으로 오래 놀고 있는 커넥션을 서버가 알아서 끊게 둘 수 있습니다. 이름이 비슷한 `idle_in_transaction_session_timeout`은 '열린 트랜잭션 안에서' idle인 세션만 끊으므로, 요청이 끝나 트랜잭션 밖에서 노는 이 좀비 커넥션에는 동작하지 않습니다.
 - PgBouncer 같은 풀러를 쓰면, 애초에 좀비 커넥션 관리 자체가 풀러의 몫이 됩니다. 앱은 풀러에만 붙으니 DB의 실제 커넥션은 풀러가 수명까지 책임집니다.
 
 정리하면, 매 요청 `$disconnect()`는 문제를 푸는 대신 재수립 비용만 얹습니다. 좀비 커넥션은 timeout과 풀러로 다루는 게 맞습니다.
