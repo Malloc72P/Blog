@@ -1,0 +1,271 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '서버리스 환경에서 Prisma 커넥션이 고갈되는 이유와 해결법',
+  description:
+    '람다 같은 서버리스에 Prisma를 올리면 트래픽이 몰릴 때 DB 커넥션이 폭발하는 이유를 메커니즘으로 풀고, connection_limit·클라이언트 재사용·외부 풀러로 이어지는 해결 순서를 정리합니다.',
+  seriesId: 'backend',
+  postId: 'serverless-prisma-connections',
+  tags: ['PrismaORM', '서버리스', 'DB', '커넥션풀', 'Lambda'],
+  date: '2026-07-23 21:00',
+});
+
+저는 로컬과 상시 서버(EC2)에서는 멀쩡히 돌던 Next.js 앱을 AWS Lambda로 옮겼다가, 트래픽이 조금 몰리자마자 `too many connections`로 API가 우수수 실패하는 걸 겪은 적이 있습니다.
+DB도 그대로, Prisma 코드도 그대로였는데 실행 환경만 서버리스로 바꿨더니 커넥션이 터진 겁니다.
+
+원인을 파고들어 보니, 이건 Prisma의 버그도 DB 설정 실수도 아니라 **서버리스라는 실행 모델과 커넥션 풀이 근본적으로 궁합이 안 맞아서** 생기는 문제였습니다.
+이번 포스트에서는 그 메커니즘을 먼저 분해하고, 제가 실제로 밟았던 해결 순서(`connection_limit` → 클라이언트 재사용 → 외부 풀러)를 코드와 함께 정리해 보겠습니다.
+
+---
+
+## 왜 서버리스에서 커넥션이 터지는가
+
+먼저 상시 서버와 서버리스가 커넥션을 어떻게 다루는지 비교해 보겠습니다.
+
+**상시 서버(EC2, 컨테이너)** 는 프로세스 하나가 오래 떠 있습니다.
+이 프로세스 안에 `PrismaClient` 인스턴스가 하나 있고, 그 밑에 **커넥션 풀**이 딱 하나 붙습니다.
+요청이 아무리 많이 들어와도 이 풀 안의 커넥션을 돌려쓰기 때문에, DB가 보는 커넥션 수는 "서버 대수 × 풀 크기" 정도로 예측 가능합니다.
+
+**서버리스(Lambda)** 는 이 전제가 통째로 무너집니다.
+서버리스 플랫폼은 동시에 들어온 요청을 처리하려고 **함수 인스턴스를 그때그때 여러 개 복제**합니다.
+문제는 이 인스턴스 하나하나가 **자기만의 `PrismaClient`와 자기만의 커넥션 풀**을 들고 있다는 점입니다.
+
+레스토랑에 비유하면 이렇습니다.
+상시 서버는 홀 하나에 웨이터 팀(풀) 하나를 두고 손님을 돌려가며 응대합니다.
+반면 서버리스는 손님이 몰리면 **손님마다 전용 주방을 통째로 하나씩 새로 짓는** 구조입니다. 주방마다 수도관(커넥션)을 따로 끌어오니, 손님이 늘수록 수도관도 그만큼 곧장 늘어납니다.
+
+수치로 보면 감이 더 잘 잡힙니다.
+
+- Prisma의 기본 커넥션 풀 크기는 `num_physical_cpus * 2 + 1`입니다(driver adapter 없이 쓰는 클래식 `PrismaClient` 기준). Lambda처럼 vCPU가 1\~2개인 작은 환경이면 인스턴스당 풀이 **3\~5개** 정도가 됩니다.
+- 여기서 트래픽이 몰려 **동시 실행 인스턴스가 200개**가 됐다고 해봅시다.
+- DB가 보는 커넥션은 `200 인스턴스 × 5 = 1000개`입니다.
+- 그런데 PostgreSQL의 기본 `max_connections`는 보통 **100** 언저리(그중 일부는 superuser 예약)입니다.
+
+결과는 뻔합니다. 100자리밖에 없는 주차장에 1000대가 몰려오니 `too many connections`로 거절당하는 거죠.
+핵심은 **인스턴스 수 × 인스턴스당 풀 크기**라는 곱셈이 서버리스에서 갑자기 폭발한다는 데 있습니다. 앞으로의 해결 순서는 이 곱셈의 두 항을 각각 줄이되, 그 사이에 곱셈 모델(`인스턴스 수 × 풀 크기`)이 실제로 성립하도록 클라이언트를 재사용하는 단계를 끼워 넣는 것입니다.
+
+---
+
+## 1단계: connection_limit 낮추기
+
+가장 먼저, 그리고 가장 손쉽게 할 수 있는 건 **인스턴스당 풀 크기를 줄이는** 것입니다.
+Prisma는 연결 문자열의 `connection_limit` 파라미터로 이 값을 조절합니다. 서버리스에서는 공식 문서도 **`connection_limit=1`부터 시작**하라고 권장합니다.
+
+```bash
+# .env
+# 커넥션 문자열 뒤에 ?connection_limit=1 을 붙인다
+DATABASE_URL="postgresql://user:password@db-host:5432/mydb?connection_limit=1"
+```
+
+스키마 쪽은 평소처럼 `env`로 URL만 읽어 오면 됩니다.
+
+```prisma
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+**Prisma 7을 쓴다면 이 부분이 달라집니다.** Prisma 7부터는 관계형 DB도 [driver adapter](https://www.prisma.io/docs/orm/overview/databases/database-drivers)가 기본이라, `connection_limit` URL 파라미터가 사라지고 풀 크기를 어댑터 쪽에서 잡습니다. PostgreSQL이면 `@prisma/adapter-pg`의 `max`가 위 `connection_limit`에 해당하고, `PrismaClient`도 어댑터를 넘겨 만듭니다.
+
+```typescript
+// Prisma 7 + driver adapter
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+
+// connection_limit=1 대신 어댑터의 max로 풀 크기를 1로 잡는다.
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+  max: 1,
+});
+
+export const prisma = new PrismaClient({ adapter });
+```
+
+어댑터를 쓰면 기본 풀 크기도 앞서 본 `num_physical_cpus * 2 + 1`이 아니라 드라이버 기본값(pg는 10)을 따릅니다. 그러니 서버리스에서는 위처럼 `max`를 직접 낮춰 주는 게 중요합니다. 이어지는 예제들은 클래식 `PrismaClient`(v6 계열) 기준이며, Prisma 7에서는 `new PrismaClient()`를 `new PrismaClient({ adapter })`로 바꿔 읽으면 됩니다.
+
+여기서 "풀을 크게 잡아야 성능이 좋은 것 아닌가?" 하는 의문이 들 수 있습니다.
+맞습니다. 다만 그건 **상시 서버 이야기**입니다. 서버리스에서는 방향이 정반대인데, 이유는 실행 모델에 있습니다.
+
+- **상시 서버**: 프로세스 하나가 **여러 요청을 동시에** 처리합니다. 그래서 풀을 넉넉히 잡아야 요청들이 커넥션을 나눠 쓰며 동시성을 확보합니다. 풀이 작으면 요청들이 커넥션을 기다리며 병목이 생기죠.
+- **서버리스**: 인스턴스 하나가 보통 **한 번에 요청 하나**만 처리합니다. 동시성은 인스턴스를 여러 개 띄우는 방식으로 이미 확보돼 있습니다. 그러니 인스턴스 안에서 커넥션을 2개, 5개씩 들고 있어 봐야 대부분 놀고 있을 뿐이고, 그만큼 곱셈의 값만 키웁니다.
+
+즉 서버리스에서는 **동시성을 인스턴스 개수로 조절**하고, 인스턴스 하나는 커넥션을 최소한(1개)만 쥐게 하는 편이 커넥션 총량 관점에서 유리합니다.
+앞의 예시에 적용하면 `200 × 5 = 1000`이 `200 × 1 = 200`으로 줄어듭니다. 아직 100을 넘지만, 5배 나아졌습니다.
+
+다만 `connection_limit=1`은 곱셈의 **한 항(풀 크기)** 만 1로 만든 것이라서, 인스턴스 수 자체가 계속 늘면 여전히 부족합니다. 그래서 다음 단계가 필요합니다.
+
+---
+
+## 2단계: 핸들러 바깥에서 클라이언트 재사용
+
+두 번째로 챙길 것은 **`PrismaClient`를 매 요청마다 새로 만들지 않는** 것입니다.
+이걸 이해하려면 서버리스의 cold start와 warm invocation을 먼저 알아야 합니다.
+
+- **cold start**: 요청을 처리할 인스턴스가 없어서 플랫폼이 실행 환경(컨테이너)을 **새로 띄우는** 경우입니다. 이때 핸들러 **바깥**에 있는 초기화 코드가 딱 한 번 실행됩니다(AWS Lambda의 INIT 단계).
+- **warm invocation**: 한 번 뜬 컨테이너는 요청이 끝나도 곧바로 사라지지 않고 **freeze(동결)** 됩니다. 다음 요청이 오면 이 컨테이너를 **thaw(해동)** 해서 재사용합니다. 이때 INIT 단계는 다시 돌지 않습니다.
+
+이 freeze/thaw 모델이 핵심입니다.
+핸들러 **바깥**에서 `PrismaClient`를 만들어 두면, cold start 때 한 번 생성된 클라이언트(와 그 커넥션)가 컨테이너에 얹혀 있다가, warm invocation에서 **그대로 재사용**됩니다.
+반대로 핸들러 **안**에서 `new PrismaClient()`를 부르면, warm 상태여도 매 요청마다 새 클라이언트와 새 풀이 생겨 커넥션이 줄줄 샙니다.
+
+```typescript
+// handler.ts
+import { PrismaClient } from '@prisma/client';
+import type { APIGatewayProxyHandler } from 'aws-lambda';
+
+// 핸들러 '바깥' = INIT 단계.
+// cold start 때 한 번만 실행되고, warm invocation에서는 이 인스턴스를 그대로 재사용한다.
+const prisma = new PrismaClient();
+
+export const handler: APIGatewayProxyHandler = async () => {
+  // 여기서 new PrismaClient()를 부르지 않는다.
+  const users = await prisma.user.findMany();
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify(users),
+  };
+};
+```
+
+위 `handler.ts`는 raw AWS Lambda 예시입니다. Next.js에는 이렇게 직접 작성하는 핸들러가 없는데, 여기서 말하는 '핸들러 바깥'은 Next.js에서는 **모듈 최상단**(예: `lib/prisma.ts`)에 해당합니다.
+모듈 최상단도 컨테이너가 뜰 때 한 번만 평가되므로, 바로 아래에서 볼 `globalThis` 싱글턴은 개발 중 HMR 누수를 막는 것을 넘어 프로덕션에서도 그대로 '핸들러 바깥 재사용' 역할을 합니다.
+
+한 가지 과장하지 말아야 할 점이 있습니다.
+핸들러 바깥 초기화가 재사용을 보장하는 건 **어디까지나 warm invocation에서**입니다.
+cold start는 정의상 새 컨테이너라서, cold start가 일어날 때마다 `PrismaClient`가 새로 생깁니다.
+그러니 이 패턴은 "커넥션이 늘어나는 속도를 늦춰 주는" 것이지, 인스턴스 폭증 자체를 막아 주는 마법은 아닙니다. 그 부분은 3단계에서 다룹니다.
+
+### 개발 중 HMR로 인한 클라이언트 누수 막기 (globalThis 패턴)
+
+Next.js를 로컬에서 개발할 때는 결이 조금 다른 문제가 하나 더 있습니다.
+개발 서버는 코드를 저장할 때마다 HMR(Hot Module Replacement)로 모듈을 다시 불러오는데, 그때마다 `new PrismaClient()`가 새로 실행되어 커넥션이 계속 쌓입니다.
+조금만 저장을 반복해도 개발 DB가 `too many connections`를 뱉는 걸 보게 되죠.
+
+Prisma가 권장하는 해법은 `globalThis`에 인스턴스를 한 번만 매달아 두고, 이미 있으면 그걸 재사용하는 싱글턴 패턴입니다.
+
+```typescript
+// lib/prisma.ts
+import { PrismaClient } from '@prisma/client';
+
+// globalThis는 HMR로 모듈이 다시 로드돼도 초기화되지 않는다.
+// any나 non-null 단언 없이 좁히기 위해 unknown을 한 번 거쳐 캐스팅한다.
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+// 프로덕션에서는 globalThis에 매달지 않는다(불필요한 전역 오염 방지).
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
+```
+
+`globalForPrisma.prisma`가 이미 있으면 그걸 쓰고, 없을 때만 새로 만듭니다.
+`globalThis`는 HMR로 모듈이 다시 로드돼도 살아남기 때문에, 몇 번을 저장해도 클라이언트는 하나로 유지됩니다.
+그리고 이 파일 하나만 만들어 두고 다른 곳에서는 전부 여기서 `prisma`를 import 하면, 앱 어디에서도 `PrismaClient`가 중복 생성되지 않습니다.
+
+---
+
+## 3단계: 외부 커넥션 풀러
+
+`connection_limit=1`로 풀 크기를 1까지 줄이고 클라이언트도 재사용하게 만들었는데도, **동시 실행 인스턴스 수 자체가 DB의 커넥션 상한을 넘길 만큼 많다면** 여전히 터집니다.
+앞의 예시에서 `200 × 1 = 200`이 여전히 100을 넘던 게 바로 이 경우입니다. 곱셈의 남은 한 항, 즉 인스턴스 수는 트래픽에 따라 우리가 통제하기 어렵죠.
+
+이걸 근본적으로 끊는 방법은 **앱과 DB 사이에 커넥션 풀러를 한 겹 두는** 것입니다.
+수많은 인스턴스가 DB에 직접 붙는 대신 풀러에 붙고, 풀러는 **소수의 커넥션만 DB와 유지하며 재활용**합니다. 인스턴스가 몇백 개로 불어나도 DB가 보는 커넥션은 풀러가 정한 상한 안에서만 움직이게 됩니다.
+
+### PgBouncer (transaction 모드)
+
+가장 널리 쓰이는 선택지는 [PgBouncer](https://www.pgbouncer.org/)입니다.
+단, Prisma와 함께 쓸 때는 반드시 **transaction 모드**로 둬야 합니다. Prisma Client가 정상 동작하려면 트랜잭션마다 커넥션을 배정하는 이 모드가 필요합니다.
+
+주의할 지점은 **prepared statement**입니다.
+Prisma는 내부적으로 named prepared statement를 쓰는데, transaction 모드 풀러와 충돌할 수 있습니다.
+과거에는 연결 문자열에 `?pgbouncer=true`를 붙여 Prisma가 prepared statement를 쓰지 않도록 우회했습니다.
+다만 PgBouncer 1.21.0부터는 prepared statement를 지원(`max_prepared_statements`를 0보다 크게 설정)하므로, Prisma 공식 문서는 **1.21.0 이상에서는 `pgbouncer=true`를 붙이지 말라**고 안내합니다. 쓰는 PgBouncer 버전에 따라 설정이 갈리니 버전부터 확인하세요.
+
+또 하나, Prisma Migrate 같은 CLI 작업은 스키마 엔진이 풀러를 거치면 안 되므로 **DB에 직접 붙는 별도 URL**이 필요합니다. 이건 `directUrl`로 분리합니다.
+
+```prisma
+// prisma/schema.prisma
+datasource db {
+  provider  = "postgresql"
+  // 앱(Prisma Client)은 PgBouncer를 통해 붙는다
+  url       = env("DATABASE_URL")
+  // Prisma Migrate/CLI는 풀러를 우회해 DB에 직접 붙는다
+  directUrl = env("DIRECT_URL")
+}
+```
+
+```bash
+# .env
+# 앱 런타임: PgBouncer(6432) 경유
+DATABASE_URL="postgresql://user:password@pgbouncer-host:6432/mydb?connection_limit=1"
+# 마이그레이션/CLI: DB(5432) 직접
+DIRECT_URL="postgresql://user:password@db-host:5432/mydb"
+```
+
+### 매니지드 풀러 (Prisma Accelerate, Prisma Postgres)
+
+PgBouncer를 직접 세우고 운영하는 게 부담이라면, Prisma가 제공하는 매니지드 풀링을 쓸 수 있습니다.
+
+여기서 버전 이야기를 짚고 갈 필요가 있습니다.
+예전 자료를 보면 **Prisma Data Proxy**가 자주 등장하는데, 이건 **2026년 5월에 종료**되었습니다. 지금 새로 도입한다면 Data Proxy는 선택지가 아닙니다.
+현재 Prisma의 매니지드 커넥션 풀링은 **Prisma Accelerate**입니다. Data Proxy를 대체하며 커넥션 풀링에 글로벌 쿼리 캐시까지 얹은 서비스죠.
+DB까지 Prisma가 관리해 주길 원한다면, 커넥션 풀링이 내장된 **Prisma Postgres**도 있습니다.
+
+이 매니지드 방식의 장점은 인프라를 직접 굴리지 않아도 서버리스에서 커넥션 관리가 해결된다는 점이고, 트레이드오프는 외부 서비스에 대한 의존과 비용입니다.
+
+---
+
+## 하지 말 것: 매 요청마다 $disconnect
+
+커넥션이 터지는 걸 보면 "요청이 끝날 때마다 `$disconnect()`로 깔끔하게 닫아 주면 되지 않나?" 하는 생각이 자연스럽게 듭니다.
+저도 처음엔 그렇게 했습니다. 그런데 이건 **서버리스에서 오히려 해로운** 처방입니다. 이유가 두 가지입니다.
+
+**첫째, 커넥션 재수립 비용이 큽니다.**
+DB 커넥션 하나를 여는 데는 TCP 핸드셰이크, TLS 협상, 인증 같은 과정을 매번 거쳐야 합니다.
+매 요청 끝에 `$disconnect()`로 닫아 버리면, 다음 요청은 warm invocation이라 컨테이너를 재사용할 수 있는데도 커넥션은 처음부터 다시 열어야 합니다. 애써 확보한 warm 재사용의 이점을 스스로 걷어차는 셈이죠.
+
+**둘째, freeze/thaw 모델과 정면으로 어긋납니다.**
+2단계에서 봤듯 서버리스 컨테이너는 요청이 끝나면 destroy되는 게 아니라 freeze됩니다.
+`$disconnect()`를 부르지 않으면 freeze된 컨테이너 안에 살아 있는 커넥션이 다음 thaw 때 그대로 재사용됩니다.
+그래서 Prisma 공식 문서도 **"장시간 실행되거나 서버리스인 앱에서는 매 요청마다 `$disconnect()`를 호출하지 말라"** 고 못 박습니다. 커넥션은 닫으라고 있는 게 아니라 재사용하라고 있는 겁니다.
+
+그럼 컨테이너가 결국 종료될 때 미처 닫지 못한 **좀비 커넥션**은 어떻게 하냐는 걱정이 남습니다.
+freeze된 컨테이너가 플랫폼에 의해 회수될 때, 앱이 `$disconnect()`를 부를 기회 없이 사라지면 DB 쪽에는 잠깐 idle 커넥션이 남을 수 있습니다.
+하지만 이건 매 요청 `$disconnect()`로 풀 문제가 아니라, **DB나 풀러의 idle timeout에 맡길 문제**입니다.
+
+- PostgreSQL 14 이상이라면 `idle_session_timeout` 설정으로 오래 놀고 있는 커넥션을 서버가 알아서 끊게 둘 수 있습니다. 이름이 비슷한 `idle_in_transaction_session_timeout`은 '열린 트랜잭션 안에서' idle인 세션만 끊으므로, 요청이 끝나 트랜잭션 밖에서 노는 이 좀비 커넥션에는 동작하지 않습니다.
+- PgBouncer 같은 풀러를 쓰면, 애초에 좀비 커넥션 관리 자체가 풀러의 몫이 됩니다. 앱은 풀러에만 붙으니 DB의 실제 커넥션은 풀러가 수명까지 책임집니다.
+
+정리하면, 매 요청 `$disconnect()`는 문제를 푸는 대신 재수립 비용만 얹습니다. 좀비 커넥션은 timeout과 풀러로 다루는 게 맞습니다.
+
+---
+
+## 정리
+
+서버리스에서 Prisma 커넥션이 터지는 건 **인스턴스 수 × 인스턴스당 풀 크기**라는 곱셈이 트래픽에 따라 폭발하기 때문입니다.
+해결은 이 곱셈의 두 항을 순서대로 줄여 나가는 과정이었습니다.
+
+- **1단계 (풀 크기 ↓)**: `connection_limit=1`로 인스턴스당 커넥션을 최소화한다. 서버 환경과 방향이 반대인 이유는 동시성을 인스턴스 개수로 확보하기 때문이다.
+- **2단계 (재사용)**: `PrismaClient`를 핸들러 바깥에서 만들어 warm invocation에서 재사용한다. 개발 중에는 `globalThis` 싱글턴으로 HMR 누수를 막는다. 단 cold start마다 새 인스턴스가 생기는 건 어쩔 수 없다.
+- **3단계 (인스턴스 수 ↓)**: 인스턴스가 아무리 늘어도 DB 커넥션은 외부 풀러가 상한 안에서 재활용하게 만든다.
+- **금기**: 매 요청 `$disconnect()`는 재수립 비용만 늘리고 freeze/thaw 재사용을 깨뜨린다. 좀비 커넥션은 idle timeout과 풀러에 맡긴다.
+
+어디까지 하면 되는지는 트래픽 규모와 DB 종류에 따라 다릅니다. 상황별로 정리하면 이렇습니다.
+
+| 상황 | 권장 구성 |
+| --- | --- |
+| 트래픽이 적고 간헐적 | `connection_limit=1` + 클라이언트 재사용만으로 충분한 경우가 많다 |
+| 동시성이 중간 이상, DB를 직접 운영 | PgBouncer(transaction 모드)를 앞에 두고 `directUrl` 분리 |
+| 운영 부담을 줄이고 싶을 때 | 매니지드 풀러(Prisma Accelerate) 또는 Prisma Postgres |
+
+제 경우 처음의 `too many connections`는 사실 1단계와 2단계만으로도 급한 불은 꺼졌고, 트래픽이 더 커지고 나서야 3단계 풀러를 도입했습니다.
+서버리스에 Prisma를 올릴 때 같은 함정에 빠진 분들에게 이 순서가 도움이 되면 좋겠습니다.
+
+긴 글 읽어주셔서 감사합니다.
