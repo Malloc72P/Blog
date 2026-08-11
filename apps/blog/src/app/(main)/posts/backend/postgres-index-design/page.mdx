@@ -1,0 +1,562 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'DESC 인덱스는 정말 더 빠를까: PostgreSQL 인덱스 설계를 500만 행으로 다시 재봤습니다',
+  description:
+    '예전 노트에 적어둔 “DESC 인덱스를 만들면 역순 스캔이 사라져 더 빠르다”는 설명이 맞는지 PostgreSQL 18에서 500만 행으로 직접 재봤습니다. 인덱스 방향과 커버링 인덱스가 각각 언제 값어치를 하는지 EXPLAIN ANALYZE로 확인한 기록입니다.',
+  seriesId: 'backend',
+  postId: 'postgres-index-design',
+  tags: ['PostgreSQL', 'DB', '인덱스', '쿼리최적화', 'EXPLAIN'],
+  date: '2026-08-11 21:00',
+});
+
+예전에 PostgreSQL 성능을 정리해 둔 노트에 이런 문장을 적어 놓았습니다.
+
+> PostgreSQL 인덱스는 기본적으로 ASC(오름차순)으로 생성되며, `DESC` 쿼리를 위해 역순으로 스캔합니다.
+> 명시적으로 `DESC` 인덱스를 생성하면, 인덱스 역순 스캔 대신 정방향 스캔이 되어 성능이 더 좋습니다.
+
+로그 테이블을 `ORDER BY timestamp DESC`로 조회하는 흔한 패턴을 정리하면서 적어 둔 메모였습니다.
+이번에 이 내용을 블로그로 옮기려다가, 문득 "정말 그런가?" 싶었습니다.
+역순으로 읽는 게 정말 더 느린 걸까요? 얼마나 느린 걸까요?
+
+그래서 docker로 PostgreSQL을 띄우고 500만 행을 넣어 직접 재봤습니다.
+**결론부터 말하면 제가 적어둔 문장은 틀렸습니다.** 단일 컬럼 정렬에서 인덱스 방향은 성능에 영향을 주지 않았습니다.
+그리고 재보는 김에 같이 확인한 커버링 인덱스도 알던 것과 조금 달랐습니다. 이쪽은 **효과가 있지만 조건이 붙고, 조건을 벗어나면 오히려 손해**였습니다.
+
+이 글은 그 측정 기록입니다.
+
+인덱스를 책 뒤에 붙은 **찾아보기(색인)** 라고 생각하면 이야기가 편해집니다.
+본문 500쪽을 다 넘기는 대신 색인에서 단어를 찾아 페이지 번호로 바로 뛰는 거죠.
+이 비유를 끝까지 끌고 가면서, 색인을 **뒤에서부터 읽으면 느린지**, 색인에 **내용까지 적어 두면 이득인지**를 차례로 확인해 보겠습니다.
+
+---
+
+## 측정 환경 만들기
+
+먼저 재현 가능한 환경부터 만들었습니다. docker로 PostgreSQL 18을 띄우고, 로그성 테이블에 500만 행을 넣습니다.
+
+```bash
+docker run -d --name pg-index-bench \
+  -e POSTGRES_PASSWORD=bench -e POSTGRES_DB=bench \
+  -p 55432:5432 postgres:18
+```
+
+테이블은 로그 데이터를 흉내 냈습니다. 6초 간격으로 500만 건이면 대략 1년 치입니다.
+
+```sql
+CREATE TABLE log_data (
+  id      bigserial PRIMARY KEY,
+  ts      timestamptz NOT NULL,
+  level   text NOT NULL,
+  service text NOT NULL,
+  message text NOT NULL
+);
+
+INSERT INTO log_data (ts, level, service, message)
+SELECT
+  timestamptz '2025-01-01 00:00:00+00' + (i * interval '6 seconds'),
+  (ARRAY['DEBUG','INFO','WARN','ERROR'])[1 + (i % 4)],
+  (ARRAY['api','worker','scheduler','gateway'])[1 + (i % 4)],
+  md5(i::text) || repeat('.', 80)
+FROM generate_series(1, 5000000) i;
+
+VACUUM ANALYZE log_data;
+
+SELECT count(*), pg_size_pretty(pg_total_relation_size('log_data')) FROM log_data;
+```
+
+적재 결과는 **500만 행**, 테이블과 PK 인덱스를 합쳐 **939MB**입니다.
+(`pg_total_relation_size`는 힙뿐 아니라 딸린 인덱스까지 더한 값이라, 이 시점에는 `log_data_pkey`가 함께 잡혀 있습니다.)
+
+측정에서 제일 신경 쓴 건 **한 번만 재고 결론 내리지 않는 것**이었습니다.
+`EXPLAIN ANALYZE`를 한 번 돌린 값은 캐시 상태에 따라 두 배씩 튑니다.
+실제로 이번 측정에서도 단발 실행으로는 앞뒤가 뒤집히는 구간이 있었습니다.
+그래서 같은 쿼리를 여러 번 돌려 **중앙값**을 보는 함수를 하나 만들어 썼습니다.
+
+```sql
+-- 같은 쿼리를 n회 실행해 실행시간 분포를 돌려준다.
+-- EXPLAIN ANALYZE의 "Execution Time"만 뽑아 쓰므로 클라이언트 왕복 시간은 빠진다.
+CREATE OR REPLACE FUNCTION bench(q text, n int DEFAULT 10)
+RETURNS TABLE(runs int, min_ms numeric, med_ms numeric, max_ms numeric) AS $$
+DECLARE
+  j json;
+  times numeric[] := '{}';
+BEGIN
+  FOR i IN 1..n LOOP
+    EXECUTE 'EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ' || q INTO j;
+    times := array_append(times, (j->0->>'Execution Time')::numeric);
+  END LOOP;
+  RETURN QUERY
+  SELECT n,
+         round(min(x)::numeric, 2),
+         round(percentile_cont(0.5) WITHIN GROUP (ORDER BY x)::numeric, 2),
+         round(max(x)::numeric, 2)
+  FROM unnest(times) x;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+이제 `SELECT * FROM bench('SELECT ...', 20)` 한 줄로 20회 반복 측정이 됩니다.
+
+---
+
+## 먼저 확인: 인덱스는 확실히 효과가 있다
+
+본론에 들어가기 전에 기준선부터 잡았습니다. 인덱스가 아예 없을 때입니다.
+
+```sql
+SELECT * FROM log_data ORDER BY ts DESC LIMIT 1000;
+```
+
+```text
+Limit  (actual time=474.719..486.259 rows=1000.00 loops=1)
+  ->  Gather Merge  (actual time=471.228..482.724 rows=1000.00 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        ->  Sort  (actual time=458.305..458.327 rows=547.00 loops=3)
+              Sort Key: ts DESC
+              Sort Method: top-N heapsort  Memory: 564kB
+              ->  Parallel Seq Scan on log_data  (actual time=0.378..217.953 rows=1666666.67 loops=3)
+Execution Time: 525.450 ms
+```
+
+**중앙값 412.52ms.** 1000행만 필요한데 500만 행을 전부 훑고(`Parallel Seq Scan`) 정렬합니다(`top-N heapsort`).
+색인 없이 책을 처음부터 끝까지 넘기는 거죠.
+
+여기에 인덱스를 하나 만들면 이렇게 바뀝니다.
+
+```sql
+CREATE INDEX idx_asc ON log_data (ts);
+```
+
+**중앙값 0.13ms.** 412ms에서 0.13ms, 약 **3,000배**입니다.
+여기까지는 예상대로였습니다. 문제는 다음부터입니다.
+
+---
+
+## 본론: DESC 인덱스는 정말 더 빠른가
+
+이제 제 노트가 주장하던 걸 확인할 차례입니다.
+같은 쿼리를 **ASC 인덱스**와 **DESC 인덱스**에서 각각 20회씩 돌렸습니다.
+
+먼저 `(ts)` — 평범한 오름차순 인덱스입니다.
+
+```text
+--- ASC 인덱스 (ts) ---
+Limit  (cost=0.43..47.68 rows=1000 width=141) (actual time=0.102..0.335 rows=1000.00 loops=1)
+  Buffers: shared hit=22 read=6
+  ->  Index Scan Backward using idx_asc on log_data
+        (cost=0.43..236238.45 rows=5000001 width=141) (actual time=0.102..0.294 rows=1000.00 loops=1)
+Execution Time: 0.387 ms
+
+ runs | min_ms | med_ms | max_ms
+------+--------+--------+--------
+   20 |   0.12 |   0.13 |   0.31
+```
+
+노트에 적힌 대로 `Index Scan Backward`, 즉 역방향 스캔이 잡혔습니다. 여기까진 맞았습니다.
+
+다음은 `(ts DESC)` — 노트가 권하던 내림차순 인덱스입니다.
+
+```text
+--- DESC 인덱스 (ts DESC) ---
+Limit  (cost=0.43..47.68 rows=1000 width=141) (actual time=0.115..0.316 rows=1000.00 loops=1)
+  Buffers: shared hit=22 read=5
+  ->  Index Scan using idx_desc on log_data
+        (cost=0.43..236238.39 rows=4999997 width=141) (actual time=0.115..0.266 rows=1000.00 loops=1)
+Execution Time: 0.371 ms
+
+ runs | min_ms | med_ms | max_ms
+------+--------+--------+--------
+   20 |   0.12 |   0.12 |   0.20
+```
+
+`Backward`가 사라지고 정방향 `Index Scan`이 됐습니다. 노트가 말한 그대로입니다.
+그런데 **0.13ms와 0.12ms.** 최솟값은 0.12ms로 아예 같습니다.
+읽은 버퍼도 28개와 27개로 사실상 동일합니다.
+
+더 결정적인 건 **비용 추정치**입니다. 두 계획 모두 `cost=0.43..47.68`로 **소수점까지 완전히 같습니다.**
+플래너 자신이 역방향 스캔과 정방향 스캔을 같은 비용으로 취급하고 있다는 뜻입니다.
+
+인덱스 크기도 봤는데, 이것도 같았습니다.
+
+```text
+ indexrelname | size
+--------------+--------
+ idx_asc      | 107 MB
+ idx_desc     | 107 MB
+```
+
+### 왜 차이가 없을까
+
+PostgreSQL의 B-tree 인덱스는 **리프 페이지들이 양쪽으로 연결되어 있습니다.**
+각 리프 페이지가 오른쪽 형제뿐 아니라 왼쪽 형제 포인터도 들고 있어서, 뒤에서부터 읽는 것도 앞에서부터 읽는 것과 똑같이 "포인터를 따라 페이지를 한 장씩 넘기는" 작업입니다.
+
+색인 비유로 돌아가면 이렇습니다.
+책 뒤 찾아보기를 마지막 장부터 거꾸로 넘긴다고 해서, 첫 장부터 넘길 때보다 힘든 게 아닙니다.
+넘기는 방향만 반대일 뿐 페이지 수는 같습니다.
+`DESC` 인덱스를 새로 만드는 건 **똑같은 색인을 역순으로 한 부 더 인쇄해서 책에 끼워 넣는 것**에 가깝습니다. 107MB를 더 쓰고 얻는 게 없습니다.
+
+### 많이 읽을 때는 다르지 않을까
+
+역방향 스캔이 불리하다는 이야기에는 나름의 근거가 있습니다.
+정방향 순차 읽기는 OS나 스토리지의 **미리 읽기(read-ahead)** 혜택을 받지만 역방향은 그러기 어렵다는 겁니다.
+1000행만 읽어서는 이 차이가 드러나지 않을 수 있으니, `LIMIT`을 50만으로 올려 30회씩 다시 재봤습니다.
+
+```text
+--- LIMIT 500000, 30회 반복 ---
+ASC 인덱스 (역방향)  : min 62.06 / med 66.52 / max  83.88
+DESC 인덱스 (정방향) : min 64.74 / med 67.21 / max  98.63
+
+--- 인덱스를 새로 만들고 VACUUM 후 한 번 더 ---
+ASC 인덱스 (역방향)  : min 64.86 / med  72.24 / max  87.15
+DESC 인덱스 (정방향) : min 71.41 / med  97.78 / max 194.75
+```
+
+50만 행을 훑어도 차이가 없습니다. 그뿐 아니라 **두 라운드 모두 역방향이 근소하게 빨랐습니다.**
+물론 이걸 두고 "역방향이 더 빠르다"고 말할 생각은 없습니다. 편차 안에 묻히는 수준이니까요.
+말할 수 있는 건 하나입니다. **역방향 스캔에 눈에 띄는 손해는 없었습니다.**
+
+한 가지 정직하게 덧붙이면, 이 측정은 테이블과 인덱스를 합쳐 1GB 남짓 되는 데이터가 대부분 메모리에 올라온 상태에서 이뤄졌습니다.
+디스크에서 매번 읽어야 하는 환경이라면 미리 읽기 이야기가 더 유효할 수 있습니다.
+다만 그렇더라도 **인덱스를 하나 더 만들 만한 이유는 되지 못한다**는 게 제 결론입니다.
+인덱스 유무가 3,000배를 만드는 동안, 방향 차이는 두 라운드 모두 측정 편차 안에 머물렀으니까요.
+
+---
+
+## 그럼 DESC 인덱스는 언제 필요한가
+
+여기서 그만두면 "인덱스 방향은 신경 쓸 필요 없다"가 되는데, 그것도 사실이 아닙니다.
+`DESC`를 명시해야만 하는 경우가 분명히 있습니다. **정렬 방향이 섞일 때**입니다.
+
+로그를 서비스별로 묶고, 각 서비스 안에서는 최신순으로 보고 싶다고 해봅시다.
+
+```sql
+SELECT * FROM log_data ORDER BY service ASC, ts DESC LIMIT 1000;
+```
+
+`service`는 오름차순, `ts`는 내림차순입니다. 먼저 평범한 복합 인덱스를 만들어 봤습니다.
+
+```sql
+CREATE INDEX idx_mixed_plain ON log_data (service, ts);
+```
+
+```text
+Limit  (cost=165029.96..165249.01 rows=1000) (actual time=548.504..553.979 rows=1000.00 loops=1)
+  Buffers: shared hit=4422 read=111180 written=248
+  ->  Gather Merge
+        Workers Planned: 2
+        Workers Launched: 2
+        ->  Incremental Sort  (actual time=534.359..534.400 rows=550.00 loops=3)
+              Sort Key: service, ts DESC
+              Presorted Key: service
+              Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 41kB
+              Pre-sorted Groups: 1  Sort Method: top-N heapsort  Average Memory: 564kB
+              ->  Parallel Index Scan using idx_mixed_plain on log_data
+                    (actual time=0.094..435.165 rows=416667.67 loops=3)
+Execution Time: 573.375 ms
+
+ runs | min_ms | med_ms | max_ms
+------+--------+--------+--------
+   10 | 318.60 | 377.88 | 569.01
+```
+
+**중앙값 377.88ms.** 계획을 보면 무슨 일이 벌어졌는지 그대로 나옵니다.
+
+`Presorted Key: service` — 인덱스 덕분에 `service`까지는 정렬이 맞습니다.
+하지만 그 안의 `ts DESC`는 맞지 않아서 `Incremental Sort`가 붙었습니다.
+그리고 `rows=416667.67 loops=3`, 워커 2개와 리더까지 세 프로세스가 각각 41만여 행씩 합쳐 **125만 행을 읽었습니다.** 1000행이 필요한데요.
+각 `service` 그룹을 통째로 읽어서 그 안에서 다시 정렬해야 하니 `LIMIT`이 먹히지 않은 겁니다.
+
+이번엔 방향을 맞춘 인덱스를 만들어 봅니다.
+
+```sql
+CREATE INDEX idx_mixed_desc ON log_data (service ASC, ts DESC);
+```
+
+```text
+Limit  (cost=0.43..114.87 rows=1000 width=141) (actual time=0.060..0.547 rows=1000.00 loops=1)
+  Buffers: shared hit=86 read=6
+  ->  Index Scan using idx_mixed_desc on log_data
+        (actual time=0.059..0.506 rows=1000.00 loops=1)
+Execution Time: 0.612 ms
+
+ runs | min_ms | med_ms | max_ms
+------+--------+--------+--------
+   10 |   0.13 |   0.23 |   0.34
+```
+
+`Sort`가 통째로 사라지고 순수 `Index Scan`이 됐습니다. **377.88ms에서 0.23ms, 약 1,600배입니다.**
+
+### 단일 컬럼과 무엇이 다른가
+
+앞에서 단일 컬럼일 때는 방향이 무의미했는데 왜 여기서는 결정적일까요.
+**인덱스를 뒤집어 읽는 것으로 만들 수 있는 순서가 무엇인지** 생각해 보면 답이 나옵니다.
+
+`(service, ts)` 인덱스를 읽는 방법은 두 가지뿐입니다.
+
+- 정방향으로 읽으면 `service ASC, ts ASC`
+- 역방향으로 읽으면 `service DESC, ts DESC`
+
+역방향으로 읽으면 **두 컬럼이 같이 뒤집힙니다.** 한쪽만 뒤집을 수는 없습니다.
+그래서 `service` 값이 여러 개 섞여 나오는 한, `service ASC, ts DESC`는 이 인덱스를 어떻게 읽어도 만들 수 없는 순서입니다.
+
+여기서 한 가지 단서를 붙여야 합니다. `WHERE service = 'api'`처럼 **선행 컬럼이 한 값으로 고정되면 이야기가 달라집니다.**
+그때는 플래너가 `service`를 상수로 보고 정렬 조건에서 지워 버리기 때문에, 요구 사항이 사실상 `ts DESC` 하나로 줄어 역방향 스캔만으로 끝납니다.
+복합 인덱스의 방향이 문제가 되는 건 선행 컬럼이 실제로 여러 값을 오갈 때입니다.
+
+단일 컬럼일 때 방향이 무의미했던 것도 같은 이유입니다.
+컬럼이 하나뿐이면 "전체를 뒤집는" 것만으로 원하는 순서가 나오니까요.
+**뒤집기로 만들 수 있으면 방향은 공짜고, 만들 수 없으면 인덱스를 새로 만들어야 합니다.**
+
+### 단일 컬럼에도 예외가 하나 있다
+
+"컬럼이 하나면 방향은 공짜"라고 했는데, 여기에는 예외가 있습니다.
+인덱스를 뒤집으면 정렬 방향만이 아니라 **NULL의 위치도 같이 뒤집히기** 때문입니다.
+
+PostgreSQL에서 `(ts)`는 사실 `(ts ASC NULLS LAST)`입니다. 이걸 역방향으로 읽으면 `ts DESC NULLS FIRST`만 나옵니다.
+그래서 `ORDER BY ts DESC`는 되지만 `ORDER BY ts DESC NULLS LAST`는 안 됩니다.
+
+```text
+-- (ts) 인덱스에서 ORDER BY ts DESC
+Limit
+  ->  Index Only Scan Backward using idx_asc on log_data
+
+-- (ts) 인덱스에서 ORDER BY ts DESC NULLS LAST
+Limit
+  ->  Gather Merge
+        Workers Planned: 2
+        ->  Sort
+              Sort Key: ts DESC NULLS LAST
+              ->  Parallel Index Only Scan using idx_asc on log_data
+```
+
+컬럼이 하나뿐인데도 전체 `Sort`가 붙었습니다.
+더 인상적인 건 이 `ts` 컬럼이 **`NOT NULL`이라는 점**입니다. NULL이 한 건도 들어갈 수 없는데도 플래너는 봐주지 않습니다.
+이때는 방향을 맞춘 인덱스가 실제로 필요합니다.
+
+```text
+-- (ts DESC NULLS LAST) 인덱스를 만들면
+Limit
+  ->  Index Only Scan using idx_desc_nl on log_data
+```
+
+결국 "뒤집기로 만들 수 있는가"라는 기준은 그대로인데, **뒤집기가 방향과 NULL 위치를 한 묶음으로 뒤집는다**는 걸 같이 봐야 정확합니다.
+
+색인 비유로 하면, 찾아보기를 거꾸로 넘기는 건 되지만 "회사 이름은 가나다순, 그 안에서 날짜는 최신순"으로 정렬된 색인은 거꾸로 넘기기로는 못 만듭니다. 그건 그렇게 인쇄된 색인이 따로 있어야 합니다.
+
+---
+
+## 커버링 인덱스: 맞았지만 조건이 붙는다
+
+노트의 두 번째 항목은 커버링 인덱스였습니다.
+`INCLUDE`로 조회할 컬럼을 인덱스에 넣어 두면 테이블(힙)을 건드리지 않고 인덱스만 읽고 끝낼 수 있다는 내용입니다.
+색인 비유로는, 색인에 페이지 번호만 적는 대신 **찾는 내용의 요약까지 적어 두는 것**입니다. 본문을 펼칠 필요가 없어지죠.
+
+이건 맞았습니다. 다만 **언제 이득인지**가 노트에 빠져 있었습니다.
+
+먼저 1000행만 읽는 경우입니다.
+
+```sql
+SELECT ts, level, service FROM log_data ORDER BY ts DESC LIMIT 1000;
+```
+
+```text
+일반 인덱스 (ts DESC)                        : med 0.14ms
+커버링 인덱스 (ts DESC) INCLUDE (level, service) : med 0.11ms
+```
+
+**0.14ms에서 0.11ms.** 방향은 맞지만 크기가 미미합니다. 이 정도로는 107MB를 더 쓸 이유가 되기 어렵습니다.
+
+그래서 읽는 양을 늘려 봤습니다. 특정 시점 이후 20만 행을 반환하는 쿼리입니다.
+
+```sql
+SELECT ts, level, service FROM log_data
+WHERE ts >= timestamptz '2025-06-01+00'
+ORDER BY ts DESC LIMIT 200000;
+```
+
+```text
+--- 일반 DESC 인덱스 ---
+Limit  (cost=0.43..10090.81 rows=200000) (actual time=0.137..46.701 rows=200000.00 loops=1)
+  Buffers: shared hit=4258 read=549
+  ->  Index Scan using idx_desc on log_data
+Execution Time: 51.209 ms
+med 32.20ms
+
+--- 커버링 인덱스 ---
+Limit  (cost=0.43..7461.46 rows=200000) (actual time=0.076..27.374 rows=200000.00 loops=1)
+  Buffers: shared hit=1 read=988
+  ->  Index Only Scan using idx_covering on log_data
+        Heap Fetches: 0
+Execution Time: 31.727 ms
+med 21.22ms
+```
+
+여기서는 확실합니다. **32.20ms에서 21.22ms로 약 34% 빨라졌습니다.**
+
+더 눈여겨볼 건 시간이 아니라 `Buffers`입니다.
+**4,807개에서 989개로 약 5분의 1**이 됐습니다.
+`Index Scan`은 인덱스에서 찾은 20만 개의 위치로 힙 페이지를 하나씩 찾아가야 하는데, `Index Only Scan`은 인덱스 페이지만 순서대로 읽고 끝납니다. `Heap Fetches: 0`이 그 증거입니다.
+
+즉 커버링 인덱스의 이득은 **읽는 행 수에 비례해서 커집니다.** 1000행에서는 아낄 힙 접근 자체가 얼마 없었던 거죠.
+
+### SELECT * 를 쓰면 무력화된다
+
+한 가지 확인해 볼 게 있습니다. `INCLUDE`에 넣지 않은 컬럼을 조회하면 어떻게 될까요.
+
+```text
+SELECT * FROM log_data ORDER BY ts DESC LIMIT 1000;
+->  Index Scan using idx_covering on log_data
+```
+
+`Index Only Scan`이 아니라 그냥 `Index Scan`으로 강등됩니다.
+`message` 컬럼이 인덱스에 없으니 결국 힙에 가야 하고, 커버링 인덱스를 만든 의미가 사라집니다.
+
+노트에 "필요한 컬럼만 SELECT" 항목이 따로 있었는데, 사실 이건 별개의 팁이 아니라 **커버링 인덱스가 동작하기 위한 전제 조건**이었습니다.
+
+---
+
+## 커버링 인덱스가 오히려 손해인 경우
+
+여기까지는 "조건만 맞으면 이득"이라는 이야기였습니다. 그런데 조건을 벗어나면 손해가 납니다.
+저도 이 부분은 예상하지 못했습니다.
+
+집계 쿼리를 재봤을 때입니다.
+
+```sql
+SELECT count(*) FROM log_data WHERE ts >= timestamptz '2025-06-01+00';
+```
+
+```text
+--- 일반 DESC 인덱스 ---
+->  Parallel Index Only Scan using idx_desc on log_data
+      Heap Fetches: 0
+      Buffers: shared hit=9 read=7723
+med 71.53ms
+
+--- 커버링 인덱스 ---
+->  Parallel Index Only Scan using idx_covering on log_data
+      Heap Fetches: 0
+      Buffers: shared hit=9 read=13922
+med 80.52ms
+```
+
+**커버링 인덱스 쪽이 더 느립니다.** 71.53ms에서 80.52ms입니다.
+
+이유는 `Buffers`에 그대로 나옵니다. 읽은 페이지가 **7,723개에서 13,922개로 거의 두 배**입니다.
+`count(*)`는 컬럼 값 자체가 필요 없어서 일반 인덱스로도 `Index Only Scan`이 잡힙니다(측정 직전 `VACUUM`을 돌려 `Heap Fetches: 0`인 상태입니다).
+`INCLUDE`로 붙인 `level`, `service` 컬럼은 이 쿼리에 아무 도움이 안 되면서, 인덱스만 **107MB에서 193MB로** 불려 놓았습니다.
+읽을 페이지가 늘었으니 느려지는 게 당연합니다.
+
+쓰기 비용도 재봤습니다. 10만 건을 INSERT 하는 시간입니다.
+
+```text
+인덱스 없음 (PK만)  : med 155.66ms
+일반 DESC 인덱스    : med 222.52ms  (+43%)
+커버링 인덱스       : med 276.81ms  (+78%)
+```
+
+커버링 인덱스는 이 측정에서 쓰기를 **78% 느리게** 만들었습니다. 인덱스에 넣은 컬럼이 늘었으니 매 INSERT마다 기록할 것도 늘어난 겁니다.
+
+다만 이 숫자는 앞의 것들보다 느슨하게 봐야 합니다.
+각 3회 중앙값인 데다, 세 조건을 순서대로 재느라 매 실행이 10만 행을 실제로 남겨서 뒤로 갈수록 테이블이 커진 상태(500만 행 → 590만 행)에서 측정됐습니다.
+쓰기가 느려지는 방향은 분명하지만, 43%와 78%라는 폭 자체를 그대로 옮겨 쓸 값은 아닙니다.
+
+색인 비유가 여기서도 들어맞습니다.
+색인에 요약을 적어 두면 찾을 때는 편하지만, 색인 자체가 두꺼워집니다.
+색인을 통째로 훑어야 하는 일(집계)에서는 두꺼운 색인이 그대로 손해고, 책 내용이 바뀔 때마다(쓰기) 고쳐 적을 곳도 많아집니다.
+
+---
+
+## 함정: VACUUM 없이는 Index Only Scan이 아니다
+
+마지막으로 실무에서 걸리기 쉬운 지점을 하나 확인했습니다.
+`Index Only Scan`이라는 이름과 달리, 이 스캔은 **조건이 맞지 않으면 힙을 다시 읽습니다.**
+
+PostgreSQL의 인덱스는 각 행이 현재 트랜잭션에서 보여도 되는지(가시성)를 저장하지 않습니다.
+그래서 인덱스만 읽고 끝내려면 "이 페이지의 모든 행은 모두에게 보인다"는 정보가 따로 필요한데, 그게 **visibility map**이고 이걸 갱신하는 게 `VACUUM`입니다.
+
+`VACUUM` 직후에는 이렇습니다.
+
+```text
+->  Index Only Scan using idx_covering on log_data
+      Heap Fetches: 0
+Execution Time: 0.554 ms
+```
+
+여기서 최근 구간의 행들을 UPDATE 해서 visibility map을 더럽힌 뒤 같은 쿼리를 돌리면 이렇게 바뀝니다.
+
+```text
+->  Index Only Scan using idx_covering on log_data
+      Heap Fetches: 1999
+Execution Time: 0.756 ms
+```
+
+계획 이름은 여전히 `Index Only Scan`인데 **`Heap Fetches`가 1999**입니다.
+1000행을 돌려주려고 힙을 1999번 찾아갔습니다. 이름만 Only인 셈이죠.
+
+다시 `VACUUM ANALYZE`를 돌리면 0으로 돌아옵니다.
+
+```text
+->  Index Only Scan using idx_covering on log_data
+      Heap Fetches: 0
+Execution Time: 0.391 ms
+```
+
+로그 테이블처럼 쓰기가 잦은 테이블에 커버링 인덱스를 걸었다면, `Heap Fetches`가 0인지 꼭 확인해야 합니다.
+0이 아니라면 autovacuum이 따라오지 못하고 있다는 신호입니다.
+
+---
+
+## 정리
+
+측정 결과를 한 표로 모으면 이렇습니다. PostgreSQL 18.4, 500만 행 기준입니다.
+반복 횟수가 항목마다 달라서 마지막 열에 같이 적었습니다. 3회짜리와 30회짜리를 같은 무게로 읽으면 안 되니까요.
+
+| 시나리오 | 비교 | 결과 | 반복 |
+| --- | --- | --- | --- |
+| `ORDER BY ts DESC LIMIT 1000` | 인덱스 없음 | 412.52ms | 5 |
+| | `(ts)` — Index Scan Backward | **0.13ms** | 20 |
+| | `(ts DESC)` — Index Scan | **0.12ms** | 20 |
+| `ORDER BY ts DESC LIMIT 500000` | `(ts)` 역방향 | 66.52ms | 30 |
+| | `(ts DESC)` 정방향 | 67.21ms | 30 |
+| `ORDER BY service ASC, ts DESC` | `(service, ts)` — Incremental Sort | 377.88ms | 10 |
+| | `(service ASC, ts DESC)` — Index Scan | **0.23ms** | 10 |
+| 20만 행 반환 | `(ts DESC)` — Index Scan | 32.20ms | 10 |
+| | INCLUDE 추가 — Index Only Scan | **21.22ms** | 10 |
+| `count(*)` (약 282만 행) | `(ts DESC)` | **71.53ms** | 10 |
+| | INCLUDE 추가 | 80.52ms | 10 |
+| INSERT 10만 건 | 인덱스 없음 | 155.66ms | 3 |
+| | `(ts DESC)` | 222.52ms | 3 |
+| | INCLUDE 추가 | 276.81ms | 3 |
+
+여기서 끌어낸 원칙은 세 가지입니다.
+
+- **효과의 대부분은 인덱스 유무에서 나온다.** 412ms에서 0.13ms, 약 3,000배입니다. 방향이나 `INCLUDE`를 고민하기 전에 인덱스가 걸려 있는지부터 확인하는 게 먼저입니다.
+- **인덱스 방향은 뒤집기로 만들 수 없는 순서일 때만 의미가 있다.** 단일 컬럼 정렬이면 `DESC`를 붙이든 말든 같습니다. 단 `NULLS` 위치까지 지정하면 예외고요. `ORDER BY a ASC, b DESC`처럼 방향이 섞일 때는 인덱스에 방향을 명시해야 하며, 이때는 1,600배까지 벌어집니다.
+- **커버링 인덱스는 읽는 행이 많을 때만 값어치를 한다.** 20만 행에서는 34% 이득이었지만, 1000행에서는 미미했고 `count(*)`에서는 오히려 손해였습니다. 그리고 인덱스 크기는 80% 늘고, 쓰기는 이 측정에서 78% 느려졌습니다.
+
+세 가지를 관통하는 건 결국 **"이 쿼리가 몇 페이지를 읽어야 하는가"** 하나입니다.
+`Execution Time`보다 `Buffers`와 `Heap Fetches`를 먼저 보게 된 것도 그래서입니다. 시간은 캐시 상태에 따라 흔들리지만, 읽은 페이지 수는 거짓말을 하지 않습니다.
+
+---
+
+## 마치며
+
+노트에 적어둔 문장이 틀렸다는 걸 확인하는 데 걸린 시간은, 사실 컨테이너 하나 띄우고 쿼리 몇 개 돌리는 30분이 전부였습니다.
+그 30분을 들이지 않은 채로 한참을 "DESC 인덱스를 만들어야 빠르다"고 알고 있었던 셈입니다.
+
+돌아보면 그 문장이 그럴듯했던 이유는 **말이 되기 때문**이었습니다.
+역순으로 읽으면 뭔가 손해일 것 같고, 방향을 맞춰 주면 이득일 것 같습니다.
+하지만 B-tree 리프 페이지가 양방향으로 연결돼 있다는 사실 하나면 그 직관은 무너집니다.
+그럴듯함과 사실 사이의 거리를 좁혀 주는 게 결국 `EXPLAIN ANALYZE`였습니다.
+
+색인 비유로 이 글을 시작했는데, 마지막으로 한 번만 더 쓰겠습니다.
+색인을 거꾸로 넘기는 건 공짜지만, **가나다순 안에 최신순이 들어간 색인은 따로 인쇄해야 하고**, **요약까지 적어 둔 색인은 두꺼워진 만큼 대가를 치릅니다.**
+인덱스 설계라는 게 결국 이 셋을 구분하는 일이었습니다.
+
+이 글에 쓴 측정 스크립트는 위에 그대로 옮겨 두었으니, 궁금하시면 각자 환경에서 직접 재보셔도 좋겠습니다.
+저처럼 한참을 틀리게 알고 있던 게 하나쯤 나올지도 모릅니다.
+
+긴 글 읽어주셔서 감사합니다.
