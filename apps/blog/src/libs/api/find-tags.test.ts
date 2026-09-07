@@ -1,26 +1,18 @@
+import { mdxFile } from '@libs/api/__fixtures__/mdx-file';
 import { findTagPostCounts, findTags } from '@libs/api/find-tags';
-import { getAllMdxFiles, MdxFileInfo } from '@libs/api/mdx-utils';
+import { getAllMdxFiles } from '@libs/api/mdx-utils';
 
 jest.mock('@libs/api/mdx-utils');
 const mockGetAll = getAllMdxFiles as jest.MockedFunction<typeof getAllMdxFiles>;
-
-function f(slug: string, fm: Partial<MdxFileInfo['frontMatter']>): MdxFileInfo {
-  return {
-    slug,
-    route: `/posts/${slug}`,
-    filePath: `/fake/${slug}`,
-    frontMatter: { title: slug, date: '2026-01-01 00:00', ...fm },
-  };
-}
 
 beforeEach(() => mockGetAll.mockReset());
 
 describe('findTags', () => {
   it('모든 글의 태그를 모으고 중복을 제거한다(삽입 순서 유지)', async () => {
     mockGetAll.mockResolvedValue([
-      f('a', { tags: ['Typescript', 'never'] }),
-      f('b', { tags: ['Typescript', '타입시스템'] }),
-      f('c', {}), // tags 없음
+      mdxFile('a', { tags: ['Typescript', 'never'] }),
+      mdxFile('b', { tags: ['Typescript', '타입시스템'] }),
+      mdxFile('c', {}), // tags 없음
     ]);
 
     const tags = await findTags();
@@ -28,7 +20,7 @@ describe('findTags', () => {
   });
 
   it('태그가 하나도 없으면 빈 배열', async () => {
-    mockGetAll.mockResolvedValue([f('a', {}), f('b', {})]);
+    mockGetAll.mockResolvedValue([mdxFile('a', {}), mdxFile('b', {})]);
     expect(await findTags()).toEqual([]);
   });
 });
@@ -36,10 +28,10 @@ describe('findTags', () => {
 describe('findTagPostCounts', () => {
   it('태그별로 그 태그가 달린 글 개수를 센다', async () => {
     mockGetAll.mockResolvedValue([
-      f('a', { tags: ['Typescript', 'never'] }),
-      f('b', { tags: ['Typescript', '타입시스템'] }),
-      f('c', { tags: ['Typescript'] }),
-      f('d', {}), // tags 없음
+      mdxFile('a', { tags: ['Typescript', 'never'] }),
+      mdxFile('b', { tags: ['Typescript', '타입시스템'] }),
+      mdxFile('c', { tags: ['Typescript'] }),
+      mdxFile('d', {}), // tags 없음
     ]);
 
     const counts = await findTagPostCounts();
@@ -51,8 +43,8 @@ describe('findTagPostCounts', () => {
 
   it('시리즈 랜딩 페이지의 태그는 세지 않는다', async () => {
     mockGetAll.mockResolvedValue([
-      f('frontend', { tags: ['Typescript'], isSeriesLanding: true }),
-      f('frontend/a', { tags: ['Typescript'] }),
+      mdxFile('frontend', { tags: ['Typescript'], isSeriesLanding: true }),
+      mdxFile('frontend/a', { tags: ['Typescript'] }),
     ]);
 
     const counts = await findTagPostCounts();
@@ -62,7 +54,7 @@ describe('findTagPostCounts', () => {
   });
 
   it('태그가 하나도 없으면 빈 Map', async () => {
-    mockGetAll.mockResolvedValue([f('a', {}), f('b', {})]);
+    mockGetAll.mockResolvedValue([mdxFile('a', {}), mdxFile('b', {})]);
     expect((await findTagPostCounts()).size).toBe(0);
   });
 });

@@ -1,28 +1,20 @@
+import { mdxFile } from '@libs/api/__fixtures__/mdx-file';
 import { findPosts } from '@libs/api/find-posts';
-import { getAllMdxFiles, MdxFileInfo } from '@libs/api/mdx-utils';
+import { getAllMdxFiles } from '@libs/api/mdx-utils';
 import { Constants } from '@libs/constants';
 
 // fs를 읽는 getAllMdxFiles를 mock해 실제 글과 무관하게 "필터/정렬/limit" 로직만 검증한다.
 jest.mock('@libs/api/mdx-utils');
 const mockGetAll = getAllMdxFiles as jest.MockedFunction<typeof getAllMdxFiles>;
 
-function f(slug: string, fm: Partial<MdxFileInfo['frontMatter']>): MdxFileInfo {
-  return {
-    slug,
-    route: `/posts/${slug}`,
-    filePath: `/fake/${slug}`,
-    frontMatter: { title: slug, date: '2026-01-01 00:00', ...fm },
-  };
-}
-
 beforeEach(() => mockGetAll.mockReset());
 
 describe('findPosts', () => {
   it('시리즈 랜딩을 제외하고 최신순으로 정렬한다', async () => {
     mockGetAll.mockResolvedValue([
-      f('frontend', { isSeriesLanding: true, date: '2025-01-01 00:00' }),
-      f('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
-      f('frontend/b', { series: 'frontend', date: '2026-03-01 00:00' }),
+      mdxFile('frontend', { isSeriesLanding: true, date: '2025-01-01 00:00' }),
+      mdxFile('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
+      mdxFile('frontend/b', { series: 'frontend', date: '2026-03-01 00:00' }),
     ]);
 
     const posts = await findPosts();
@@ -31,8 +23,8 @@ describe('findPosts', () => {
 
   it('seriesId로 해당 시리즈만 필터한다', async () => {
     mockGetAll.mockResolvedValue([
-      f('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
-      f('ai/x', { series: 'ai', date: '2026-02-01 00:00' }),
+      mdxFile('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
+      mdxFile('ai/x', { series: 'ai', date: '2026-02-01 00:00' }),
     ]);
 
     const posts = await findPosts({ seriesId: 'frontend' });
@@ -41,8 +33,8 @@ describe('findPosts', () => {
 
   it("seriesId가 'latest'면 전체(랜딩 제외)를 반환한다", async () => {
     mockGetAll.mockResolvedValue([
-      f('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
-      f('ai/x', { series: 'ai', date: '2026-02-01 00:00' }),
+      mdxFile('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
+      mdxFile('ai/x', { series: 'ai', date: '2026-02-01 00:00' }),
     ]);
 
     const posts = await findPosts({ seriesId: 'latest' });
@@ -51,9 +43,9 @@ describe('findPosts', () => {
 
   it('limit으로 개수를 제한한다', async () => {
     mockGetAll.mockResolvedValue([
-      f('a', { series: 's', date: '2026-01-01 00:00' }),
-      f('b', { series: 's', date: '2026-02-01 00:00' }),
-      f('c', { series: 's', date: '2026-03-01 00:00' }),
+      mdxFile('a', { series: 's', date: '2026-01-01 00:00' }),
+      mdxFile('b', { series: 's', date: '2026-02-01 00:00' }),
+      mdxFile('c', { series: 's', date: '2026-03-01 00:00' }),
     ]);
 
     const posts = await findPosts({ limit: 2 });
@@ -69,8 +61,8 @@ describe('findPosts', () => {
     it("seriesId가 'latest'면 제외 목록의 시리즈 글을 뺀다", async () => {
       Constants.series.excludedFromLatestIds = ['fullstack'];
       mockGetAll.mockResolvedValue([
-        f('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
-        f('fullstack/x', { series: 'fullstack', date: '2026-02-01 00:00' }),
+        mdxFile('frontend/a', { series: 'frontend', date: '2026-01-01 00:00' }),
+        mdxFile('fullstack/x', { series: 'fullstack', date: '2026-02-01 00:00' }),
       ]);
 
       const posts = await findPosts({ seriesId: 'latest' });
@@ -80,7 +72,7 @@ describe('findPosts', () => {
     it('제외 목록에 있어도 해당 시리즈를 직접 조회하면 그대로 반환한다', async () => {
       Constants.series.excludedFromLatestIds = ['fullstack'];
       mockGetAll.mockResolvedValue([
-        f('fullstack/x', { series: 'fullstack', date: '2026-02-01 00:00' }),
+        mdxFile('fullstack/x', { series: 'fullstack', date: '2026-02-01 00:00' }),
       ]);
 
       const posts = await findPosts({ seriesId: 'fullstack' });
@@ -90,7 +82,7 @@ describe('findPosts', () => {
     it('seriesId 없이 호출하면(전체 글 목록) 제외 목록의 영향을 받지 않는다', async () => {
       Constants.series.excludedFromLatestIds = ['fullstack'];
       mockGetAll.mockResolvedValue([
-        f('fullstack/x', { series: 'fullstack', date: '2026-02-01 00:00' }),
+        mdxFile('fullstack/x', { series: 'fullstack', date: '2026-02-01 00:00' }),
       ]);
 
       const posts = await findPosts();
@@ -100,8 +92,8 @@ describe('findPosts', () => {
 
   it("orderBy 'createAtASC'는 오래된 순으로 정렬한다", async () => {
     mockGetAll.mockResolvedValue([
-      f('a', { series: 's', date: '2026-03-01 00:00' }),
-      f('b', { series: 's', date: '2026-01-01 00:00' }),
+      mdxFile('a', { series: 's', date: '2026-03-01 00:00' }),
+      mdxFile('b', { series: 's', date: '2026-01-01 00:00' }),
     ]);
 
     const posts = await findPosts({ orderBy: 'createAtASC' });
