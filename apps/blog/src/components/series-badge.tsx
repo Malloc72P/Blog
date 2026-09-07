@@ -1,3 +1,4 @@
+import { PageLinkMap } from '@libs/page-link-map';
 import { Badge } from './badge';
 
 export interface SeriesBadgeProps {
@@ -17,7 +18,12 @@ export function SeriesBadge({
   active,
 }: SeriesBadgeProps) {
   return (
-    <Badge href={seriesId ? `/posts/${seriesId}` : '#'} onClick={onClick} color={color} active={active}>
+    <Badge
+      href={seriesId ? PageLinkMap.series.landing(seriesId) : '#'}
+      onClick={onClick}
+      color={color}
+      active={active}
+    >
       {title}
     </Badge>
   );

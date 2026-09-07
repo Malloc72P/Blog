@@ -1,4 +1,5 @@
 import { Constants } from './constants';
+import { PageLinkMap } from './page-link-map';
 
 export type PostType = 'article' | 'series-landing';
 
@@ -65,7 +66,10 @@ export function frontmatter({
   isSeriesLanding = false,
   tags = [],
 }: FrontmatterInput): FrontmatterOutput {
-  const path = postId ? `/posts/${seriesId}/${postId}` : `/posts/${seriesId}`;
+  // 경로 규칙을 PageLinkMap 한 곳에 두어 canonical·OG url이 실제 라우트와 어긋나지 않게 한다.
+  const path = postId
+    ? PageLinkMap.post.detail(seriesId, postId)
+    : PageLinkMap.series.landing(seriesId);
   const ogImages = Constants.openGraph.images;
 
   return {
