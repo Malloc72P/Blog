@@ -6,8 +6,8 @@ import { MainHeaderLogo, MainHeaderProps } from './main-header';
 import { IconMenu2, IconX } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { PageLinkMap } from '@libs/page-link-map';
+import { useActivePath } from '@hooks/use-active-path';
+import { NavItemModel, toSeriesNavItems, toTagNavItems } from '@libs/nav-items';
 import { Divider } from './divider';
 import { useFocusTrap } from '@hooks/use-focus-trap';
 import { useModalA11y } from '@hooks/use-modal-a11y';
@@ -165,21 +165,13 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
               <SidebarSection
                 onClick={onLinkClick}
                 title="Series"
-                items={seriesList.map((series) => ({
-                  id: series.id,
-                  label: series.title,
-                  href: PageLinkMap.series.landing(series.id),
-                }))}
+                items={toSeriesNavItems(seriesList)}
               />
 
               <SidebarSection
                 onClick={onLinkClick}
                 title="Tags"
-                items={tags.map((tag) => ({
-                  id: tag.id,
-                  label: tag.id,
-                  href: PageLinkMap.tags.landing(tag.id),
-                }))}
+                items={toTagNavItems(tags)}
               />
             </div>
           </div>,
@@ -191,17 +183,13 @@ export function MobileSidebar({ seriesList, tags }: MobileSidebarProps) {
 
 interface SidebarSectionProps {
   title: string;
-  items: {
-    id: string;
-    label: string;
-    href: string;
-  }[];
+  items: NavItemModel[];
   onClick: () => void;
 }
 
 function SidebarSection({ title, items, onClick }: SidebarSectionProps) {
   // 현재 경로를 읽어 Series 목록에서 활성 항목을 강조한다.
-  const pathname = usePathname();
+  const isActivePath = useActivePath();
 
   return (
     <div className="sidebar-section">
@@ -213,7 +201,7 @@ function SidebarSection({ title, items, onClick }: SidebarSectionProps) {
       <ul className="space-y-2">
         {items.map((item) => {
           // href가 현재 경로와 정확히 일치하면 활성 항목으로 표시한다.
-          const active = item.href === pathname;
+          const active = isActivePath(item.href);
 
           return (
             <li key={item.id} onClick={onClick}>

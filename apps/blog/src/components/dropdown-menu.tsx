@@ -3,14 +3,12 @@
 import { IconChevronDown } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useActivePath } from '@hooks/use-active-path';
+import { NavItemModel } from '@libs/nav-items';
 import { KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
-export interface DropdownMenuItemProps {
-  id: string;
-  label: string;
-  href: string;
-}
+// 내비게이션 항목 모양은 헤더·푸터·사이드바가 공유하므로 NavItemModel을 그대로 쓴다.
+export type DropdownMenuItemProps = NavItemModel;
 
 export interface DropdownMenuProps {
   title: string;
@@ -27,7 +25,7 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
   const [offsetX, setOffsetX] = useState(0);
 
   // 현재 경로를 읽어 드롭다운 항목 중 활성 시리즈를 강조한다.
-  const pathname = usePathname();
+  const isActivePath = useActivePath();
 
   // 트리거(button)와 드롭다운 목록(ul)을 aria-controls로 연결하기 위한 고유 id.
   const listId = useId();
@@ -162,7 +160,7 @@ export function DropdownMenu({ title, items, leftOffset = 0, ...option }: Dropdo
         {/* ------------------------------------------------------ */}
         {items.map((item) => {
           // href가 현재 경로와 정확히 일치하면 활성 항목으로 표시한다.
-          const active = item.href === pathname;
+          const active = isActivePath(item.href);
 
           return (
             <li

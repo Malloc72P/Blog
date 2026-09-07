@@ -1,3 +1,4 @@
+import { toSeriesNavItems } from '@libs/nav-items';
 import { PageLinkMap } from '@libs/page-link-map';
 import classNames from 'classnames';
 import Link from 'next/link';
@@ -38,11 +39,7 @@ export function MainHeader({ seriesList, tags }: MainHeaderProps) {
           <DropdownMenu
             title="Series"
             width={200}
-            items={seriesList.map((series) => ({
-              id: series.id,
-              label: series.title,
-              href: PageLinkMap.series.landing(series.id),
-            }))}
+            items={toSeriesNavItems(seriesList)}
           />
           {/* === TAGS INDEX LINK ===
               태그가 49개로 많아 드롭다운 대신 전체 태그 인덱스 페이지로 가는 링크를 노출한다. */}
