@@ -1,9 +1,10 @@
 'use client';
 
+import { useFocusTrap } from '@hooks/use-focus-trap';
 import { useModalA11y } from '@hooks/use-modal-a11y';
 import { IconList, IconX } from '@tabler/icons-react';
 import classNames from 'classnames';
-import { KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Toc, TocItem } from './toc';
 
@@ -93,27 +94,9 @@ export function MobileToc({ toc, activeId, onFragIdChanged }: MobileTocProps) {
       ?.scrollIntoView({ block: 'nearest' });
   }, [open, dialogRef]);
 
-  // Tab을 시트 내부에 가두는 포커스 트랩(mobile-sidebar와 동일 패턴).
+  // Tab을 시트 내부에 가두는 포커스 트랩(사이드바·검색 모달과 같은 훅을 공유한다).
   // Esc 닫기는 위 document 레벨 리스너가 전담한다(여기서도 처리하면 중복 호출).
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Tab') {
-      const sheet = dialogRef.current;
-      if (!sheet) return;
-      const focusables = sheet.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last?.focus(); // 처음에서 Shift+Tab → 마지막으로 순환
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first?.focus(); // 마지막에서 Tab → 처음으로 순환
-      }
-    }
-  };
+  const onKeyDown = useFocusTrap(dialogRef);
 
   // 헤딩이 없는 짧은 글은 목차 자체가 무의미하므로 플로팅 버튼도 렌더하지 않는다.
   if (toc.length === 0) {
