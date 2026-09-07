@@ -1,11 +1,11 @@
 'use client';
 
-import { PageLinkMap } from '@libs/page-link-map';
 import { SeriesModel } from '@libs/types/commons';
 import { IconArrowUp } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useActivePath } from '@hooks/use-active-path';
+import { toSeriesNavItems } from '@libs/nav-items';
 import React, { PropsWithChildren, ReactNode } from 'react';
 
 export interface MainFooterProps {
@@ -44,11 +44,7 @@ export function MainFooter({ seriesList }: MainFooterProps) {
           {/* === MAIN FOOTER RIGHT SECTION SERIES LIST === */}
           <FooterList
             label="SERIES"
-            items={seriesList.map((series) => ({
-              id: series.id,
-              label: series.title,
-              href: PageLinkMap.series.landing(series.id),
-            }))}
+            items={toSeriesNavItems(seriesList)}
           />
 
           {/* === MAIN FOOTER RIGHT SECTION SITE MAP === */}
@@ -85,7 +81,7 @@ interface FooterListProps {
 
 function FooterList({ label, items }: FooterListProps) {
   // 현재 경로를 읽어 SERIES 목록에서 활성 항목을 강조한다.
-  const pathname = usePathname();
+  const isActivePath = useActivePath();
 
   return (
     <div className="md:w-[200px] md:ml-10 mt-10 md:mt-0 mb-10">
@@ -96,7 +92,7 @@ function FooterList({ label, items }: FooterListProps) {
         {items.map((item) => (
           <li key={item.id}>
             {/* href가 현재 경로와 정확히 일치하면 활성 항목으로 표시한다. */}
-            <LinkButton href={item.href} color="primary" active={item.href === pathname}>
+            <LinkButton href={item.href} color="primary" active={isActivePath(item.href)}>
               {item.label}
             </LinkButton>
           </li>

@@ -1,3 +1,4 @@
+import { DateUtil } from '@libs/date-util';
 import { PostModel } from './types/commons';
 
 // 같은 시리즈일 때 더해주는 가중치. 태그 자카드(0~1)와 합산되므로,
@@ -40,7 +41,8 @@ export function recommendPosts(current: PostModel, all: PostModel[], limit = 4):
     .filter((post) => post.id !== current.id) // 현재 글 제외
     .map((post) => ({ post, score: similarityScore(current, currentTagIds, post) }))
     .filter((scored) => scored.score > 0) // 접점 없는 글 제외
-    .sort((a, b) => b.score - a.score || b.post.date.localeCompare(a.post.date)) // 점수↓, 동점은 최신↑
+    // 점수 내림차순, 동점이면 최신 글 우선
+    .sort((a, b) => b.score - a.score || DateUtil.compareDateDesc(a.post.date, b.post.date))
     .slice(0, limit)
     .map((scored) => scored.post);
 }

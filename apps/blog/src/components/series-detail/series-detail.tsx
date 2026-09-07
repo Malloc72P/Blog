@@ -1,13 +1,13 @@
 import { ArticleHeader } from '@components/article';
 import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
-import { PostCard } from '@components/post-card';
+import { PostListSection } from '@components/post-list-section';
 import { findPosts } from '@libs/api/find-posts';
 import { findSeriesList } from '@libs/api/find-series';
 import { Constants } from '@libs/constants';
 import { Mapper } from '@libs/mapper';
 import { PageLinkMap } from '@libs/page-link-map';
-import { PostModel, SeriesModel } from '@libs/types/commons';
+import { SeriesModel } from '@libs/types/commons';
 import classNames from 'classnames';
 import Link from 'next/link';
 
@@ -20,10 +20,7 @@ export async function SeriesDetail({ series }: SeriesDetailProps) {
   const seriesList = await findSeriesList();
   const seriesModels = seriesList.map(Mapper.toSeriesModel);
 
-  const posts = allPosts
-    .map((item) => Mapper.toPostModel({ item, seriesModels }))
-    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
-    .filter((post): post is PostModel => post !== null);
+  const posts = Mapper.toPostModels(allPosts, seriesModels);
 
   // latest 시리즈는 여러 시리즈가 섞인 목록이므로 카드에 시리즈 배지를 노출한다.
   const showSeriesBadge = series.id === Constants.series.latestId;
@@ -72,23 +69,13 @@ export async function SeriesDetail({ series }: SeriesDetailProps) {
 
         <Divider />
 
-        {/* posts가 비어 있으면 빈 상태 문구를 보여주고, 아니면 카드 목록을 렌더링한다. */}
-        {posts.length === 0 ? (
-          <div className="py-[65px] text-center text-gray-600">
-            아직 이 시리즈에 작성된 포스트가 없습니다.
-          </div>
-        ) : (
-          <article className="py-[65px]">
-            {posts.map((post) => (
-              <PostCard
-                key={post.route}
-                post={post}
-                series={series}
-                showSeriesBadge={showSeriesBadge}
-              />
-            ))}
-          </article>
-        )}
+        <PostListSection
+          posts={posts}
+          showSeriesBadge={showSeriesBadge}
+          emptyState={
+            <p className="text-center text-gray-600">아직 이 시리즈에 작성된 포스트가 없습니다.</p>
+          }
+        />
       </div>
     </ArticleContainer>
   );

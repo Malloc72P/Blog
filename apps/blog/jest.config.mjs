@@ -16,7 +16,6 @@ const config = {
     '^@components/(.*)$': '<rootDir>/src/components/$1',
     '^@libs/(.*)$': '<rootDir>/src/libs/$1',
     '^@hooks/(.*)$': '<rootDir>/src/hooks/$1',
-    '^@interfaces/(.*)$': '<rootDir>/src/interfaces/$1',
     '^src/(.*)$': '<rootDir>/src/$1',
   },
 };

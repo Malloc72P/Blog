@@ -1,3 +1,4 @@
+import { PageLinkMap } from '@libs/page-link-map';
 import { Badge } from './badge';
 
 export interface TagBadgeProps {
@@ -6,9 +7,9 @@ export interface TagBadgeProps {
 }
 
 export function TagBadge({ tagId, onClick }: TagBadgeProps) {
-  // sitemap과 표기를 맞추기 위해 태그 ID를 인코딩해 링크를 생성한다(저위험 변경).
+  // 경로 생성은 PageLinkMap에 맡긴다. sitemap과 같은 인코딩 규칙을 쓰기 위해서다.
   return (
-    <Badge href={`/tags/${encodeURIComponent(tagId)}`} onClick={onClick}>
+    <Badge href={PageLinkMap.tags.landing(tagId)} onClick={onClick}>
       {tagId}
     </Badge>
   );

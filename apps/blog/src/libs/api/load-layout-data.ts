@@ -18,10 +18,7 @@ export interface MainLayoutData {
 export async function loadMainLayoutData(): Promise<MainLayoutData> {
   const seriesModels = (await findSeriesList()).map(Mapper.toSeriesModel);
   const tags = (await findTags()).map(Mapper.toTagModel);
-  const posts = (await findPosts())
-    .map((item) => Mapper.toPostModel({ item, seriesModels }))
-    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
-    .filter((post): post is PostModel => post !== null);
+  const posts = Mapper.toPostModels(await findPosts(), seriesModels);
 
   return { seriesModels, tags, posts };
 }

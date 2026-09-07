@@ -140,7 +140,7 @@ export function MainClientPage({ seriesPosts }: MainClientPageProps) {
               return;
             }
 
-            return <PostCard key={post.route} post={post} series={series} />;
+            return <PostCard key={post.route} post={post} />;
           })}
           {
             <Link href={PageLinkMap.series.landing(currentSeriesFilter.id)}>

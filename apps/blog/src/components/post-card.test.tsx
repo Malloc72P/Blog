@@ -19,7 +19,7 @@ const post: PostModel = {
 
 describe('PostCard', () => {
   it('포스트 제목을 레벨 2 헤딩(h2)으로 렌더하며, 제목 링크 안에 위치한다', () => {
-    render(<PostCard post={post} series={series} />);
+    render(<PostCard post={post} />);
 
     const heading = screen.getByRole('heading', { level: 2, name: '내 포스트 제목' });
     expect(heading).toBeInTheDocument();

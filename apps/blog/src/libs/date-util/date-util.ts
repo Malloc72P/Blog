@@ -32,6 +32,17 @@ const format = (date: string | Date | dayjs.Dayjs, formatType: IDateFormat) => {
   return result;
 };
 
+/**
+ * 날짜 문자열 두 개를 최신순(내림차순)으로 비교한다.
+ *
+ * 글 목록 정렬은 PostModel(date)과 MdxFileInfo(frontMatter.date) 양쪽에서 필요해,
+ * 담는 객체가 아니라 날짜 문자열을 받는 형태로 둔다. 정렬 기준을 바꿀 일이 생기면 여기만 고친다.
+ */
+const compareDateDesc = (a: string, b: string) => new Date(b).getTime() - new Date(a).getTime();
+
+/** 날짜 문자열 두 개를 오래된순(오름차순)으로 비교한다. */
+const compareDateAsc = (a: string, b: string) => new Date(a).getTime() - new Date(b).getTime();
+
 export const DateUtil = {
   toLocalTime,
   format,
@@ -41,6 +52,8 @@ export const DateUtil = {
     seoul: 'Asia/Seoul',
     toronto: 'America/Toronto',
   },
-  postSorter: (a: PostModel, b: PostModel) =>
-    new Date(b.date).getTime() - new Date(a.date).getTime(),
+  compareDateDesc,
+  compareDateAsc,
+  postSorter: (a: PostModel, b: PostModel) => compareDateDesc(a.date, b.date),
+  postSorterAsc: (a: PostModel, b: PostModel) => compareDateAsc(a.date, b.date),
 };

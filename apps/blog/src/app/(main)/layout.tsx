@@ -1,3 +1,4 @@
+import { DateUtil } from '@libs/date-util';
 import { loadMainLayoutData } from '@libs/api/load-layout-data';
 import { PropsWithChildren } from 'react';
 import MainClientLayout from './main-client-layout';
@@ -12,7 +13,7 @@ export const dynamic = 'force-static';
 export default async function MainLayout({ children }: PropsWithChildren) {
   const { seriesModels, tags, posts: loadedPosts } = await loadMainLayoutData();
   // 시리즈 내 이전/다음 글 계산을 위해 날짜 오름차순으로 정렬한다.
-  const posts = [...loadedPosts].sort((a, b) => a.date.localeCompare(b.date));
+  const posts = [...loadedPosts].sort(DateUtil.postSorterAsc);
   const postDesc = posts.slice().reverse();
 
   const preparedPosts = posts.map((currentPost) => ({

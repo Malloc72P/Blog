@@ -1,3 +1,4 @@
+import { DateUtil } from '@libs/date-util';
 import { ArticleContainer } from '@components/article-container';
 import { loadMainLayoutData } from '@libs/api/load-layout-data';
 import { PageLinkMap } from '@libs/page-link-map';
@@ -14,7 +15,7 @@ export default async function NotFound() {
   const { seriesModels, tags, posts } = await loadMainLayoutData();
 
   // 별도 인기도 데이터가 없어 최신 글 4개를 복구 동선으로 제시한다.
-  const recentPosts = [...posts].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+  const recentPosts = [...posts].sort(DateUtil.postSorter).slice(0, 4);
 
   return (
     <MainClientLayout seriesList={seriesModels} tags={tags} posts={posts}>

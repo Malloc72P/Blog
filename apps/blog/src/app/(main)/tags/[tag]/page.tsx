@@ -4,6 +4,7 @@ import { findSeriesList } from '@libs/api/find-series';
 import { findTags } from '@libs/api/find-tags';
 import { Mapper } from '@libs/mapper';
 import { PageLinkMap } from '@libs/page-link-map';
+import { shouldIndexTagPage } from '@libs/tag-index-policy';
 import { PostModel, TagModel } from '@libs/types/commons';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -26,8 +27,8 @@ export async function generateMetadata(props: TagPageParams): Promise<Metadata> 
     (list) => list.filter((post) => post.frontMatter.tags?.includes(tagId)).length,
   );
 
-  // 매칭되는 글이 없으면 검색엔진 색인에서 제외한다(빈 태그 페이지 노출 방지).
-  const shouldIndex = matchedCount > 0;
+  // 글이 없거나 적은 태그 페이지는 검색엔진 색인에서 제외한다. 판정 기준은 사이트맵과 공유한다.
+  const shouldIndex = shouldIndexTagPage(matchedCount);
 
   return {
     title: `Posts Tagged with “${tagId}”`,
@@ -36,13 +37,14 @@ export async function generateMetadata(props: TagPageParams): Promise<Metadata> 
     alternates: {
       canonical: PageLinkMap.tags.landing(tagId),
     },
-    robots: shouldIndex ? undefined : { index: false },
+    // 색인에서 빼더라도 follow는 유지해, 크롤러가 이 페이지의 링크를 타고 포스트를 발견하도록 둔다.
+    robots: shouldIndex ? undefined : { index: false, follow: true },
   };
 }
 
 export async function generateStaticParams() {
   const allTags = await findTags();
-  return [...new Set(allTags)].map((tag) => ({ tag }));
+  return allTags.map((tag) => ({ tag }));
 }
 
 export default async function TagPage(props: TagPageParams) {
@@ -64,10 +66,7 @@ export default async function TagPage(props: TagPageParams) {
   //   PostModel로 가공
   const seriesList = await findSeriesList();
   const seriesModels = seriesList.map(Mapper.toSeriesModel);
-  const postModels: PostModel[] = posts
-    .map((p) => Mapper.toPostModel({ item: p, seriesModels }))
-    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
-    .filter((post): post is PostModel => post !== null);
+  const postModels: PostModel[] = Mapper.toPostModels(posts, seriesModels);
 
   return <TagDetail tag={tagModel} posts={postModels} />;
 }

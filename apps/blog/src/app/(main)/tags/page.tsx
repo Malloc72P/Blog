@@ -2,8 +2,7 @@ import { ArticleHeader } from '@components/article';
 import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
 import { TagBadge } from '@components/tag-badge';
-import { findPosts } from '@libs/api/find-posts';
-import { findTags } from '@libs/api/find-tags';
+import { findTagPostCounts, findTags } from '@libs/api/find-tags';
 import { PageLinkMap } from '@libs/page-link-map';
 import type { Metadata } from 'next';
 
@@ -21,17 +20,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TagsIndexPage() {
-  // 전체 태그와 전체 글을 조회한다.
-  const tags = [...new Set(await findTags())];
-  const posts = await findPosts();
-
-  // 태그별 글 개수를 미리 집계해 배지 옆에 함께 표기한다.
-  const countByTag = new Map<string, number>();
-  posts.forEach((post) => {
-    post.frontMatter.tags?.forEach((tag) => {
-      countByTag.set(tag, (countByTag.get(tag) ?? 0) + 1);
-    });
-  });
+  // 전체 태그와 태그별 글 개수를 조회한다. 개수 집계는 사이트맵·색인 판정과 같은 함수를 쓴다.
+  const tags = await findTags();
+  const countByTag = await findTagPostCounts();
 
   return (
     <ArticleContainer>

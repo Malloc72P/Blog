@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearch } from './search-context';
+import { useFocusTrap } from '@hooks/use-focus-trap';
 import { useModalA11y } from '@hooks/use-modal-a11y';
 
 export function SearchModal() {
@@ -24,6 +25,9 @@ export function SearchModal() {
 
   // 질의가 바뀔 때마다 결과 재계산(status는 콜백에서 참조하지 않아 의존성에서 제외)
   const results = useMemo(() => search(query), [search, query]);
+
+  // Tab 포커스 트랩. 아래 early return보다 앞에서 호출해야 훅 순서가 흔들리지 않는다.
+  const trapFocus = useFocusTrap(containerRef);
 
   // 모달이 열리면 입력 초기화 + 포커스
   useEffect(() => {
@@ -60,21 +64,7 @@ export function SearchModal() {
     }
     // Tab 포커스를 모달 내부로 가둔다(포커스 트랩)
     if (e.key === 'Tab') {
-      const container = containerRef.current;
-      if (!container) return;
-      const focusables = container.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last?.focus(); // 처음에서 Shift+Tab → 마지막으로 순환
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first?.focus(); // 마지막에서 Tab → 처음으로 순환
-      }
+      trapFocus(e);
       return;
     }
     if (results.length === 0) return;
