@@ -1,3 +1,4 @@
+import { DateUtil } from '@libs/date-util';
 import { getAllMdxFiles, MdxFileInfo } from './mdx-utils';
 import { prepareParam } from '../param-util';
 import { Constants } from '@libs/constants';
@@ -33,13 +34,9 @@ export async function findPosts(
 
   // 정렬
   if (orderBy === 'latest') {
-    posts.sort(
-      (a, b) => new Date(b.frontMatter.date).getTime() - new Date(a.frontMatter.date).getTime(),
-    );
+    posts.sort((a, b) => DateUtil.compareDateDesc(a.frontMatter.date, b.frontMatter.date));
   } else if (orderBy === 'createAtASC') {
-    posts.sort(
-      (a, b) => new Date(a.frontMatter.date).getTime() - new Date(b.frontMatter.date).getTime(),
-    );
+    posts.sort((a, b) => DateUtil.compareDateAsc(a.frontMatter.date, b.frontMatter.date));
   }
 
   // 제한
