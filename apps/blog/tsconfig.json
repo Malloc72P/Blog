@@ -10,8 +10,7 @@
     "paths": {
       "@components/*": ["src/components/*"],
       "@libs/*": ["src/libs/*"],
-      "@hooks/*": ["src/hooks/*"],
-      "@interfaces/*": ["src/interfaces/*"]
+      "@hooks/*": ["src/hooks/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts", "next.config.js", ".next/types/**/*.ts"],

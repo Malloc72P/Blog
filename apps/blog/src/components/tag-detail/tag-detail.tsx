@@ -1,7 +1,7 @@
 import { ArticleHeader } from '@components/article';
 import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
-import { PostCard } from '@components/post-card';
+import { PostListSection } from '@components/post-list-section';
 import { PageLinkMap } from '@libs/page-link-map';
 import { PostModel, TagModel } from '@libs/types/commons';
 import Link from 'next/link';
@@ -19,14 +19,8 @@ export async function TagDetail({ tag, posts }: TagDetailProps) {
 
         <Divider />
 
-        <article className="py-[65px]">
-          {/* 방어적 빈 상태: 해당 태그에 글이 없으면 안내 문구와 이동 링크를 노출한다. */}
-          {posts.length === 0 ? (
-            <TagDetailEmptyState />
-          ) : (
-            posts.map((post) => <PostCard key={post.route} post={post} series={post.series} />)
-          )}
-        </article>
+        {/* 방어적 빈 상태: 해당 태그에 글이 없으면 안내 문구와 이동 링크를 노출한다. */}
+        <PostListSection posts={posts} emptyState={<TagDetailEmptyState />} />
       </div>
     </ArticleContainer>
   );

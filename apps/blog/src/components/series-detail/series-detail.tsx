@@ -1,7 +1,7 @@
 import { ArticleHeader } from '@components/article';
 import { ArticleContainer } from '@components/article-container';
 import { Divider } from '@components/divider';
-import { PostCard } from '@components/post-card';
+import { PostListSection } from '@components/post-list-section';
 import { findPosts } from '@libs/api/find-posts';
 import { findSeriesList } from '@libs/api/find-series';
 import { Constants } from '@libs/constants';
@@ -69,23 +69,13 @@ export async function SeriesDetail({ series }: SeriesDetailProps) {
 
         <Divider />
 
-        {/* posts가 비어 있으면 빈 상태 문구를 보여주고, 아니면 카드 목록을 렌더링한다. */}
-        {posts.length === 0 ? (
-          <div className="py-[65px] text-center text-gray-600">
-            아직 이 시리즈에 작성된 포스트가 없습니다.
-          </div>
-        ) : (
-          <article className="py-[65px]">
-            {posts.map((post) => (
-              <PostCard
-                key={post.route}
-                post={post}
-                series={series}
-                showSeriesBadge={showSeriesBadge}
-              />
-            ))}
-          </article>
-        )}
+        <PostListSection
+          posts={posts}
+          showSeriesBadge={showSeriesBadge}
+          emptyState={
+            <p className="text-center text-gray-600">아직 이 시리즈에 작성된 포스트가 없습니다.</p>
+          }
+        />
       </div>
     </ArticleContainer>
   );

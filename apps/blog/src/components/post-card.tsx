@@ -1,6 +1,6 @@
 'use client';
 
-import { PostModel, SeriesModel } from '@libs/types/commons';
+import { PostModel } from '@libs/types/commons';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SeriesBadge } from './series-badge';
@@ -9,7 +9,6 @@ import { DateUtil } from '@libs/date-util';
 
 export interface PostCardProps {
   post: PostModel;
-  series: SeriesModel;
   // 혼합 목록(최신글/태그/랜딩)에서만 시리즈 배지를 노출한다. 단일 시리즈 페이지에선 false.
   showSeriesBadge?: boolean;
 }
