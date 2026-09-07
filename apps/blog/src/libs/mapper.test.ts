@@ -58,3 +58,23 @@ describe('Mapper.toSeriesModel / toTagModel', () => {
     expect(Mapper.toTagModel('Typescript')).toEqual({ id: 'Typescript' });
   });
 });
+
+describe('Mapper.toPostModels', () => {
+  it('변환 가능한 글만 PostModel[]로 좁힌다', () => {
+    // 두 번째 글은 시리즈가 없어 toPostModel이 null을 반환하고, 그 경고 출력을 테스트에서 숨긴다.
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const models = Mapper.toPostModels(
+      [item(), item({ series: '없는시리즈' }), item({ title: '두번째' })],
+      seriesModels,
+    );
+
+    expect(models).toHaveLength(2);
+    expect(models.map((post) => post.title)).toEqual(['클로저', '두번째']);
+    warn.mockRestore();
+  });
+
+  it('빈 배열이면 빈 배열을 반환한다', () => {
+    expect(Mapper.toPostModels([], seriesModels)).toEqual([]);
+  });
+});

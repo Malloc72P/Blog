@@ -1,15 +1,13 @@
 import { findPosts } from './find-posts';
-import { getAllMdxFiles } from './mdx-utils';
 
+/**
+ * 글에 달린 태그를 중복 없이 모은다(등장 순서 유지).
+ *
+ * findTagPostCounts와 같은 소스를 쓰도록 그 결과의 키를 그대로 돌려준다. 두 함수가 서로 다른
+ * 기준(시리즈 랜딩 포함 여부)으로 갈리면 태그 목록과 글 개수가 어긋나기 때문이다.
+ */
 export async function findTags(): Promise<string[]> {
-  const allFiles = await getAllMdxFiles();
-  const tags = new Set<string>();
-
-  allFiles.forEach((file) => {
-    file.frontMatter.tags?.forEach((tag) => tags.add(tag));
-  });
-
-  return Array.from(tags);
+  return [...(await findTagPostCounts()).keys()];
 }
 
 /**

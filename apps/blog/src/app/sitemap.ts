@@ -14,7 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const { url } = Constants.siteConfig;
 
   const seriesModels = (await findSeriesList()).map((item) => Mapper.toSeriesModel(item));
-  const posts = await findPostModels(seriesModels);
+  const posts = Mapper.toPostModels(await findPosts(), seriesModels);
   const tagPostCounts = await findTagPostCounts();
 
   return [
@@ -23,13 +23,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...createSeriesEntries(url, seriesModels),
     ...createIndexableTagEntries(url, tagPostCounts),
   ];
-}
-
-async function findPostModels(seriesModels: SeriesModel[]): Promise<PostModel[]> {
-  return (await findPosts())
-    .map((item) => Mapper.toPostModel({ item, seriesModels }))
-    // 시리즈 미존재로 스킵된 포스트(null)를 제거해 PostModel[]로 좁힌다.
-    .filter((post): post is PostModel => post !== null);
 }
 
 function createHomeEntry(url: string): SitemapEntry {

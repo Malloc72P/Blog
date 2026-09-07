@@ -27,6 +27,17 @@ const toPostModel = ({
   };
 };
 
+/**
+ * MdxFileInfo 목록을 PostModel 목록으로 변환한다.
+ *
+ * toPostModel이 시리즈 미존재로 반환한 null을 타입 가드 필터로 제거해 PostModel[]로 좁힌다.
+ * 이 변환은 사이트맵·랜딩·태그 상세·시리즈 상세가 모두 거치는 절차라 한 곳에 모은다.
+ */
+const toPostModels = (items: MdxFileInfo[], seriesModels: SeriesModel[]): PostModel[] =>
+  items
+    .map((item) => toPostModel({ item, seriesModels }))
+    .filter((post): post is PostModel => post !== null);
+
 const toSeriesModel = (series: MdxFileInfo): SeriesModel => ({
   id: series.slug.split('/').pop() || series.slug,
   title: series.frontMatter.title,
@@ -35,4 +46,4 @@ const toSeriesModel = (series: MdxFileInfo): SeriesModel => ({
 
 const toTagModel = (tag: string) => ({ id: tag });
 
-export const Mapper = { toPostModel, toSeriesModel, toTagModel };
+export const Mapper = { toPostModel, toPostModels, toSeriesModel, toTagModel };
