@@ -163,7 +163,16 @@ console.log(typeof m.default); // 'object'
 "src/main.js" has the following exports: "createMap", "default" and "version"
 ```
 
-`default` 모드는 내보낼 것이 정확히 하나일 때만 성립합니다. 그 하나를 통째로 `module.exports`에 대입하는 방식이라 나머지 이름들은 갈 곳이 없습니다. default export만 있는 엔트리로 바꿔 번들하면 출력 형태가 달라집니다.
+`default` 모드는 **default export가 유일한 export일 때만** 성립합니다. 그 하나를 통째로 `module.exports`에 대입하는 방식이라 다른 이름들은 갈 곳이 없습니다.
+
+여기서 조건은 "내보낼 것이 하나"가 아닙니다. named export 하나만 내보내는 엔트리로 바꿔 봐도 똑같이 에러가 납니다.
+
+```text
+[!] RollupError: "default" was specified for "output.exports", but entry module
+"src/named-only.js" has the following exports: "createMap"
+```
+
+`module.exports`에 통째로 대입할 대상은 default export뿐이라, 이름이 붙은 export는 하나여도 대입할 자리가 없습니다. default export만 있는 엔트리로 바꿔 번들하면 출력 형태가 달라집니다.
 
 ```javascript
 // exports: 'default'로 번들한 결과 — 첫 줄부터 다르다
@@ -190,7 +199,7 @@ console.log(typeof m.default); // 'object'
 | --- | --- | --- |
 | CJS 분기 | `factory(exports)` | `module.exports = factory()` |
 | 소비하는 쪽 | `require('lib').createMap` | `require('lib')`가 곧 그 값 |
-| 조건 | 이름이 여럿이어도 됨 | 내보낼 것이 정확히 하나여야 함 |
+| 조건 | 이름이 여럿이어도 됨 | default export가 유일한 export여야 함 |
 
 두 소비 방식은 서로 호환되지 않습니다. `named`로 번들한 결과를 `default`처럼 쓰면 `require('lib')` 자체를 값으로 착각하게 되고, 반대도 마찬가지입니다. 번들 하나가 두 방식을 동시에 만족시킬 수 없어서 Rollup이 한쪽을 골라야 합니다.
 
@@ -234,7 +243,7 @@ output: [
 
 `output.name`에 적은 `'Cartis'`가 브라우저인 경우에 쓰이는 전역 변수 이름입니다. `<script>` 태그로 불러갔을 때 `window.Cartis`로 접근하게 됩니다.
 
-여기까지 보면 앞의 경고가 다시 읽힙니다. UMD는 ESM 모듈을 **이름이 여럿일 수 없는 두 세계(CommonJS와 브라우저 전역)로 내려보내는 포장**입니다. `named`와 `default` 중 하나를 고르는 일은, 그 세계에서 이름 여럿을 프로퍼티로 붙일지 값 하나를 통째로 대입할지 정하는 일이었습니다.
+여기까지 보면 앞의 경고가 다시 읽힙니다. UMD는 ESM 모듈을 **이름을 값 하나의 프로퍼티로만 담을 수 있는 두 세계(CommonJS와 브라우저 전역)로 내려보내는 포장**입니다. 두 세계에도 이름을 여럿 둘 수는 있지만, `exports.createMap`처럼 값 하나에 붙는 프로퍼티여야 합니다. `named`와 `default` 중 하나를 고르는 일은, 그 값에 이름을 여럿 붙일지 값 하나를 통째로 대입할지 정하는 일이었습니다.
 
 > `format: 'esm'`으로만 번들하면 이 경고는 아예 뜨지 않습니다. ESM 결과물은 named와 default를 둘 다 그대로 내보낼 수 있어 고를 것이 없기 때문입니다. 이 경고는 ESM 자체의 문제가 아니라 **ESM을 CommonJS로 옮길 때 생기는 문제**입니다.
 
