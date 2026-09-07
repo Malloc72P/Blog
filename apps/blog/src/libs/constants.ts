@@ -9,6 +9,12 @@ export const Constants = {
     // skip 링크(본문 바로가기)와 <main> 타깃을 잇는 앵커 id. 두 파일이 같은 값을 공유하도록 단일화한다.
     mainContentId: 'main-content',
   },
+  seo: {
+    // 태그 페이지를 검색엔진 색인 대상으로 삼을 최소 글 개수.
+    // 글 1개짜리 태그 페이지는 고유한 내용이 포스트 제목 한 줄뿐이라 검색엔진이 색인하지 않으면서
+    // 크롤 예산만 소모한다. 판정 로직은 tag-index-policy.ts의 shouldIndexTagPage가 담당한다.
+    tagIndexMinPostCount: 2,
+  },
   siteConfig: {
     name: 'Malloc72p.TechBlog',
     title: 'Malloc72P의 기술블로그',
