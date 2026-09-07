@@ -1,7 +1,7 @@
 'use client';
 
 import { IconCheck, IconCopy } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useCopyToClipboard } from '@hooks/use-copy-to-clipboard';
 import classes from './post-detail.module.scss';
 import classNames from 'classnames';
 
@@ -26,20 +26,8 @@ export interface CopyButtonProps {
  *
  */
 export function CopyButton({ getContent }: CopyButtonProps) {
-  // 복사 성공 여부를 상태로 관리해 클릭 후 일정 시간 체크 아이콘으로 피드백한다.
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    // 클립보드 쓰기에 실패해도 화면이 깨지지 않도록 예외를 흡수한다.
-    try {
-      await navigator.clipboard.writeText(getContent());
-      setCopied(true);
-      // 1.5초 뒤 원래 복사 아이콘으로 되돌린다.
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // 클립보드 접근이 거부된 환경에서는 조용히 무시한다.
-    }
-  };
+  // 복사 성공 여부와 피드백 타이머는 공용 훅이 관리한다.
+  const { copied, copy } = useCopyToClipboard();
 
   return (
     <button
@@ -53,7 +41,7 @@ export function CopyButton({ getContent }: CopyButtonProps) {
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
         classes.copyBtn
       )}
-      onClick={handleCopy}
+      onClick={() => copy(getContent())}
     >
       {copied ? (
         // 복사 성공 시 체크 아이콘으로 시각 피드백을 준다.

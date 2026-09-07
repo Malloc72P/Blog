@@ -2,6 +2,7 @@
 
 import { IconBrandX, IconCheck, IconLink, IconShare } from '@tabler/icons-react';
 import classNames from 'classnames';
+import { useCopyToClipboard } from '@hooks/use-copy-to-clipboard';
 import { useEffect, useState } from 'react';
 
 export interface ShareButtonsProps {
@@ -19,25 +20,14 @@ const buttonClass = classNames(
 );
 
 export function ShareButtons({ url, title }: ShareButtonsProps) {
-  // 링크 복사 성공 피드백 상태.
-  const [copied, setCopied] = useState(false);
+  // 링크 복사 성공 피드백은 코드블록 복사 버튼과 같은 훅을 쓴다.
+  const { copied, copy } = useCopyToClipboard();
   // navigator.share 지원 여부. SSR과 마크업이 어긋나지 않도록 마운트 후에만 반영한다.
   const [canNativeShare, setCanNativeShare] = useState(false);
 
   useEffect(() => {
     setCanNativeShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
   }, []);
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      // 1.5초 뒤 원래 아이콘으로 되돌린다.
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // 클립보드 접근이 거부된 환경에서는 조용히 무시한다.
-    }
-  };
 
   const nativeShare = async () => {
     try {
@@ -59,7 +49,7 @@ export function ShareButtons({ url, title }: ShareButtonsProps) {
       {/* 링크 복사 */}
       <button
         type="button"
-        onClick={copyLink}
+        onClick={() => copy(url)}
         aria-label={copied ? '링크 복사됨' : '링크 복사'}
         className={buttonClass}
       >
