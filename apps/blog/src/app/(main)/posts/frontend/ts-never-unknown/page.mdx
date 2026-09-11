@@ -1,7 +1,7 @@
 import { frontmatter } from '@libs/frontmatter';
 
 export const metadata = frontmatter({
-  title: 'never와 unknown 제대로 쓰기: 바닥 타입과 꼭대기 타입',
+  title: 'TypeScript 바닥 타입 never와 꼭대기 타입 unknown',
   description:
     'unknown을 any보다 안전하게 다루는 법, never가 나오는 상황, 그리고 never로 분기 누락을 컴파일 타임에 잡는 exhaustive check까지 실제 코드로 정리합니다.',
   seriesId: 'frontend',
@@ -10,21 +10,21 @@ export const metadata = frontmatter({
   date: '2026-06-22 22:10',
 });
 
-타입스크립트를 쓰다 보면 `never`와 `unknown`을 마주칩니다. 분명 내가 적은 적 없는데 에러 메시지에 `never`가 튀어나오기도 하고, 라이브러리 타입에서 `unknown`을 받아 어떻게 다뤄야 할지 막막할 때도 있습니다.
+타입스크립트를 쓰다 보면 `never`와 `unknown`을 마주칩니다. 작성한 적 없는 `never`가 에러 메시지에 튀어나오기도 하고, 라이브러리 타입에서 `unknown`을 받아 어떻게 다뤄야 할지 막막할 때도 있습니다.
 
-두 타입은 정반대 자리에 있습니다. `never`는 "어떤 값도 될 수 없는" 바닥 타입(bottom type)이고, `unknown`은 "어떤 값이든 될 수 있는" 꼭대기 타입(top type)입니다. 이 위치만 잡아두면 둘이 왜 그렇게 동작하는지 자연스럽게 풀립니다. [이전 글](/posts/frontend/ts-type-narrowing)에서 다룬 타입 좁히기가 여기서도 핵심 도구로 쓰입니다.
+두 타입은 정반대 자리에 있습니다. `never`는 "어떤 값도 될 수 없는" 바닥 타입(bottom type)이고, `unknown`은 "어떤 값이든 될 수 있는" 꼭대기 타입(top type)입니다. 이 위치를 알면 두 타입이 왜 그렇게 동작하는지 이해할 수 있습니다. [이전 글](/posts/frontend/ts-type-narrowing)에서 다룬 타입 좁히기를 여기서도 씁니다.
 
-## 타입에도 바닥과 꼭대기가 있다
+## 타입의 바닥과 꼭대기
 
 타입을 "그 타입에 속하는 값의 집합"으로 보면 이해가 쉽습니다. `string`은 모든 문자열의 집합이고, `boolean`은 `true`와 `false` 두 값의 집합입니다.
 
 이 관점에서 `unknown`은 가능한 모든 값을 담은 가장 큰 집합입니다. 무엇이든 `unknown`에 넣을 수 있습니다. 반대로 `never`는 원소가 하나도 없는 빈 집합입니다. `never` 타입의 값은 만들 수 없습니다.
 
-그래서 둘의 사용법도 정반대입니다. `unknown`은 너무 넓어서 **꺼내 쓰기 전에 좁혀야** 하고, `never`는 값이 없어서 **거기에 도달하면 안 되는 지점**을 표시하는 데 쓰입니다.
+그래서 둘의 사용법도 정반대입니다. `unknown`은 너무 넓어서 **꺼내 쓰기 전에 좁혀야** 하고, `never`는 값이 없어서 **도달하면 안 되는 곳**을 표시하는 데 쓰입니다.
 
 ## unknown: any보다 안전한 꼭대기 타입
 
-`unknown`은 무엇이든 받을 수 있습니다. 하지만 받은 다음이 다릅니다. 타입을 좁히기 전에는 거의 아무 연산도 허용하지 않습니다.
+`unknown`에는 무엇이든 넣을 수 있지만, 타입을 좁히기 전에는 거의 아무 연산도 허용하지 않습니다.
 
 ```typescript
 function lengthOf(input: unknown): number {
@@ -49,7 +49,7 @@ console.log(lengthOf([1, 2, 3])); // 3
 console.log(lengthOf(42)); // 0
 ```
 
-여기서 `any`와 비교하면 `unknown`의 가치가 분명해집니다. `any`는 검사를 통째로 꺼버립니다.
+`any`와 비교하면 `unknown`의 차이가 분명해집니다. `any`는 검사를 전부 꺼버립니다.
 
 ```typescript
 const dangerous: any = 'just a string';
@@ -80,7 +80,7 @@ function fail(message: string): never {
 }
 ```
 
-`never`가 모든 타입의 서브타입이라는 점은 이런 함수와 잘 맞습니다. 빈 집합은 모든 집합의 부분집합이니, `never`는 어떤 타입 자리에도 끼어들 수 있습니다. 덕분에 아래처럼 한 분기에서 `fail`을 호출하면, 그 분기는 값을 반환하지 않아도 타입 검사를 통과합니다.
+`never`는 모든 타입의 서브타입입니다. 빈 집합은 모든 집합의 부분집합이므로, `never`는 어떤 타입 자리에도 들어갈 수 있습니다. 덕분에 아래처럼 한 분기에서 `fail`을 호출하면, 그 분기는 값을 반환하지 않아도 타입 검사를 통과합니다.
 
 ```typescript
 function assertString(value: unknown): string {
@@ -97,7 +97,7 @@ console.log(assertString('ok')); // ok
 
 ## never로 빠짐없이 분기 검사하기
 
-`never`가 가장 실용적으로 빛나는 곳은 판별 유니온(discriminated union)의 빠짐없는 분기 검사, 이른바 exhaustive check입니다.
+`never`는 판별 유니온(discriminated union)의 빠짐없는 분기 검사, 이른바 exhaustive check에 자주 쓰입니다.
 
 도형 타입이 두 종류라고 해봅시다. `switch`로 모든 종류를 처리한 뒤, `default`에서 남은 값을 `never`에 할당합니다.
 
@@ -126,7 +126,7 @@ console.log(area({ kind: 'square', size: 3 })); // 9
 
 모든 `kind`를 처리하면 `default`에 도달하는 `shape`의 타입은 `never`로 좁혀집니다. 그래서 `never`에 할당하는 코드가 문제없이 통과합니다.
 
-진가는 나중에 종류를 하나 추가할 때 드러납니다. `triangle`을 유니온에 더했는데 `switch`에 케이스를 빠뜨리면, `default`로 흘러드는 `shape`에는 아직 triangle 타입이 남아 있습니다. `never`가 아닌 값을 `never`에 넣으려 하니 컴파일 에러가 납니다.
+종류를 하나 추가했을 때를 예로 들어보겠습니다. `triangle`을 유니온에 더했는데 `switch`에 케이스를 빠뜨리면, `default`로 흘러드는 `shape`에는 아직 triangle 타입이 남아 있습니다. `never`가 아닌 값을 `never`에 넣으려 하니 컴파일 에러가 납니다.
 
 ```typescript
 type Shape =
@@ -151,11 +151,11 @@ function area(shape: Shape): number {
 }
 ```
 
-![케이스 누락 시 컴파일 에러를 보여주는 터미널 화면. tsc 실행 결과 error TS2322, triangle 타입을 never에 할당할 수 없다는 메시지가 빨간색으로 출력된다.](/ts-exhaustive-error.png)
+![triangle 케이스 누락으로 tsc가 error TS2322를 출력한 터미널 화면](/ts-exhaustive-error.png)
 
-런타임에 도형을 그려보고 나서야 빠뜨린 걸 아는 게 아니라, 타입을 추가한 순간 컴파일러가 "여기 처리 안 했어요"라고 알려줍니다. 종류가 늘어나는 유니온을 다룰 때 이 패턴 하나로 누락을 컴파일 타임에 막을 수 있습니다.
+이 패턴을 쓰면 런타임에 실행해 보기 전에, 유니온에 타입을 추가하는 시점에 컴파일 에러로 누락을 알 수 있습니다.
 
-## void와 never는 다르다
+## void와 never의 차이
 
 `never`를 처음 보면 `void`와 헷갈리기 쉽습니다. 둘 다 "반환값이 마땅치 않은" 자리에 쓰이지만 의미가 다릅니다.
 
@@ -167,11 +167,11 @@ function logMessage(msg: string): void {
 }
 
 function throwError(msg: string): never {
-  throw new Error(msg); // 애초에 반환 지점에 도달하지 못한다.
+  throw new Error(msg); // 애초에 반환 위치에 도달하지 못한다.
 }
 ```
 
-`void`인 함수는 호출 다음 줄이 실행되지만, `never`인 함수는 호출한 시점에서 흐름이 끊깁니다. 반환 타입만 봐도 이 함수가 정상 종료되는지 알 수 있는 셈입니다.
+`void`인 함수는 호출 다음 줄이 실행되지만, `never`인 함수는 호출한 시점에서 흐름이 끊깁니다. 반환 타입이 `never`이면 이 함수가 정상적으로 반환하지 않는다는 것을 알 수 있습니다.
 
 ## 정리
 
@@ -185,10 +185,10 @@ function throwError(msg: string): never {
 | `void`    | -                 | 정상 종료하되 반환값이 없음   | 부수 효과만 있는 함수                     |
 
 - `unknown`은 너무 넓어서 좁히기 전에는 쓸 수 없다. 그래서 `any`보다 안전하다.
-- `never`는 빈 집합이라 값이 없고, "도달하면 안 되는 지점"을 표시하는 데 쓴다.
+- `never`는 빈 집합이라 값이 없고, "도달하면 안 되는 곳"을 표시하는 데 쓴다.
 - 판별 유니온에서 `never` 할당으로 exhaustive check를 걸면, 케이스 누락을 컴파일 타임에 잡는다.
 - `never`는 반환하지 못하는 함수, `void`는 반환값이 없는 함수다.
 
 ## 마치며
 
-`never`와 `unknown`은 처음엔 구석에 있는 특수한 타입처럼 보이지만, 위치를 잡고 나면 매일 쓰는 도구가 됩니다. 특히 exhaustive check는 한 번 익혀두면 유니온을 다룰 때마다 안전망이 되어줍니다. 긴 글 읽어주셔서 감사합니다.
+`never`와 `unknown`은 특수한 타입처럼 보이지만, 타입 계층에서 어디에 있는지 알면 쓰임새가 분명해집니다. 특히 exhaustive check는 유니온에 케이스를 추가할 때 누락을 컴파일 타임에 잡아 줍니다. 긴 글 읽어주셔서 감사합니다.

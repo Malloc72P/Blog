@@ -3,22 +3,20 @@ import { frontmatter } from '@libs/frontmatter';
 export const metadata = frontmatter({
   title: 'as const와 keyof typeof로 enum 없이 안전한 상수 만들기',
   description:
-    'TypeScript enum이 남기는 런타임 코드와 함정들을 짚고, as const 객체와 (typeof X)[keyof typeof X] 패턴으로 값은 enum처럼 쓰면서 타입은 문자열 리터럴 유니온으로 좁히는 법을 실제 코드로 정리합니다.',
+    'TypeScript enum이 남기는 런타임 코드와 주의할 점을 설명하고, as const 객체와 (typeof X)[keyof typeof X] 패턴으로 값은 enum처럼 쓰면서 타입은 문자열 리터럴 유니온으로 좁히는 방법을 코드로 정리합니다.',
   seriesId: 'frontend',
   postId: 'ts-as-const',
   tags: ['TypeScript', 'as const', 'enum', '타입시스템'],
   date: '2026-07-06 21:00',
 });
 
-## enum을 쓸까 말까
+## enum과 런타임 코드
 
-상태 값이나 옵션처럼 정해진 값 몇 개를 코드 곳곳에서 쓸 때, 저는 습관적으로 `enum`을 먼저 떠올렸습니다. 값을 한곳에 모아두고 이름으로 참조하니 오타도 줄고 깔끔해 보였기 때문입니다.
+상태 값이나 옵션처럼 정해진 값 몇 개를 코드 곳곳에서 쓸 때 `enum`을 쓰면 값을 한곳에 모아두고 이름으로 참조할 수 있습니다. 다만 `enum`은 타입 정보로 끝나지 않고 **런타임에 실제 코드를 남깁니다**.
 
-그런데 어느 순간부터 팀 컨벤션이나 오픈소스 코드에서 `enum` 대신 `as const`로 만든 객체를 자주 보게 됐습니다. 처음엔 취향 차이인가 싶었지만, `enum`이 컴파일된 결과를 직접 들여다보고 나서 생각이 바뀌었습니다. `enum`은 타입 정보로 끝나지 않고 **런타임에 실제 코드를 남깁니다**.
+이 글에서는 `enum`이 남기는 코드와 주의할 점을 먼저 보고, `as const` 객체와 `(typeof X)[keyof typeof X]` 패턴으로 같은 목적을 더 가볍게 달성하는 방법을 정리합니다.
 
-이 글에서는 `enum`이 남기는 것과 그 함정을 먼저 보고, `as const` 객체 + `(typeof X)[keyof typeof X]` 패턴으로 같은 목적을 더 가볍게 달성하는 방법을 정리합니다.
-
-## enum은 타입이 아니라 값이다
+## enum이 남기는 런타임 객체
 
 TypeScript의 타입은 대부분 컴파일 시점에 지워집니다. `interface`, `type`, 타입 애너테이션은 자바스크립트로 변환되면 흔적도 없이 사라집니다. 그런데 `enum`은 예외입니다.
 
@@ -44,9 +42,9 @@ var Direction;
 // tsc 원본 출력은 큰따옴표를 쓴다: Direction[Direction["Up"] = 0] = "Up";
 ```
 
-타입 하나 정의했을 뿐인데 즉시 실행 함수(IIFE)가 객체를 만들어냅니다. 게다가 자세히 보면 키와 값을 **양방향으로** 넣고 있습니다. `Direction['Up']`은 `0`이고, `Direction[0]`은 `'Up'`입니다. 숫자 enum의 역방향 매핑(reverse mapping)인데, 우리가 딱히 요청하지 않은 코드가 번들에 포함되는 셈입니다.
+타입 하나 정의했을 뿐인데 즉시 실행 함수(IIFE)가 객체를 만들어냅니다. 게다가 자세히 보면 키와 값을 **양방향으로** 넣고 있습니다. `Direction['Up']`은 `0`이고, `Direction[0]`은 `'Up'`입니다. 숫자 enum이 만드는 역방향 매핑(reverse mapping)입니다. 요청하지 않은 코드가 번들에 그대로 포함됩니다.
 
-이 역방향 매핑은 함정이기도 합니다. `Object.keys`로 키를 순회하면 값이 두 배로 나옵니다.
+이 역방향 매핑은 문제를 일으키기도 합니다. `Object.keys`로 키를 순회하면 값이 두 배로 나옵니다.
 
 ```typescript
 enum Direction {
@@ -59,7 +57,7 @@ console.log(Object.keys(Direction));
 // 실제로는 ['0', '1', 'Up', 'Down']
 ```
 
-## 문자열 enum은 값이 같아도 거부한다
+## 문자열 enum의 nominal 타입
 
 `enum`은 구조가 아니라 이름으로 구분되는 nominal 타입입니다. 그래서 값이 완전히 같은 문자열이어도, enum 멤버를 거치지 않은 값은 받지 않습니다.
 
@@ -77,9 +75,9 @@ move(Direction.Up); // 반드시 멤버를 거쳐야 한다.
 
 `'UP'`은 `Direction.Up`이 가진 값과 글자 하나 다르지 않지만 컴파일러는 막습니다. 값을 쓰는 모든 자리에서 `Direction`을 import해 멤버로 접근해야 한다는 뜻입니다. API 응답이나 설정 파일처럼 이미 평범한 문자열로 들어오는 데이터를 다룰 때, 이 nominal 특성은 편의보다 걸림돌이 되곤 합니다.
 
-## const enum은 대안이 되기 어렵다
+## const enum의 환경 제약
 
-런타임 코드가 싫다면 `const enum`이 있습니다. `const enum`은 객체를 만들지 않고, 사용하는 자리에 값을 직접 인라인합니다.
+런타임 코드를 피하고 싶다면 `const enum`이 있습니다. `const enum`은 객체를 만들지 않고, 사용하는 자리에 값을 직접 인라인합니다.
 
 ```typescript
 const enum Direction {
@@ -91,7 +89,7 @@ const d = Direction.Up;
 // 컴파일 결과: const d = 0; (Direction 객체 자체가 사라진다)
 ```
 
-깔끔해 보이지만, 값을 인라인하려면 컴파일러가 enum 선언을 볼 수 있어야 합니다. 문제는 컴파일된 라이브러리가 넘겨주는 ambient const enum(`.d.ts`의 `declare const enum`)입니다. 파일을 하나씩 독립적으로 변환하는 환경에서는 그 값을 알 수 없어, `isolatedModules`가 켜져 있으면 아예 에러로 막습니다.
+값을 인라인하려면 컴파일러가 enum 선언을 볼 수 있어야 합니다. 문제는 컴파일된 라이브러리가 넘겨주는 ambient const enum(`.d.ts`의 `declare const enum`)입니다. 파일을 하나씩 독립적으로 변환하는 환경에서는 그 값을 알 수 없어, `isolatedModules`가 켜져 있으면 아예 에러로 막습니다.
 
 ```typescript
 // tsconfig에 "isolatedModules": true (이 블로그를 포함한 Next.js 환경의 기본값)
@@ -102,11 +100,11 @@ const c = Color.Red;
 
 그래서 TypeScript 공식 문서도 라이브러리로 배포하는 코드에는 `const enum`을 피하라고 안내합니다. 런타임 코드는 없앨 수 있지만 쓸 수 있는 환경이 좁습니다.
 
-정리하면, 일반 `enum`은 원치 않는 런타임 코드와 nominal 타입의 경직성이 문제고, `const enum`은 환경 제약이 문제입니다. 그래서 저는 값과 타입을 분리해서 직접 조합하는 쪽으로 넘어왔습니다.
+정리하면, 일반 `enum`은 원치 않는 런타임 코드와 nominal 타입의 경직성이 문제고, `const enum`은 환경 제약이 문제입니다. 값과 타입을 분리해서 직접 조합하는 방법이 대안이 됩니다.
 
-## as const: 객체를 리터럴로 얼려두기
+## as const로 리터럴 타입 고정하기
 
-핵심 도구는 `as const`입니다. 평범한 객체는 그 프로퍼티 타입이 넓게 추론됩니다.
+여기서 쓰는 도구가 `as const`입니다. 평범한 객체는 그 프로퍼티 타입이 넓게 추론됩니다.
 
 ```typescript
 const direction = {
@@ -117,7 +115,7 @@ const direction = {
 // 추론된 타입: { Up: string; Down: string }
 ```
 
-값이 `'UP'`인데도 타입은 `string`으로 넓어집니다. 나중에 `direction.Up`을 다른 문자열로 바꿔도 괜찮다고 보기 때문입니다. 여기에 `as const`를 붙이면 이야기가 달라집니다.
+값이 `'UP'`인데도 타입은 `string`으로 넓어집니다. 나중에 `direction.Up`을 다른 문자열로 바꿔도 괜찮다고 보기 때문입니다. 여기에 `as const`를 붙이면 결과가 달라집니다.
 
 ```typescript
 const Direction = {
@@ -152,7 +150,7 @@ const Direction = {
 
 ## keyof typeof로 유니온 타입 뽑아내기
 
-값은 준비됐으니 이제 타입이 필요합니다. `enum`은 이름 하나가 값과 타입 역할을 겸했지만, `as const` 객체에서는 타입을 따로 만들어줍니다. 여기서 `typeof`와 `keyof`를 이어 붙입니다.
+값은 준비됐으니 이제 타입이 필요합니다. `enum`은 이름 하나가 값과 타입 역할을 겸했지만, `as const` 객체에서는 타입을 따로 만듭니다. 여기서 `typeof`와 `keyof`를 이어 붙입니다.
 
 먼저 `typeof`로 객체의 타입을 가져옵니다.
 
@@ -197,8 +195,8 @@ function move(dir: Direction) {
   console.log(`이동: ${dir}`);
 }
 
-move(Direction.Up); // OK — 값은 enum처럼 참조
-move('DOWN'); // OK — 리터럴 값도 그대로 허용
+move(Direction.Up); // OK: 값은 enum처럼 참조
+move('DOWN'); // OK: 리터럴 값도 그대로 허용
 move('DIAGONAL'); // error: '"DIAGONAL"' 형식은 'Direction' 형식에 할당할 수 없습니다.
 ```
 
@@ -214,7 +212,7 @@ Object.values(Direction).forEach((dir) => move(dir));
 
 ## satisfies로 형태까지 검증하기
 
-`as const`에 `satisfies`를 더하면 "값은 좁게 유지하면서 형태는 검사"라는 두 마리 토끼를 잡을 수 있습니다. 예를 들어 모든 값이 문자열이어야 한다는 제약을 걸고 싶다면 이렇게 씁니다.
+`as const`에 `satisfies`를 더하면 값은 좁게 유지하면서 형태까지 검사할 수 있습니다. 예를 들어 모든 값이 문자열이어야 한다는 제약을 걸고 싶다면 이렇게 씁니다.
 
 ```typescript
 const Direction = {
@@ -225,7 +223,7 @@ const Direction = {
 } as const satisfies Record<string, string>;
 ```
 
-`satisfies Record<string, string>`는 각 값이 문자열인지 검사하되, 타입을 `Record<string, string>`으로 넓혀버리지 않습니다. `as const` 덕분에 `Up`의 타입은 여전히 `'UP'` 리터럴로 남습니다. 실수로 값에 숫자를 넣으면 위처럼 그 자리에서 잡아줍니다.
+`satisfies Record<string, string>`는 각 값이 문자열인지 검사하되, 타입을 `Record<string, string>`으로 넓혀버리지 않습니다. `as const` 덕분에 `Up`의 타입은 여전히 `'UP'` 리터럴로 남습니다. 실수로 값에 숫자를 넣으면 위처럼 그 자리에서 잡습니다.
 
 `satisfies`를 더 깊게 보고 싶다면 [타입 좁히기](/posts/frontend/ts-type-narrowing) 글에서 다룬 좁히기 개념과 함께 이해하면 좋습니다.
 
@@ -250,4 +248,4 @@ const Direction = {
 
 ## 마치며
 
-`as const`와 `keyof typeof`는 각각 보면 사소한 문법이지만, 이어 붙이면 `enum`을 대체하는 실전 패턴이 됩니다. 저는 이 패턴으로 옮긴 뒤로 번들에 원치 않는 코드가 끼는 걱정도, 역방향 매핑 때문에 순회가 꼬이는 일도 없어졌습니다. 다음에 `enum`을 적으려다 손이 멈춘다면, `as const` 객체로 한번 바꿔보시길 권합니다. 긴 글 읽어주셔서 감사합니다.
+`as const`와 `keyof typeof`는 각각 보면 사소한 문법이지만, 이어 붙이면 `enum`을 대체하는 실전 패턴이 됩니다. 번들에 원치 않는 코드가 포함되는 문제와 역방향 매핑 때문에 순회 결과가 꼬이는 문제를 모두 피할 수 있습니다. `enum` 대신 `as const` 객체와 `(typeof X)[keyof typeof X]` 패턴을 함께 쓰는 것도 방법입니다. 긴 글 읽어주셔서 감사합니다.
