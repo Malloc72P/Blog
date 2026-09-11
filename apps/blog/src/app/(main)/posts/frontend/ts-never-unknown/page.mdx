@@ -1,7 +1,7 @@
 import { frontmatter } from '@libs/frontmatter';
 
 export const metadata = frontmatter({
-  title: 'TypeScript never와 unknown 타입',
+  title: 'TypeScript 바닥 타입 never와 꼭대기 타입 unknown',
   description:
     'unknown을 any보다 안전하게 다루는 법, never가 나오는 상황, 그리고 never로 분기 누락을 컴파일 타임에 잡는 exhaustive check까지 실제 코드로 정리합니다.',
   seriesId: 'frontend',
@@ -12,7 +12,7 @@ export const metadata = frontmatter({
 
 타입스크립트를 쓰다 보면 `never`와 `unknown`을 마주칩니다. 작성한 적 없는 `never`가 에러 메시지에 튀어나오기도 하고, 라이브러리 타입에서 `unknown`을 받아 어떻게 다뤄야 할지 막막할 때도 있습니다.
 
-두 타입은 정반대 자리에 있습니다. `never`는 "어떤 값도 될 수 없는" 바닥 타입(bottom type)이고, `unknown`은 "어떤 값이든 될 수 있는" 꼭대기 타입(top type)입니다. 이 위치를 알면 두 타입이 왜 그렇게 동작하는지 이해할 수 있습니다. [이전 글](/posts/frontend/ts-type-narrowing)에서 다룬 타입 좁히기가 여기서도 핵심 도구로 쓰입니다.
+두 타입은 정반대 자리에 있습니다. `never`는 "어떤 값도 될 수 없는" 바닥 타입(bottom type)이고, `unknown`은 "어떤 값이든 될 수 있는" 꼭대기 타입(top type)입니다. 이 위치를 알면 두 타입이 왜 그렇게 동작하는지 이해할 수 있습니다. [이전 글](/posts/frontend/ts-type-narrowing)에서 다룬 타입 좁히기를 여기서도 씁니다.
 
 ## 타입의 바닥과 꼭대기
 
@@ -153,7 +153,7 @@ function area(shape: Shape): number {
 
 ![triangle 케이스 누락으로 tsc가 error TS2322를 출력한 터미널 화면](/ts-exhaustive-error.png)
 
-이 패턴을 쓰면 런타임에 실행해 보기 전에, 타입을 추가하는 시점에 컴파일 에러로 누락을 알 수 있습니다. 종류가 늘어나는 유니온을 다룰 때 누락을 컴파일 타임에 막을 수 있습니다.
+이 패턴을 쓰면 런타임에 실행해 보기 전에, 유니온에 타입을 추가하는 시점에 컴파일 에러로 누락을 알 수 있습니다.
 
 ## void와 never의 차이
 
@@ -171,7 +171,7 @@ function throwError(msg: string): never {
 }
 ```
 
-`void`인 함수는 호출 다음 줄이 실행되지만, `never`인 함수는 호출한 시점에서 흐름이 끊깁니다. 반환 타입만 봐도 이 함수가 정상 종료되는지 알 수 있습니다.
+`void`인 함수는 호출 다음 줄이 실행되지만, `never`인 함수는 호출한 시점에서 흐름이 끊깁니다. 반환 타입이 `never`이면 이 함수가 정상적으로 반환하지 않는다는 것을 알 수 있습니다.
 
 ## 정리
 

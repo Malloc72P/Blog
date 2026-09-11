@@ -1,7 +1,7 @@
 import { frontmatter } from '@libs/frontmatter';
 
 export const metadata = frontmatter({
-  title: 'TypeScript 비동기 제너레이터와 SSE 스트림 처리',
+  title: 'TypeScript 비동기 제너레이터와 SSE 스트림 처리, 메인 스레드 양보',
   description:
     '값을 여러 번 내놓는 async generator의 동작 원리를 yield와 next()의 메커니즘으로 설명하고, SSE 스트림 소비와 렌더링을 막지 않는 무거운 계산 처리에 적용합니다.',
   seriesId: 'frontend',
@@ -110,7 +110,7 @@ main();
 전부 모일 때까지 기다렸다가 배열로 받는 게 아니라, **토큰이 준비될 때마다 루프 본문이 한 번씩 실행**됩니다.
 
 제너레이터는 **풀(pull) 방식**으로 동작합니다.
-`yield`에서 멈춘 제너레이터는 소비자가 다음 값을 요청(`next()` 호출)하기 전까지 스스로 진행하지 않습니다. 로그를 심어서 확인해 보겠습니다.
+`yield`에서 멈춘 제너레이터는 소비자가 다음 값을 요청(`next()` 호출)하기 전까지 스스로 진행하지 않습니다. 로그를 심어서 확인해 보겠습니다. 로그의 '주방'은 제너레이터 쪽 출력이고, '손님'은 소비자 쪽 출력입니다.
 
 ```typescript
 async function* courseMeal() {
@@ -274,7 +274,7 @@ export async function* readSSE(url: string): AsyncGenerator<string, void, void> 
 > 참고로 이 파서는 이전 포스트 서버의 형식(`data: ` + JSON + `\n\n`)에 맞춘 단순화 버전입니다.
 > SSE 스펙상 줄 끝은 `\r\n`도 허용되고 `data:` 뒤의 공백도 선택 사항이라, 다른 서버에 붙일 때는 `split(/\r?\n\r?\n/)` 같은 보강이 필요합니다.
 
-이 복잡함이 전부 제너레이터 안에 있으므로, 소비하는 쪽 코드는 이렇게 줄어듭니다.
+버퍼 처리 같은 파싱 로직이 전부 제너레이터 안에 있으므로, 소비하는 쪽 코드는 이렇게 줄어듭니다.
 
 ```tsx
 // app/page.tsx
@@ -330,7 +330,7 @@ const results = items.map(heavyCalculation);
 
 ### await만으로는 양보되지 않는 이유
 
-async 함수로 만들고 중간에 `await`를 넣으면 해결된다고 생각하기 쉽지만, 그렇게 해도 화면은 계속 멈춥니다.
+async 함수로 만들고 중간에 `await`를 넣으면 해결된다고 생각하기 쉽습니다. 하지만 `await Promise.resolve()`처럼 마이크로태스크로 이어지는 `await`만 넣으면 화면은 계속 멈춥니다.
 
 ```typescript
 // 주의: 이렇게 하면 화면은 여전히 얼어붙는다
@@ -424,7 +424,7 @@ async function runHeavyJob() {
 청크 하나(200건)를 처리하는 데 걸리는 시간만큼만 콜스택을 점유하고 곧바로 양보하기 때문에, 렌더링이 몇 초씩 밀리는 일이 사라집니다.
 
 `chunkSize`는 조절 포인트입니다. 60fps 기준으로 한 프레임의 예산은 약 16ms이므로, 청크 하나의 처리 시간이 그 안팎에 들어오도록 잡으면 체감이 매끄럽습니다.
-이 글의 측정 환경에서 `heavyCalculation`을 재 보면 1,000건짜리 청크 하나가 약 50ms로 예산을 넘었습니다. 그래서 기본값을 200으로 잡았습니다.
+`heavyCalculation`을 직접 측정해 보니 1,000건짜리 청크 하나가 약 50ms로 예산을 넘었습니다(측정값은 기기마다 다릅니다). 그래서 기본값을 200으로 잡았습니다.
 너무 작게 잡으면 양보 오버헤드(태스크 전환)가 커지고, 너무 크게 잡으면 다시 버벅임이 생기니, 실제 데이터로 측정해 보고 정하는 걸 권합니다.
 
 ---

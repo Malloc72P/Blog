@@ -20,7 +20,7 @@ export const metadata = frontmatter({
 
 ## main만 있는 패키지의 문제
 
-`package.json`에서 `main`은 패키지의 기본 진입점 파일 경로만 지정합니다. 그 외 파일에 대한 접근 제한은 없습니다.
+`package.json`의 `main`은 패키지의 기본 진입점 파일 경로를 지정합니다.
 
 `main`만 있는 패키지를 하나 만들어 보겠습니다.
 
@@ -52,7 +52,7 @@ console.log(internal.secret); // '내부 구현입니다'  ← 그냥 통과된�
 
 ## exports 선언과 접근 제한
 
-`exports` 필드는 정반대의 규칙을 적용합니다. 필드에 적어둔 경로만 열리고, 나머지는 모두 **차단**됩니다.
+`exports` 필드는 정반대의 규칙을 적용합니다. 필드에 적어둔 경로만 열립니다.
 
 ```json
 {
@@ -115,7 +115,7 @@ console.log(lib.flavor); // 'ESM 빌드'
 console.log(require('my-lib').flavor); // 'CommonJS 빌드'
 ```
 
-한 패키지가 두 모듈 시스템을 동시에 지원하는, 이른바 **듀얼 패키지**가 이렇게 만들어집니다. [Jest 설정 글](/posts/frontend/jest-testing)에서 `"type": "module"` 하나 때문에 씨름했던 걸 떠올려 보면, 소비자마다 모듈 형식이 제각각인 현실에서 이 분기가 왜 필요한지 와닿습니다.
+한 패키지가 두 모듈 시스템을 동시에 지원하는, 이른바 **듀얼 패키지**가 이렇게 만들어집니다. [Jest 설정 글](/posts/frontend/jest-testing)에서 본 것처럼 `package.json`의 `"type": "module"` 설정 하나로 `.js` 파일을 해석하는 방식이 달라집니다. 소비자마다 이 설정과 모듈 형식이 다르기 때문에 이 분기가 필요합니다.
 
 ### 조건 매칭 순서
 
@@ -147,7 +147,7 @@ console.log(lib.flavor); // 'CommonJS 빌드'  ← import인데 CJS가 나왔다
 
 TypeScript용 `types` 조건에도 "먼저 들어맞는 하나"라는 규칙은 똑같이 적용됩니다. 다만 `types`의 자리는 방금 정리한 "구체적인 것부터"로는 설명되지 않습니다. `import`·`require`가 "어느 모듈 시스템이냐"를 가르는 조건이라면, `types`는 "묻는 쪽이 타입 검사기냐"를 가르는 다른 기준이기 때문입니다.
 
-`types`를 맨 위에 두는 이유는 따로 있습니다. 런타임은 `types`를 조건 목록에 아예 넣지 않으므로 위로 올려도 잃을 것이 없습니다. 반대로 TypeScript는 `import`나 `require`가 먼저 들어맞으면 그 파일 옆에 있는 선언 파일을 사용합니다. 그래서 `types`가 아래 있으면 밀립니다. 이 문제는 겉으로 잘 드러나지 않습니다.
+`types`를 맨 위에 두는 이유는 따로 있습니다. 런타임은 `types`를 조건 목록에 아예 넣지 않으므로 위로 올려도 잃을 것이 없습니다. 반대로 TypeScript는 `import`나 `require`가 먼저 들어맞으면 그 파일 옆에 있는 선언 파일을 사용합니다. 그래서 `types`가 아래 있으면 `types`에 적은 선언 파일이 쓰이지 않을 수 있습니다. 이 문제는 겉으로 잘 드러나지 않습니다.
 
 `types`를 아래에 두고, `import`가 가리키는 `index.mjs` 옆에 낡은 선언 파일(`index.d.mts`)이 남아 있는 상황을 만들어 확인했습니다. 소비하는 쪽은 ESM 모드입니다. CJS 모드에서는 `import` 조건이 매칭되지 않아 이 문제가 재현되지 않습니다.
 
@@ -233,7 +233,7 @@ import data from 'my-lib/geojson/korea' with { type: 'json' };
 console.log(data.type); // 'FeatureCollection'
 ```
 
-값 쪽에 `.json`을 붙여뒀다는 사실을 잊고, 소비하는 쪽에서 습관대로 확장자를 붙여 적으면 문제가 생깁니다.
+값 쪽에 이미 `.json`이 붙어 있는데, 소비하는 쪽에서 습관대로 확장자를 붙여 적으면 문제가 생깁니다.
 
 ```javascript
 require.resolve('my-lib/geojson/korea.json');
@@ -249,7 +249,7 @@ require.resolve('my-lib/geojson/korea.json');
 | `"./geojson/*": "./dist/geojson/*.json"` | `my-lib/geojson/korea` | `korea.json`으로 쓰면 `.../korea.json.json`을 찾다 실패 |
 | `"./geojson/*": "./dist/geojson/*"` | `my-lib/geojson/korea.json` | `korea`로 쓰면 `.../korea`를 찾다 실패 |
 
-표에서 보듯 한쪽이 더 안전한 것은 아닙니다. 둘 다 소비자가 반대 습관으로 쓰면 똑같이 깨지고, 차이는 "어느 습관과 맞는지"뿐입니다.
+표에서 보듯 두 방식의 안전성은 같습니다. 둘 다 소비자가 반대 습관으로 쓰면 똑같이 깨지고, 차이는 "어느 습관과 맞는지"뿐입니다.
 
 이 글에서는 두 번째 방식을 권합니다. 소비자가 쓰는 경로와 실제 파일명이 같아서, `dist/geojson/korea.json`을 보면 `my-lib/geojson/korea.json`이라는 것이 바로 보이기 때문입니다. 확장자를 감추는 첫 번째 방식은 경로가 짧지만, 소비자가 파일명에서 경로를 유추할 수 없어 문서에 의존하게 됩니다.
 
@@ -279,4 +279,4 @@ require.resolve('my-lib/geojson/korea.json');
 
 `exports`는 진입점 설정이자 캡슐화 도구입니다. 공개할 파일을 정하는 일이 패키지의 API를 설계하는 일과 같습니다.
 
-"`types`를 맨 위에 둬라" 같은 규칙은 그대로 외워 쓰기 쉽지만, 실제로 재현해 보면 이유가 다르게 나타나는 경우가 있습니다. 결론이 같더라도 이유를 **직접 확인**해 두면 비슷한 문제를 만났을 때 원인을 더 빨리 찾을 수 있습니다. 긴 글 읽어주셔서 감사합니다.
+"`types`를 맨 위에 둬라" 같은 규칙은 이유를 모른 채 외워 쓰기 쉽습니다. 이 글에서 재현해 보니, 흔히 알려진 이유(타입을 못 찾는다)와 실제 이유(엉뚱한 선언 파일을 먼저 찾는다)가 달랐습니다. 결론이 같더라도 이유를 **직접 확인**해 두면 비슷한 문제를 만났을 때 원인을 더 빨리 찾을 수 있습니다. 긴 글 읽어주셔서 감사합니다.

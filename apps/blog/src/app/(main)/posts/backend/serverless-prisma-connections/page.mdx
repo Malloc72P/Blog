@@ -115,7 +115,7 @@ export const handler: APIGatewayProxyHandler = async () => {
 
 위 `handler.ts`는 raw AWS Lambda 예시입니다. Next.js에는 이렇게 직접 작성하는 핸들러가 없는데, 여기서 말하는 '핸들러 바깥'은 Next.js에서는 모듈 최상단(예: `lib/prisma.ts`)에 해당합니다. 모듈 최상단도 컨테이너가 뜰 때 한 번만 평가되므로, 바로 아래에서 볼 `globalThis` 싱글턴은 개발 중 HMR 누수를 막는 것을 넘어 프로덕션에서도 '핸들러 바깥 재사용' 역할을 합니다.
 
-핸들러 바깥 초기화가 재사용을 보장하는 것은 warm invocation에서만입니다. cold start는 새 컨테이너이므로, cold start가 일어날 때마다 `PrismaClient`가 새로 생깁니다. 이 패턴은 커넥션이 늘어나는 속도를 늦추는 것이지, 인스턴스 수가 늘어나는 것 자체를 막지는 못합니다. 그 부분은 3단계에서 다룹니다.
+핸들러 바깥에서 초기화한 클라이언트는 warm invocation에서만 재사용됩니다. cold start는 새 컨테이너이므로, cold start가 일어날 때마다 `PrismaClient`가 새로 생깁니다. 이 패턴은 커넥션이 늘어나는 속도를 늦추는 것이지, 인스턴스 수가 늘어나는 것 자체를 막지는 못합니다. 그 부분은 3단계에서 다룹니다.
 
 ### 개발 중 HMR로 인한 클라이언트 누수 막기 (globalThis 패턴)
 
@@ -159,7 +159,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 주의할 점은 **prepared statement**입니다. Prisma는 내부적으로 named prepared statement를 쓰는데, transaction 모드 풀러와 충돌할 수 있습니다. 과거에는 연결 문자열에 `?pgbouncer=true`를 붙여 Prisma가 prepared statement를 쓰지 않도록 우회했습니다. PgBouncer 1.21.0부터는 prepared statement를 지원하므로(`max_prepared_statements`를 0보다 크게 설정), Prisma 공식 문서는 1.21.0 이상에서는 `pgbouncer=true`를 붙이지 말라고 안내합니다. 쓰는 PgBouncer 버전에 따라 설정이 다르므로 버전부터 확인해야 합니다.
 
-Prisma Migrate 같은 CLI 작업은 스키마 엔진이 풀러를 거치면 안 되므로 DB에 직접 붙는 별도 URL이 필요합니다. `directUrl`로 분리합니다.
+Prisma Migrate 같은 CLI 작업은 스키마 엔진이 풀러를 거치면 안 되므로 DB에 직접 붙는 별도 URL이 필요합니다. 이 URL은 `directUrl`로 따로 지정합니다.
 
 ```prisma
 // prisma/schema.prisma
@@ -184,7 +184,7 @@ DIRECT_URL="postgresql://user:password@db-host:5432/mydb"
 
 PgBouncer를 직접 세우고 운영하는 것이 부담이라면, Prisma가 제공하는 매니지드 풀링을 쓸 수 있습니다.
 
-버전에 따라 달라지는 부분이 있습니다. 예전 자료에는 Prisma Data Proxy가 자주 등장하는데, 이 서비스는 2026년 5월에 종료되었습니다. 지금 새로 도입한다면 Data Proxy는 선택지에 없습니다. 현재 Prisma의 매니지드 커넥션 풀링은 **Prisma Accelerate**입니다. Data Proxy를 대체하며 커넥션 풀링에 글로벌 쿼리 캐시까지 더한 서비스입니다. DB까지 Prisma가 관리하길 원한다면 커넥션 풀링이 내장된 **Prisma Postgres**도 있습니다.
+매니지드 풀링 서비스는 시기에 따라 바뀌었습니다. 예전 자료에는 Prisma Data Proxy가 자주 등장하는데, 이 서비스는 2026년 5월에 종료되었습니다. 지금 새로 도입한다면 Data Proxy는 선택지에 없습니다. 현재 Prisma의 매니지드 커넥션 풀링은 **Prisma Accelerate**입니다. Data Proxy를 대체하며 커넥션 풀링에 글로벌 쿼리 캐시까지 더한 서비스입니다. DB까지 Prisma가 관리하길 원한다면 커넥션 풀링이 내장된 **Prisma Postgres**도 있습니다.
 
 매니지드 방식의 장점은 인프라를 직접 운영하지 않아도 서버리스에서 커넥션 문제를 해결할 수 있다는 점이고, 트레이드오프는 외부 서비스에 대한 의존과 비용입니다.
 
@@ -198,7 +198,7 @@ PgBouncer를 직접 세우고 운영하는 것이 부담이라면, Prisma가 제
 
 둘째, freeze/thaw 모델과 어긋납니다. 2단계에서 봤듯 서버리스 컨테이너는 요청이 끝나면 삭제되는 것이 아니라 freeze됩니다. `$disconnect()`를 부르지 않으면 freeze된 컨테이너 안에 살아 있는 커넥션이 다음 thaw 때 그대로 재사용됩니다. Prisma 공식 문서도 "장시간 실행되거나 서버리스인 앱에서는 매 요청마다 `$disconnect()`를 호출하지 말라"고 안내합니다.
 
-컨테이너가 종료될 때 미처 닫지 못한 좀비 커넥션이 남는 것을 걱정할 수 있습니다. freeze된 컨테이너가 플랫폼에 의해 회수될 때, 앱이 `$disconnect()`를 부를 기회 없이 사라지면 DB 쪽에 잠깐 idle 커넥션이 남을 수 있습니다. 이 좀비 커넥션은 매 요청 `$disconnect()`로는 해결되지 않고, DB나 풀러의 idle timeout으로 처리합니다.
+컨테이너가 종료될 때 미처 닫지 못한 좀비 커넥션이 남는 것을 걱정할 수 있습니다. 플랫폼이 freeze된 컨테이너를 회수할 때, 앱이 `$disconnect()`를 부를 기회 없이 사라지면 DB 쪽에 잠깐 idle 커넥션이 남을 수 있습니다. 매 요청 `$disconnect()`를 부르면 이런 커넥션은 남지 않지만, 앞에서 본 재연결 비용 때문에 권하지 않습니다. 좀비 커넥션은 DB나 풀러의 idle timeout으로 처리합니다.
 
 - PostgreSQL 14 이상이라면 `idle_session_timeout` 설정으로 오래 놀고 있는 커넥션을 서버가 알아서 끊게 둘 수 있습니다. 이름이 비슷한 `idle_in_transaction_session_timeout`은 '열린 트랜잭션 안에서' idle인 세션만 끊으므로, 요청이 끝나 트랜잭션 밖에서 노는 이 좀비 커넥션에는 동작하지 않습니다.
 - PgBouncer 같은 풀러를 쓰면, 애초에 좀비 커넥션 관리 자체가 풀러의 몫이 됩니다. 앱은 풀러에만 붙으니 DB의 실제 커넥션은 풀러가 수명까지 책임집니다.
@@ -225,6 +225,6 @@ PgBouncer를 직접 세우고 운영하는 것이 부담이라면, Prisma가 제
 | 동시성이 중간 이상, DB를 직접 운영 | PgBouncer(transaction 모드)를 앞에 두고 `directUrl` 분리 |
 | 운영 부담을 줄이고 싶을 때 | 매니지드 풀러(Prisma Accelerate) 또는 Prisma Postgres |
 
-트래픽이 적다면 1단계와 2단계만으로 `too many connections` 문제를 해결할 수 있는 경우가 많습니다. 트래픽이 늘어나 동시 실행 인스턴스 수가 DB 커넥션 상한을 넘어서면 3단계의 외부 풀러가 필요합니다.
+표의 순서대로 1단계와 2단계를 먼저 적용하고, 동시 실행 인스턴스 수가 DB 커넥션 상한을 넘으면 3단계의 외부 풀러를 도입합니다.
 
 긴 글 읽어주셔서 감사합니다.
