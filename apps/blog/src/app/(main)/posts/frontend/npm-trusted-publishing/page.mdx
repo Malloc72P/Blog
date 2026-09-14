@@ -1,0 +1,104 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'NPM Classic Token 종료와 Trusted Publishing 전환',
+  description:
+    'NPM은 보안 강화를 위해 Classic Token을 종료하고 Granular Token과 Trusted Publishing을 대안으로 제시했습니다. Trusted Publishing은 GitHub Actions와 연동해 토큰을 따로 관리하지 않아도 되고, 배포할 때만 유효한 임시 토큰을 사용합니다.',
+  seriesId: 'frontend',
+  postId: 'npm-trusted-publishing',
+  tags: ['npm', 'GitHub Actions', 'Trusted Publishing', 'OIDC'],
+  date: '2026-09-14 21:00',
+});
+
+NPM이 보안 강화를 위해 **Classic Token** 지원을 종료했습니다. **2025년 12월 9일**부터 Classic Token은 더 이상 사용할 수 없습니다.
+
+Classic Token은 권한 범위가 넓고 유효기간도 강제하지 않았습니다. 그래서 토큰이 유출되면 계정 전체가 탈취될 위험이 컸습니다. NPM은 Classic Token 대신 **Granular Token**이나 **Trusted Publishing** 중 하나를 사용하도록 권장합니다.
+
+## Granular Token과 Trusted Publishing
+
+Classic Token이 사라진 지금, NPM에 패키지를 배포하려면 두 방법 중 하나를 사용해야 합니다.
+
+- Granular Token  
+  기존 토큰을 개선한 방식입니다. 패키지별로 권한을 제어할 수 있고, 유효기간을 반드시 정해야 합니다.
+- Trusted Publishing  
+  OpenID Connect(OIDC)를 기반으로 CI/CD 환경(예: GitHub Actions)에서 미리 발급한 토큰 없이 패키지를 배포하는 방법입니다.
+
+## Trusted Publishing을 추천하는 이유
+
+Granular Token을 사용하면 여전히 토큰을 발급받아 GitHub Secrets에 넣어야 합니다. 유효기간이 있으니 주기적으로 갱신해야 하는 부담도 있습니다. 반면 **Trusted Publishing은 GitHub Repository와 NPM을 한 번 연결해두면 토큰을 따로 관리할 필요가 없습니다.**
+
+또한 Trusted Publishing은 배포하는 짧은 순간에만 유효한 임시 토큰을 발급하고, 배포가 끝나면 바로 만료시킵니다. 그래서 토큰 유출 위험을 최소화합니다.
+
+## Trusted Publishing 설정 방법
+
+### 1. NPM 설정
+
+![NPM 패키지 Settings 페이지의 Trusted Publisher 영역에서 GitHub Actions 버튼을 선택하는 화면](/npm-trusted-publisher-select.webp)
+
+NPM 패키지 Settings 페이지의 **Select your publisher** 항목에서 GitHub Actions 버튼을 클릭합니다.
+
+![GitHub Actions용 Trusted Publisher 연결 정보를 입력하는 화면](/npm-trusted-publisher-form.webp)
+
+이어서 나오는 입력 폼에 연결 정보를 적습니다.
+
+- **Organization or user**: GitHub Repository를 소유한 사용자 또는 조직 이름을 적습니다.
+- **Repository**: 패키지 코드가 있는 GitHub Repository 이름을 적습니다.
+- **Workflow filename**: 배포 스크립트 파일 이름을 적습니다.
+  - 배포 스크립트가 `.github/workflows/publish.yml`이라면 `publish.yml`만 적으면 됩니다.
+- **Environment name**: 비워 두면 됩니다.
+- **Allowed actions**: `npm publish`로 직접 배포하는 것도 허용합니다.
+
+위 캡처는 2025년 12월 화면이라 Allowed actions 항목이 없습니다. 이 항목은 그 뒤에 추가됐고, 2026년 9월 3일 이후에 만든 설정은 기본으로 `npm stage publish`만 허용합니다.
+
+`npm stage publish`는 패키지를 바로 공개하지 않고 스테이징 영역에 올리는 명령어입니다. 스테이징된 패키지는 메인테이너가 2단계 인증(2FA)을 거쳐 승인해야 공개됩니다. 이 글처럼 배포 스크립트에서 `npm publish`로 바로 배포하려면 Allowed actions에서 `npm publish`도 허용해야 합니다.
+
+### 2. GitHub Actions 설정 1: permission
+
+이제 배포 스크립트를 수정합니다. 먼저 `on` 절 다음에 `permissions`를 추가합니다.
+
+```yaml
+name: release publish
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
+```
+
+이 배포 스크립트에는 두 권한이 필요합니다.
+
+- `id-token: write`: OIDC 토큰을 만드는 데 필요한 권한입니다. Trusted Publishing에 꼭 필요합니다.
+- `contents: write`: git push 같은 git 작업에 필요한 권한입니다. git 작업이 없다면 `read`로 두어도 됩니다.
+
+### 3. GitHub Actions 설정 2: npm update & publish
+
+```yaml
+- name: Update npm for Trusted Publishing
+  run: npm install -g npm@latest
+
+- name: Deploy NPM (Trusted Publishing)
+  run: npm publish
+```
+
+`npm publish` 전에 NPM CLI를 최신 버전으로 업데이트합니다. Trusted Publishing이 NPM CLI 11.5.1 이상을 요구하기 때문입니다.
+
+> Note: Trusted publishing requires npm CLI version 11.5.1 or later and Node version 22.14.0 or higher. ([출처](https://docs.npmjs.com/trusted-publishers))
+
+Node도 22.14.0 이상이어야 하니, 배포 스크립트에서 쓰는 Node 버전도 함께 확인해주세요. 그다음 `npm publish`를 실행하면 됩니다.
+
+## 마치며
+
+NPM이 Classic Token 지원을 왜 중단했는지, 그리고 가장 확실한 대안인 **Trusted Publishing**에 대해 알아보았습니다.
+
+간단한 설정만으로 보안을 강화하고 토큰 갱신 부담도 줄일 수 있으니, 작업 중인 프로젝트에 적용해 보시기 바랍니다.
+
+이 글은 NPM 공식 문서를 바탕으로 썼습니다. 자세한 내용은 아래 문서를 참고해주세요.
+
+- [Trusted publishing for npm packages](https://docs.npmjs.com/trusted-publishers)
+- [Staged publishing for npm packages](https://docs.npmjs.com/staged-publishing)
+
+감사합니다.
