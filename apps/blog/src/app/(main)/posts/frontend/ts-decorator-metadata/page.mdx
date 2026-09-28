@@ -1,0 +1,952 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'TypeScript 데코레이터 메타데이터와 reflect-metadata',
+  description:
+    'emitDecoratorMetadata를 켜면 컴파일 결과에 어떤 코드가 추가되는지, reflect-metadata가 메타데이터를 어디에 저장하는지, 데코레이터가 받는 target이 무엇인지, 번들하고 압축한 뒤에 무엇이 남는지를 TypeScript 7.0.2와 Rollup, terser로 직접 확인합니다.',
+  seriesId: 'frontend',
+  postId: 'ts-decorator-metadata',
+  tags: ['TypeScript', 'Decorator', 'reflect-metadata', '번들러'],
+  date: '2026-09-28 21:00',
+});
+
+데코레이터로 클래스 속성에 정보를 붙여 두고 런타임에 꺼내 쓰는 방식은 NestJS 같은 프레임워크가 많이 씁니다. 이 방식을 직접 만들어 라이브러리에 넣으려면 아래 질문에 답할 수 있어야 합니다.
+
+- 데코레이터는 언제 호출되고, 무엇을 인자로 받는가
+- 번들하고 압축한 라이브러리에서도 런타임에 그 정보를 꺼낼 수 있는가
+- 데코레이터로 붙인 정보는 번들에 들어가는가, 뺄 수 있는가
+
+이번 글에서는 이 질문들을 확인하면서 데코레이터 메타데이터가 컴파일, 런타임, 번들 단계에서 각각 어떻게 동작하는지 정리하겠습니다. 글에 나오는 출력은 전부 Node 22.20.0, TypeScript 7.0.2, reflect-metadata 0.2.2, Rollup 4.63.5, terser 5.51.2로 작은 예제를 만들어 직접 돌려본 결과입니다. esbuild, tsx, Vite의 버전은 해당 절의 표에 적었습니다.
+
+---
+
+## 데코레이터의 컴파일 결과
+
+예제 프로젝트의 tsconfig에서 이 글과 관련된 옵션입니다.
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "rootDir": "src",
+    "outDir": "out"
+  }
+}
+```
+
+`experimentalDecorators`는 TypeScript가 예전부터 지원하던 데코레이터 문법을 켜는 옵션입니다. `emitDecoratorMetadata`는 데코레이터가 붙은 곳의 타입 정보를 메타데이터로 내보내는 옵션입니다. `experimentalDecorators`를 켜지 않으면 TypeScript 5.0부터 지원하는 표준 데코레이터로 컴파일됩니다. 이 경우는 "표준 데코레이터의 메타데이터" 절에서 다룹니다.
+
+예제는 `npm run build`로 `src`의 파일을 `out`에 컴파일하고, `node out/...js`로 실행합니다. 같은 소스를 `emitDecoratorMetadata`만 끄고 컴파일한 결과는 `out-nometa`에 둡니다. 출력 블록의 첫 줄에는 실행한 명령을 적었습니다.
+
+속성 두 개에 데코레이터를 붙인 모델입니다.
+
+```typescript
+// src/01-emit/model.ts
+function Property(label: string) {
+  return function (target: object, propertyKey: string) {
+    console.log(`Property('${label}') 호출: ${propertyKey}`);
+  };
+}
+
+export class TitleModel {
+  @Property('제목')
+  text: string = '';
+
+  @Property('글자 크기')
+  fontSize: number = 12;
+}
+```
+
+`tsc`로 컴파일한 결과입니다. 파일 앞부분의 헬퍼 정의는 뒤에서 따로 보겠습니다.
+
+```javascript
+// out/01-emit/model.js (헬퍼 정의 생략)
+function Property(label) {
+    return function (target, propertyKey) {
+        console.log(`Property('${label}') 호출: ${propertyKey}`);
+    };
+}
+export class TitleModel {
+    text = '';
+    fontSize = 12;
+}
+__decorate([
+    Property('제목'),
+    __metadata("design:type", String)
+], TitleModel.prototype, "text", void 0);
+__decorate([
+    Property('글자 크기'),
+    __metadata("design:type", Number)
+], TitleModel.prototype, "fontSize", void 0);
+```
+
+- 클래스 본문에는 속성 선언만 남습니다. 데코레이터 적용은 클래스 정의가 끝난 뒤 `__decorate` 호출로 따로 나옵니다.
+- `__decorate`의 두 번째 인자가 데코레이터가 받는 target입니다. 인스턴스 속성이라 `TitleModel.prototype`이 넘어갑니다.
+- 네 번째 인자는 속성 설명자(descriptor) 자리입니다. 속성은 `void 0`(`undefined`)을 넘깁니다. 메서드는 `null`을 넘기고, 그러면 헬퍼가 `Object.getOwnPropertyDescriptor`로 설명자를 읽습니다.
+
+`out-nometa`의 결과와 비교하면 `__metadata`와 관련된 줄만 다릅니다. `fontSize` 쪽도 `text`와 같은 모양으로 바뀌므로 생략했습니다.
+
+```diff
++var __metadata = (this && this.__metadata) || function (k, v) {
++    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
++};
+ ...
+ __decorate([
+-    Property('제목')
++    Property('제목'),
++    __metadata("design:type", String)
+ ], TitleModel.prototype, "text", void 0);
+```
+
+`__metadata` 헬퍼 정의가 생기고, 데코레이터 배열 끝에 `__metadata("design:type", String)` 호출이 하나 붙습니다. 이 예제처럼 속성 타입이 원시 타입이면 차이는 여기까지입니다. 클래스를 타입으로 쓰면 import까지 달라지는데, 이 경우는 `design:type` 절에서 다루겠습니다.
+
+### 데코레이터 호출 시점
+
+`__decorate` 호출은 모듈 최상위에 있습니다. 그래서 데코레이터는 모듈을 처음 불러올 때 클래스 정의 직후에 한 번 호출됩니다. 인스턴스를 몇 개 만들든 다시 호출되지 않습니다.
+
+```typescript
+// src/02-reflect/without-reflect.ts
+import { TitleModel } from '../01-emit/model.js';
+
+console.log('Reflect.metadata 타입:', typeof (Reflect as { metadata?: unknown }).metadata);
+
+new TitleModel();
+new TitleModel();
+console.log('인스턴스 2개 생성 완료');
+```
+
+```text
+$ node out/02-reflect/without-reflect.js
+Property('제목') 호출: text
+Property('글자 크기') 호출: fontSize
+Reflect.metadata 타입: undefined
+인스턴스 2개 생성 완료
+```
+
+`Property` 호출 로그는 `import`가 끝나는 시점에 속성마다 한 번씩만 찍혔습니다. 인스턴스 두 개를 만드는 동안에는 찍히지 않았습니다.
+
+### `__metadata` 헬퍼의 조건
+
+위 출력의 세 번째 줄을 보면 `Reflect.metadata`가 없습니다. 이 예제는 reflect-metadata를 불러오지 않았기 때문입니다. 두 헬퍼의 정의를 보면 이때 무슨 일이 일어나는지 알 수 있습니다.
+
+```javascript
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+```
+
+- `__metadata`는 `Reflect.metadata` 함수가 있을 때만 그 결과를 돌려줍니다. JavaScript 표준 `Reflect` 객체에는 `metadata` 함수가 없고, reflect-metadata 패키지가 추가합니다. 패키지를 불러오지 않으면 `__metadata(...)`는 `undefined`가 됩니다.
+- `__decorate`는 데코레이터 배열을 뒤에서부터 돌면서 `if (d = decorators[i])`로 값이 있는 것만 호출합니다. `undefined`가 된 `__metadata` 자리는 건너뜁니다.
+- 배열을 뒤에서부터 돌기 때문에 `__metadata`가 `Property`보다 먼저 적용됩니다. 그래서 `Property` 안에서 `Reflect.getMetadata`로 `design:type`을 읽을 수 있습니다.
+
+정리하면 `emitDecoratorMetadata`는 메타데이터를 기록하는 호출 코드를 넣고, 실제 기록은 런타임에 reflect-metadata가 맡습니다. reflect-metadata가 없어도 기록 단계에서는 에러나 경고가 나지 않고, 메타데이터만 비어 있습니다.
+
+---
+
+## reflect-metadata의 저장 구조
+
+reflect-metadata를 먼저 불러오고 같은 모델에서 메타데이터를 꺼내 보겠습니다.
+
+```typescript
+// src/02-reflect/with-reflect.ts
+import 'reflect-metadata';
+import { TitleModel } from '../01-emit/model.js';
+
+const proto = TitleModel.prototype;
+
+console.log('text:', Reflect.getMetadata('design:type', proto, 'text'));
+console.log('fontSize:', Reflect.getMetadata('design:type', proto, 'fontSize'));
+console.log('text의 메타데이터 키:', Reflect.getMetadataKeys(proto, 'text'));
+```
+
+```text
+$ node out/02-reflect/with-reflect.js
+Property('제목') 호출: text
+Property('글자 크기') 호출: fontSize
+text: [Function: String]
+fontSize: [Function: Number]
+text의 메타데이터 키: [ 'design:type' ]
+```
+
+`design:type`에 저장된 값은 `String` 생성자 함수 자체입니다. 조회할 때는 데코레이터가 받았던 target인 `TitleModel.prototype`과 속성 이름을 함께 넘깁니다.
+
+reflect-metadata는 메타데이터를 `WeakMap`에 저장하고, 이 `WeakMap`의 키는 target 객체입니다. 패키지의 `Reflect.js`를 열어 보면 `CreateMetadataProvider`가 `new _WeakMap()`으로 저장소를 만듭니다. `_WeakMap`은 런타임에 `WeakMap`이 있으면 그것을 가리키는 변수입니다. 조회할 때는 `GetOrCreateMetadataMap(O, P, Create)`가 target 객체(`O`), 속성 키(`P`) 순서로 맵을 찾아 들어갑니다. 위 예제의 저장 상태를 그려 보면 이렇습니다.
+
+```text
+WeakMap (키: target 객체)
+└─ TitleModel.prototype → Map (키: 속성 이름)
+   ├─ 'text'     → Map { 'design:type' → String }
+   └─ 'fontSize' → Map { 'design:type' → Number }
+```
+
+키가 문자열이 아니라 객체라는 점은 "속성 정보 저장소의 키" 절에서 다시 나옵니다.
+
+### 상속한 클래스에서 조회
+
+`getMetadata`는 target 객체에 값이 없으면 프로토타입 체인을 따라 올라가며 찾습니다. 자기 자신만 보려면 `getOwnMetadata`를 씁니다.
+
+```typescript
+// src/02-reflect/inherit.ts
+import 'reflect-metadata';
+import { TitleModel } from '../01-emit/model.js';
+
+class SubTitleModel extends TitleModel {}
+
+const proto = SubTitleModel.prototype;
+
+console.log('getMetadata:', Reflect.getMetadata('design:type', proto, 'text'));
+console.log('getOwnMetadata:', Reflect.getOwnMetadata('design:type', proto, 'text'));
+console.log('부모 프로토타입:', Object.getPrototypeOf(proto) === TitleModel.prototype);
+```
+
+```text
+$ node out/02-reflect/inherit.js
+Property('제목') 호출: text
+Property('글자 크기') 호출: fontSize
+getMetadata: [Function: String]
+getOwnMetadata: undefined
+부모 프로토타입: true
+```
+
+`SubTitleModel.prototype`에는 메타데이터가 없습니다. `getMetadata`는 한 단계 위의 `TitleModel.prototype`에서 값을 찾았고, `getOwnMetadata`는 찾지 못했습니다. [프로토타입 체인 글](/posts/frontend/prototype)에서 다룬 속성 조회와 같은 순서입니다.
+
+### import 순서
+
+reflect-metadata를 불러오는 위치에 따라 결과가 달라집니다. 앞 예제에서 `import` 두 줄의 순서만 바꿔 보겠습니다.
+
+```typescript
+// src/02-reflect/wrong-order.ts
+import { TitleModel } from '../01-emit/model.js';
+import 'reflect-metadata';
+
+const proto = TitleModel.prototype;
+
+console.log('text:', Reflect.getMetadata('design:type', proto, 'text'));
+console.log('text의 메타데이터 키:', Reflect.getMetadataKeys(proto, 'text'));
+```
+
+```text
+$ node out/02-reflect/wrong-order.js
+Property('제목') 호출: text
+Property('글자 크기') 호출: fontSize
+text: undefined
+text의 메타데이터 키: []
+```
+
+ES 모듈은 `import` 문이 적힌 순서대로 의존 모듈을 먼저 실행합니다. 의존 모듈에 또 의존 모듈이 있으면 그쪽부터 실행하고, 이미 실행한 모듈은 다시 실행하지 않습니다. 이 예제에서는 `01-emit/model.js`가 먼저 실행되고, 그 안의 `__decorate`가 호출되는 시점에는 `Reflect.metadata`가 아직 없습니다. 그래서 `__metadata`가 `undefined`를 돌려주고 아무것도 기록되지 않습니다.
+
+`Reflect.getMetadata`를 호출하는 시점에는 이미 reflect-metadata를 불러왔으므로 호출 자체는 에러 없이 동작합니다. 결과만 비어 있습니다.
+
+reflect-metadata는 데코레이터가 붙은 클래스를 정의하는 어떤 모듈보다 먼저 실행돼야 합니다. 앱의 엔트리 파일 첫 줄에서 불러오는 것이 가장 확실합니다.
+
+---
+
+## `design:type`에 기록되는 값
+
+`design:type`에는 속성에 적은 타입 표기가 생성자 함수 형태로 기록됩니다. 여러 타입의 속성을 선언하고 기록된 값을 출력해 봤습니다.
+
+```typescript
+// src/03-types/types.ts (출력 부분 생략)
+import 'reflect-metadata';
+
+function Mark(target: object, propertyKey: string) {}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+class Color {
+  constructor(public hex: string) {}
+}
+
+class Box<T> {
+  constructor(public value: T) {}
+}
+
+enum Align {
+  Left,
+  Right,
+}
+
+type Size = 'small' | 'large';
+
+class Sample<T> {
+  @Mark str: string = '';
+  @Mark num: number = 0;
+  @Mark bool: boolean = false;
+  @Mark date: Date = new Date();
+  @Mark list: string[] = [];
+  @Mark tuple: [number, number] = [0, 0];
+  @Mark optional?: string;
+  @Mark nullable: string | null = null;
+  @Mark maybe: string | undefined = undefined;
+  @Mark union: string | number = '';
+  @Mark literal: Size = 'small';
+  @Mark align: Align = Align.Left;
+  @Mark point: Point = { x: 0, y: 0 };
+  @Mark color: Color = new Color('#000');
+  @Mark box: Box<string> = new Box('');
+  @Mark map: Map<string, number> = new Map();
+  @Mark record: Record<string, number> = {};
+  @Mark callback: () => void = () => {};
+  @Mark generic: T;
+  @Mark anything: unknown = null;
+  @Mark inferred = 1;
+
+  constructor(generic: T) {
+    this.generic = generic;
+  }
+}
+```
+
+`node out/03-types/types.js`의 출력을 표로 옮기면 이렇습니다.
+
+| 속성 선언 | design:type |
+| --- | --- |
+| `str: string`, `num: number`, `bool: boolean` | `String`, `Number`, `Boolean` |
+| `date: Date` | `Date` |
+| `list: string[]`, `tuple: [number, number]` | `Array` |
+| `optional?: string` | `String` |
+| `nullable: string \| null` | `Object` |
+| `maybe: string \| undefined` | `Object` |
+| `union: string \| number` | `Object` |
+| `literal: Size` (`'small' \| 'large'`) | `String` |
+| `align: Align` (숫자 enum) | `Number` |
+| `point: Point` (인터페이스) | `Object` |
+| `color: Color` (클래스) | `Color` |
+| `box: Box<string>` | `Box` |
+| `map: Map<string, number>` | `Map` |
+| `record: Record<string, number>` | `Object` |
+| `callback: () => void` | `Function` |
+| `generic: T` | `Object` |
+| `anything: unknown` | `Object` |
+| `inferred = 1` (타입 표기 없음) | `Object` |
+
+표에서 규칙 네 가지를 읽을 수 있습니다.
+
+- **적은 타입 표기가 기준입니다.** 컴파일러가 추론한 타입은 쓰지 않습니다. `inferred = 1`처럼 타입 표기를 생략하면 초기값이 숫자여도 `Object`입니다.
+- **런타임에 값이 있는 생성자만 기록됩니다.** 타입 별칭은 가리키는 타입으로 풀어서 판단합니다. `Size`는 문자열 리터럴의 유니온이라 `String`이고, `Record<string, number>`는 객체 타입이라 `Object`입니다. 인터페이스, 타입 매개변수 `T`, `unknown`은 대응하는 생성자가 없어서 `Object`입니다. 클래스 `Color`는 런타임에도 있으므로 클래스 자체가 기록됩니다.
+- **제네릭 타입 인자는 기록되지 않습니다.** `Box<string>`은 `Box`, `string[]`은 `Array`입니다. 그래서 `design:type`만으로는 `string[]`과 `number[]`를 구분할 수 없습니다. 배열 요소 타입이 필요하면 데코레이터 인자로 따로 받아야 합니다.
+- **유니온은 구성원이 한 종류일 때만 그 생성자가 기록됩니다.** `Size`는 둘 다 문자열이라 `String`이고, `string | number`는 `Object`입니다.
+
+`string | null`과 `string | undefined`가 `Object`인 것은 `strict`에 포함된 `strictNullChecks` 때문입니다. 이 옵션이 켜져 있으면 `null`과 `undefined`도 유니온의 구성원으로 취급합니다. 같은 코드를 `strictNullChecks`만 끄고 컴파일하면(`npm run types:nonstrict`) 둘 다 `String`으로 기록됩니다.
+
+선택 속성 `optional?: string`은 `strictNullChecks`와 관계없이 `String`입니다. `?`는 타입 표기가 아니라 속성 선언에 붙는 표시이기 때문입니다.
+
+### 클래스를 타입으로 쓸 때
+
+클래스는 타입이면서 런타임 값이기도 합니다. 그래서 `design:type`에 클래스가 들어가면 두 가지를 알아 둬야 합니다.
+
+첫째, 데코레이터가 실행되는 시점에 그 클래스가 초기화돼 있어야 합니다. 같은 파일 아래쪽에 선언한 클래스를 타입으로 쓰고, 이 모듈을 동적으로 불러와 에러를 출력해 봤습니다.
+
+```typescript
+// src/03-types/later-class.ts
+function Mark(target: object, propertyKey: string) {}
+
+class TitleModel {
+  // 같은 파일 아래쪽에 선언한 클래스를 타입으로 쓴다
+  @Mark
+  color?: Color;
+}
+
+class Color {}
+
+console.log(TitleModel, Color);
+```
+
+```text
+$ node out/03-types/later-class-runner.js
+ReferenceError: Cannot access 'Color' before initialization
+```
+
+`__metadata("design:type", Color)`는 `TitleModel` 정의 직후에 실행되는데, 이때 `Color`는 아직 초기화되기 전입니다. 앞에서 본 경우들은 메타데이터가 비는 것으로 끝났지만, 이 경우는 모듈을 불러오는 것 자체가 실패합니다.
+
+둘째, 다른 모듈의 클래스를 타입 자리에만 써도 그 모듈이 런타임에 실행됩니다.
+
+```typescript
+// src/09-import/color.ts
+console.log('color.ts 실행');
+
+export class Color {
+  constructor(public hex: string) {}
+}
+```
+
+```typescript
+// src/09-import/style-model.ts
+import { Color } from './color.js';
+
+function Mark(target: object, propertyKey: string) {}
+
+export class StyleModel {
+  // Color는 타입 자리에만 쓴다
+  @Mark
+  color?: Color;
+}
+```
+
+`StyleModel`을 불러오기만 하는 `main.ts`를 메타데이터를 켠 결과와 끈 결과로 각각 실행했습니다.
+
+```text
+$ node out/09-import/main.js
+color.ts 실행
+StyleModel 로드 완료: function
+$ node out-nometa/09-import/main.js
+StyleModel 로드 완료: function
+```
+
+TypeScript는 타입 자리에만 쓴 import를 컴파일 결과에서 지웁니다. 메타데이터를 끈 결과에는 `import { Color } from './color.js'`가 없어서 `color.ts`가 실행되지 않았습니다. 메타데이터를 켜면 `__metadata("design:type", Color)`가 `Color`를 값으로 쓰므로 import가 남고, `StyleModel`을 불러올 때 `color.ts`도 함께 실행됩니다. 타입으로만 의존하던 모듈이 런타임 의존성으로 바뀝니다.
+
+### 메서드와 생성자의 메타데이터
+
+메서드와 클래스에 데코레이터를 붙이면 다른 키가 추가됩니다.
+
+```typescript
+// src/04-method/method.ts
+import 'reflect-metadata';
+
+class Logger {}
+
+// NestJS의 @Injectable()과 달리 팩토리가 아니라 데코레이터 함수 자체라 괄호 없이 붙인다
+function Injectable(target: Function) {}
+function Mark(target: object, propertyKey: string, descriptor: PropertyDescriptor) {}
+
+@Injectable
+class TitleService {
+  constructor(private logger: Logger, private prefix: string) {}
+
+  @Mark
+  format(text: string, size: number): string {
+    return `${this.prefix}${text}:${size}`;
+  }
+
+  // 반환 타입을 적지 않은 메서드
+  @Mark
+  count(text: string) {
+    return text.length;
+  }
+}
+
+// 데코레이터가 없는 클래스
+class PlainService {
+  constructor(private logger: Logger) {}
+}
+
+const proto = TitleService.prototype;
+console.log('design:type      ', Reflect.getMetadata('design:type', proto, 'format'));
+console.log('design:paramtypes', Reflect.getMetadata('design:paramtypes', proto, 'format'));
+console.log('design:returntype', Reflect.getMetadata('design:returntype', proto, 'format'));
+console.log('생성자 paramtypes', Reflect.getMetadata('design:paramtypes', TitleService));
+console.log('count의 returntype', Reflect.getMetadata('design:returntype', proto, 'count'));
+console.log('PlainService 생성자 paramtypes', Reflect.getMetadata('design:paramtypes', PlainService));
+```
+
+```text
+$ node out/04-method/method.js
+design:type       [Function: Function]
+design:paramtypes [ [Function: String], [Function: Number] ]
+design:returntype [Function: String]
+생성자 paramtypes [ [class Logger], [Function: String] ]
+count의 returntype undefined
+PlainService 생성자 paramtypes undefined
+```
+
+컴파일 결과에서는 이렇게 보입니다.
+
+```javascript
+// out/04-method/method.js (일부)
+__decorate([
+    Mark,
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Number]),
+    __metadata("design:returntype", String)
+], TitleService.prototype, "format", null);
+TitleService = __decorate([
+    Injectable,
+    __metadata("design:paramtypes", [Logger, String])
+], TitleService);
+```
+
+- 메서드에는 `design:type`(항상 `Function`), `design:paramtypes`(매개변수 타입 배열), `design:returntype`(반환 타입) 세 키가 붙습니다. `design:returntype`도 적은 반환 타입이 기준이라, 반환 타입을 생략한 `count`는 `undefined`입니다.
+- 클래스에 데코레이터가 있으면 생성자 매개변수 타입이 `design:paramtypes`로 붙습니다. 데코레이터가 없는 `PlainService`에는 생기지 않았습니다. NestJS처럼 생성자 주입을 하는 DI 컨테이너는 이 값을 읽고 어떤 인스턴스를 넣을지 정합니다.
+- `Reflect.getMetadata`에 속성 이름 없이 클래스만 넘기면 클래스 자체에 붙은 메타데이터를 읽습니다.
+
+---
+
+## 데코레이터가 받는 target
+
+데코레이터의 첫 번째 인자 target은 인스턴스 멤버인지 static 멤버인지에 따라 다른 객체입니다.
+
+```typescript
+// src/05-target/static-member.ts
+function Inspect(target: object, propertyKey: string) {
+  const kind = typeof target === 'function' ? '클래스(생성자)' : '프로토타입';
+  console.log(`${propertyKey}: target은 ${kind}`);
+}
+
+class TitleModel {
+  @Inspect
+  text: string = '';
+
+  @Inspect
+  static defaultText: string = '제목 없음';
+}
+```
+
+```text
+$ node out/05-target/static-member.js
+text: target은 프로토타입
+defaultText: target은 클래스(생성자)
+```
+
+static 멤버가 있는 이 예제를 컴파일하면 `__decorate`의 두 번째 인자가 둘로 나뉩니다.
+
+```javascript
+], TitleModel.prototype, "text", void 0);
+], TitleModel, "defaultText", void 0);
+```
+
+인스턴스 멤버는 `TitleModel.prototype`을, static 멤버는 `TitleModel` 클래스 자체를 받습니다. 데코레이터가 호출되는 클래스 정의 시점에는 인스턴스가 없으므로, 인스턴스 멤버의 정보는 모든 인스턴스가 공유하는 프로토타입에 붙습니다.
+
+---
+
+## 속성 정보 저장소의 키
+
+reflect-metadata를 쓰지 않고 데코레이터가 직접 저장소에 속성 정보를 모은다면, 저장소의 키를 무엇으로 할지 정해야 합니다. 앞 절의 target 차이와 terser 압축이 모두 이 선택에 영향을 줍니다.
+
+### 클래스 이름을 키로 쓰는 저장소
+
+클래스 이름(`constructor.name`)을 키로 속성 정보를 모으면, 클래스 객체로 조회할 때 결과가 나오지 않습니다. 코드로 확인해 보겠습니다.
+
+```typescript
+// src/05-target/by-name.ts
+interface PropertyInfo {
+  key: string;
+  label: string;
+}
+
+// 클래스 이름을 키로 속성 정보를 모아 두는 저장소
+const registry = new Map<string, PropertyInfo[]>();
+
+let registeredTarget: object | undefined;
+
+function Property(label: string) {
+  return function (target: object, propertyKey: string) {
+    registeredTarget = target;
+    console.log('등록 시점 target.constructor.name:', target.constructor.name);
+
+    const name = target.constructor.name;
+    const list = registry.get(name) ?? [];
+    list.push({ key: propertyKey, label });
+    registry.set(name, list);
+  };
+}
+
+function getProperties(target: object) {
+  return registry.get(target.constructor.name);
+}
+
+class TitleModel {
+  @Property('제목')
+  text: string = '';
+}
+
+console.log('인스턴스로 조회:', getProperties(new TitleModel()));
+console.log('클래스로 조회:', getProperties(TitleModel));
+console.log('TitleModel.constructor.name:', TitleModel.constructor.name);
+console.log('등록 시점 target === TitleModel.prototype:', registeredTarget === TitleModel.prototype);
+```
+
+```text
+$ node out/05-target/by-name.js
+등록 시점 target.constructor.name: TitleModel
+인스턴스로 조회: [ { key: 'text', label: '제목' } ]
+클래스로 조회: undefined
+TitleModel.constructor.name: Function
+등록 시점 target === TitleModel.prototype: true
+```
+
+- 등록할 때 target은 `TitleModel.prototype`이고, 그 `constructor`는 `TitleModel`입니다. 그래서 `'TitleModel'`이라는 키로 저장됩니다.
+- 인스턴스의 `constructor`도 `TitleModel`이라 인스턴스로 조회하면 찾습니다.
+- 클래스 `TitleModel`은 함수 객체라서 `constructor`가 `Function`입니다. `'Function'`이라는 키로 찾으니 결과가 없습니다.
+
+조회 대상의 `constructor.name`이 `Function`이면 클래스 객체로 보고 `prototype`을 꺼내 쓰면 조회할 수 있습니다. 클래스인지 프로토타입인지만 구분하면 되므로 `typeof target === 'function'`으로 확인해도 결과는 같습니다.
+
+### 압축 후의 클래스 이름
+
+이름을 키로 쓰는 방식에는 압축과 관련된 문제가 하나 더 있습니다. terser에 `module: true` 옵션을 주면 ES 모듈의 최상위 이름까지 줄이므로 클래스 이름도 짧게 바뀝니다. 기본 옵션에서는 최상위 클래스 이름이 그대로 남고, `keep_classnames` 옵션으로 줄이지 않게 할 수도 있습니다. 이 글의 측정 스크립트는 모두 `module: true`로 압축했습니다.
+
+위 `by-name.ts`를 Rollup으로 번들하고 압축해 실행하면 이렇습니다.
+
+```text
+$ node dist/mangle/by-name.min.js
+등록 시점 target.constructor.name: r
+인스턴스로 조회: [ { key: 'text', label: '제목' } ]
+클래스로 조회: undefined
+TitleModel.constructor.name: Function
+등록 시점 target === TitleModel.prototype: true
+```
+
+클래스 이름이 `r`로 바뀌었지만, 등록과 조회가 같은 번들 안에서 일어나므로 둘 다 `r`을 읽고 인스턴스로 조회하면 찾습니다.
+
+문제는 따로 빌드한 번들 여러 개가 저장소 하나를 같이 쓸 때입니다. 속성 구조가 같은 모델 두 개로 확인했습니다.
+
+1. `chart.ts`와 `map.ts`에 모델을 하나씩 두고, 둘 다 전역 저장소에 등록합니다.
+2. `scripts/mangle.mjs`가 두 파일을 각각 Rollup으로 번들하고 terser로 압축합니다.
+3. `app.ts`가 두 번들을 차례로 불러옵니다. 각 번들은 로드되면서 저장소 상태를 출력합니다.
+
+```typescript
+// src/07-mangle/registry.ts
+// 이름을 키로 쓰는 전역 저장소. 번들 두 개가 같은 저장소를 쓰는 상황을 흉내 낸다.
+const globalRef = globalThis as { __propertyRegistry?: Map<string, string[]> };
+const registry = (globalRef.__propertyRegistry ??= new Map<string, string[]>());
+
+export function Property(target: object, propertyKey: string) {
+  const name = target.constructor.name;
+  const list = registry.get(name) ?? [];
+  list.push(propertyKey);
+  registry.set(name, list);
+}
+
+export function dump(label: string) {
+  console.log(label, Object.fromEntries(registry));
+}
+```
+
+```typescript
+// src/07-mangle/chart.ts
+import { Property, dump } from './registry.js';
+
+export class ChartTitle {
+  @Property
+  visible: boolean = true;
+}
+
+new ChartTitle();
+dump('chart 번들 로드 후:');
+```
+
+`map.ts`는 클래스 이름이 `MapLegend`이고 출력 문구가 `map 번들 로드 후:`인 것만 다릅니다. 압축하지 않은 `tsc` 결과를 불러온 경우와 압축한 번들을 불러온 경우를 비교했습니다.
+
+```text
+$ node out/07-mangle/app-unminified.js
+chart 번들 로드 후: { ChartTitle: [ 'visible' ] }
+map 번들 로드 후: { ChartTitle: [ 'visible' ], MapLegend: [ 'visible' ] }
+$ node out/07-mangle/app.js
+chart 번들 로드 후: { r: [ 'visible' ] }
+map 번들 로드 후: { r: [ 'visible', 'visible' ] }
+```
+
+압축 전에는 `ChartTitle`과 `MapLegend`로 따로 저장되던 정보가 압축 후에는 하나로 합쳐졌습니다. 두 번들은 코드 모양이 같고, terser는 두 클래스에 똑같이 `r`이라는 이름을 붙였습니다. terser는 번들마다 따로 이름을 정하므로 다른 번들과 겹치는지는 확인하지 않습니다.
+
+이름을 키로 쓰면 압축하지 않아도 다른 패키지에 같은 이름의 클래스가 있을 때 겹칩니다. 압축하면 원래 이름이 달라도 겹칠 수 있습니다.
+
+### 클래스 객체를 키로 쓰는 저장소
+
+클래스 객체를 키로 쓰면, 클래스 객체로 조회하면 결과가 없는 문제와 압축 후 이름이 겹치는 문제가 함께 사라집니다. reflect-metadata도 이름이 아닌 target 객체를 `WeakMap`의 키로 씁니다.
+
+```typescript
+// src/05-target/by-object.ts
+interface PropertyInfo {
+  key: string;
+  label: string;
+}
+
+// 클래스(생성자 함수) 객체 자체를 키로 쓰는 저장소
+const registry = new WeakMap<Function, PropertyInfo[]>();
+
+// 프로토타입이 넘어오면 constructor를, 클래스가 넘어오면 그대로 쓴다
+function toClass(target: object): Function {
+  return typeof target === 'function' ? target : target.constructor;
+}
+
+function Property(label: string) {
+  return function (target: object, propertyKey: string) {
+    const cls = toClass(target);
+    const list = registry.get(cls) ?? [];
+    list.push({ key: propertyKey, label });
+    registry.set(cls, list);
+  };
+}
+
+function getProperties(target: object) {
+  return registry.get(toClass(target));
+}
+
+class TitleModel {
+  @Property('제목')
+  text: string = '';
+}
+
+console.log('인스턴스로 조회:', getProperties(new TitleModel()));
+console.log('클래스로 조회:', getProperties(TitleModel));
+```
+
+```text
+$ node out/05-target/by-object.js
+인스턴스로 조회: [ { key: 'text', label: '제목' } ]
+클래스로 조회: [ { key: 'text', label: '제목' } ]
+```
+
+`toClass`가 프로토타입과 클래스를 같은 클래스 객체로 맞추므로 어느 쪽으로 조회해도 찾습니다. 앞의 압축 예제도 저장소만 이 방식으로 바꿔(`src/08-object-key`) 다시 돌려봤습니다. 이번에는 각 번들이 자기 클래스의 이름과 속성 목록을 출력합니다.
+
+```text
+$ node out/08-object-key/app.js
+chart 번들 ChartTitle 이름: f / 속성: [ 'visible' ]
+map 번들 MapLegend 이름: f / 속성: [ 'visible' ]
+```
+
+두 클래스 모두 이름이 `f`로 바뀌었지만 속성 정보는 섞이지 않았습니다. 키가 서로 다른 두 클래스 객체이기 때문입니다.
+
+다만 이 저장소는 `WeakMap.get`으로 키와 정확히 같은 객체만 찾습니다. reflect-metadata의 `getMetadata`와 달리 프로토타입 체인을 따라 올라가지 않으므로, 자식 클래스로 조회하면 부모 클래스의 속성 정보는 나오지 않습니다. 상속까지 다루려면 `Object.getPrototypeOf`로 부모 클래스를 따라 올라가며 조회해야 합니다.
+
+---
+
+## 번들에 남는 코드
+
+이제 데코레이터로 붙인 정보가 번들에 들어가는지 확인하겠습니다. 번들 예제(`src/06-bundle`)의 파일 구성은 이렇습니다.
+
+- `property.ts`: 클래스 객체를 키로 쓰는 `Property(label, editor)` 데코레이터와 `getProperties`. `editor`는 편집기 종류(`'text'`, `'number'`, `'color'`)입니다
+- `title-decorated.ts`: 속성 세 개에 `Property`를 붙인 `TitleModel`
+- `legend-decorated.ts`: 속성 하나에 `Property`를 붙인 `LegendModel`
+- `lib-decorated.ts`: 위 셋을 함께 내보내는 라이브러리 파일
+
+`scripts/bundle.mjs`가 `tsc` 결과를 Rollup으로 번들하고 terser(`module: true`)로 압축한 뒤, UTF-8 바이트 수와 gzip(`zlib.gzipSync` 기본값) 크기를 잽니다(`npm run bundle`).
+
+```typescript
+// src/06-bundle/title-decorated.ts
+import { Property } from './property.js';
+
+export class TitleModel {
+  @Property('제목', 'text')
+  text: string = '';
+
+  @Property('글자 크기', 'number')
+  fontSize: number = 12;
+
+  @Property('글자 색', 'color')
+  color: string = '#000000';
+}
+```
+
+먼저 `TitleModel`만 불러오는 엔트리(`entry-title.ts`)로 데코레이터가 늘리는 크기를 쟀습니다. 비교 대상은 같은 모양의 `TitleModel`에서 데코레이터를 지우고 `property.ts`도 쓰지 않는 버전입니다.
+
+| 경우 | terser 결과 | terser 결과를 gzip |
+| --- | --- | --- |
+| 데코레이터 없음 | 77 바이트 | 91 바이트 |
+| 데코레이터, 메타데이터 끔 | 799 바이트 | 489 바이트 |
+| 데코레이터, 메타데이터 켬 | 982 바이트 | 532 바이트 |
+
+데코레이터 없는 버전은 77바이트로 작아서, gzip이 붙이는 헤더 때문에 gzip 결과가 오히려 더 큽니다. 메타데이터를 켠 terser 결과 전체입니다.
+
+```javascript
+// dist/bundle/case3.min.js
+const t=new WeakMap;function e(t){return"function"==typeof t?t:t.constructor}function o(o,n){return function(r,c){const f=e(r),i=t.get(f)??[];i.push({key:c,label:o,editor:n}),t.set(f,i)}}var n=function(t,e,o,n){var r,c=arguments.length,f=c<3?e:null===n?n=Object.getOwnPropertyDescriptor(e,o):n;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)f=Reflect.decorate(t,e,o,n);else for(var i=t.length-1;i>=0;i--)(r=t[i])&&(f=(c<3?r(f):c>3?r(e,o,f):r(e,o))||f);return c>3&&f&&Object.defineProperty(e,o,f),f},r=function(t,e){if("object"==typeof Reflect&&"function"==typeof Reflect.metadata)return Reflect.metadata(t,e)};class c{text="";fontSize=12;color="#000000"}n([o("제목","text"),r("design:type",String)],c.prototype,"text",void 0),n([o("글자 크기","number"),r("design:type",Number)],c.prototype,"fontSize",void 0),n([o("글자 색","color"),r("design:type",String)],c.prototype,"color",void 0);const f=new c;var i;console.log(f.text,(i=f,t.get(e(i))??[]).length);
+```
+
+압축된 이름은 `o`가 `Property`, `n`이 `__decorate`, `r`이 `__metadata`, `c`가 `TitleModel`입니다.
+
+- 속성마다 `__decorate` 호출(`n`)이 남고, `Property`에 넘긴 라벨 문자열과 속성 이름도 그대로 남습니다.
+- 메타데이터를 켜면 속성마다 `__metadata` 호출(`r`)이 하나씩 더 붙고, `__metadata` 헬퍼 정의도 들어갑니다.
+- `__decorate` 헬퍼 정의와 `Property`, 저장소 코드도 함께 들어갑니다.
+
+`emitDecoratorMetadata`를 끄면 `__metadata` 호출과 헬퍼가 빠집니다. 속성 타입이 다른 모듈의 클래스라면 그 때문에 남던 import도 함께 빠집니다. 데코레이터 호출은 소스에서 데코레이터를 지워야 빠집니다.
+
+속성 필드(`text=""` 등)는 데코레이터가 없는 버전에도 그대로 남습니다. 메타데이터를 달 목적으로만 만든 속성이라면 필드는 원래 남고, 여기에 `__decorate` 호출과 라벨 문자열이 더해집니다.
+
+### 사용하지 않는 클래스
+
+이번에는 라이브러리 파일을 거쳐 불러오는 엔트리를 번들했습니다. 이 엔트리는 `TitleModel`과 `getProperties`만 가져오고 `LegendModel`은 가져오지 않습니다.
+
+```typescript
+// src/06-bundle/lib-decorated.ts
+export { Property, getProperties } from './property.js';
+export { TitleModel } from './title-decorated.js';
+export { LegendModel } from './legend-decorated.js';
+```
+
+```typescript
+// src/06-bundle/entry-decorated.ts
+// LegendModel은 가져오지 않는다
+import { TitleModel, getProperties } from './lib-decorated.js';
+
+const model = new TitleModel();
+console.log(model.text, getProperties(model).length);
+```
+
+데코레이터가 없는 라이브러리(`lib-plain.ts`)를 거친 번들에서는 `LegendModel`이 빠졌습니다. 데코레이터가 붙은 라이브러리를 거친 번들에서는 이름 없는 클래스로 남았습니다.
+
+```javascript
+f([o("범례 위치","text"),i("design:type",String)],class{position="bottom"}.prototype,"position",void 0)
+```
+
+`__decorate` 헬퍼는 전역 `Reflect.decorate`가 있으면 그것을 호출하고, 결과에 따라 `Object.defineProperty`로 target에 속성을 정의합니다. Rollup은 부수 효과가 없다고 판단한 코드만 지우는데, 이 호출은 지우지 않았고 호출 인자인 클래스도 함께 남았습니다. 데코레이터를 아무 일도 하지 않는 빈 함수로 바꿔도(`entry-noop.ts`) `LegendModel`은 남았습니다.
+
+이 결과는 Rollup의 기본 설정에서 확인한 것입니다. [Rollup의 `treeshake.moduleSideEffects`](https://rollupjs.org/configuration-options/#treeshake-modulesideeffects)를 `false`로 주면, 가져다 쓰는 export가 하나도 없는 모듈은 부수 효과가 없다고 보고 통째로 뺍니다. 같은 엔트리를 이 설정으로 번들하면 `LegendModel`이 빠지고, 크기도 `TitleModel`만 불러온 번들과 같은 982바이트가 됩니다.
+
+### 파일마다 들어가는 헬퍼
+
+라이브러리를 거친 번들에는 `__decorate` 헬퍼가 두 벌 들어 있습니다. `TitleModel` 쪽 호출이 쓰는 `n`과 `LegendModel` 쪽 호출이 쓰는 `f`입니다. `tsc`는 데코레이터를 쓰는 파일마다 헬퍼 정의를 넣기 때문입니다. `importHelpers` 옵션을 켜고 `tslib`을 설치하면 헬퍼를 `tslib`에서 가져오도록 바뀌고, 번들에는 한 벌만 들어갑니다.
+
+```json
+{
+  "compilerOptions": {
+    "importHelpers": true
+  }
+}
+```
+
+| 경우 | terser 결과 | terser 결과를 gzip |
+| --- | --- | --- |
+| 헬퍼를 파일마다 넣음 | 1,531 바이트 | 597 바이트 |
+| `importHelpers` + `tslib` | 1,136 바이트 | 589 바이트 |
+
+gzip 결과는 거의 같습니다. 같은 헬퍼 코드가 반복되면 gzip이 그 부분을 잘 줄이기 때문입니다. 헬퍼는 데코레이터를 쓰는 파일마다 한 벌씩 들어가므로, 그런 파일이 많을수록 terser 결과의 크기 차이는 커집니다.
+
+---
+
+## 빌드 도구별 `design:type` 지원
+
+지금까지는 `tsc`로 컴파일했습니다. 같은 `with-reflect.ts`를 다른 도구로 빌드하거나 실행하면 결과가 다릅니다.
+
+| 도구 | design:type |
+| --- | --- |
+| tsc 7.0.2 | 기록됨 |
+| esbuild 0.28.2 | 기록되지 않음 |
+| tsx 4.23.15 | 기록되지 않음 |
+| Vite 8.3.1 | 일부 기록됨. tsconfig의 `emitDecoratorMetadata`를 따르지만 값이 tsc와 다를 수 있음 |
+
+esbuild로 번들하면 데코레이터 호출은 남지만 `design:type`은 없습니다.
+
+```javascript
+// dist/esbuild/with-reflect.js (일부)
+__decorateClass([
+  Property("제목")
+], TitleModel.prototype, "text", 2);
+```
+
+```text
+$ node dist/esbuild/with-reflect.js
+Property('제목') 호출: text
+Property('글자 크기') 호출: fontSize
+text: undefined
+fontSize: undefined
+text의 메타데이터 키: []
+```
+
+[esbuild 문서](https://esbuild.github.io/content-types/)에는 `emitDecoratorMetadata`를 지원하지 않는다고 적혀 있습니다. 이 옵션은 TypeScript 타입을 JavaScript 값으로 바꿔야 하는데, esbuild는 TypeScript의 타입 시스템을 재현하지 않아 그 타입을 모릅니다.
+
+tsx도 내부에서 esbuild로 변환하므로 결과가 같습니다. 두 경우 모두 경고는 나오지 않습니다.
+
+Vite 8은 `with-reflect.ts`에서는 tsc와 같은 값을 기록했습니다. 하지만 [Vite 문서](https://vite.dev/guide/features)는 이 옵션을 일부만 지원한다고 적고 있습니다. 완전히 지원하려면 TypeScript 컴파일러의 타입 추론이 필요하기 때문입니다. 앞의 `types.ts`를 Vite로 빌드하면(`npm run vite:types`) 같은 파일에 선언한 타입 별칭 `literal: Size`가 tsc의 `String`과 달리 `Object`로 기록됩니다.
+
+개발할 때는 tsx나 Vite로 실행하고 배포할 때는 `tsc`로 빌드한다면, 두 환경의 메타데이터가 다를 수 있습니다.
+
+---
+
+## 표준 데코레이터의 메타데이터
+
+`experimentalDecorators`를 켜지 않으면 TypeScript는 표준 데코레이터로 컴파일합니다. 이때 `emitDecoratorMetadata`를 켜면 컴파일 에러가 납니다.
+
+```text
+error TS5052: Option 'emitDecoratorMetadata' cannot be specified without specifying option 'experimentalDecorators'.
+```
+
+표준 데코레이터는 `(value, context)` 두 인자를 받고, 필드 데코레이터의 `value`는 항상 `undefined`입니다. 타입 정보를 자동으로 기록하는 기능은 없습니다. 대신 `context`에 `metadata` 객체가 있고, 데코레이터가 여기에 쓴 값은 클래스의 `Symbol.metadata` 속성으로 남습니다. 이 예제는 `experimentalDecorators`를 뺀 별도 설정(`standard/tsconfig.json`)으로 컴파일합니다.
+
+```typescript
+// standard/src/standard.ts
+// Node 22에는 Symbol.metadata가 없어서 먼저 채워 둔다
+(Symbol as { metadata?: symbol }).metadata ??= Symbol('Symbol.metadata');
+
+function Property(label: string) {
+  return function (_value: undefined, context: ClassFieldDecoratorContext) {
+    const { metadata } = context;
+
+    // 자기 배열이 없으면 부모 배열을 복사해 새로 만든다
+    if (!Object.hasOwn(metadata, 'properties')) {
+      const inherited = metadata.properties;
+      metadata.properties = Array.isArray(inherited) ? [...inherited] : [];
+    }
+
+    const list = metadata.properties;
+    if (Array.isArray(list)) {
+      list.push(`${String(context.name)}:${label}`);
+    }
+  };
+}
+
+class TitleModel {
+  @Property('제목')
+  text: string = '';
+
+  @Property('글자 크기')
+  fontSize: number = 12;
+}
+
+class SubTitleModel extends TitleModel {
+  @Property('부제')
+  subtitle: string = '';
+}
+
+console.log('TitleModel:', TitleModel[Symbol.metadata]);
+console.log('SubTitleModel:', SubTitleModel[Symbol.metadata]);
+```
+
+```text
+$ node standard/out/standard.js
+TitleModel: [Object: null prototype] {
+  properties: [ 'text:제목', 'fontSize:글자 크기' ]
+}
+SubTitleModel: Object <[Object: null prototype]> {
+  properties: [ 'text:제목', 'fontSize:글자 크기', 'subtitle:부제' ]
+}
+```
+
+- `context.metadata`는 클래스마다 하나씩 만들어집니다. 저장소를 따로 만들 필요가 없고, 클래스 이름이나 target 종류를 신경 쓰지 않아도 됩니다.
+- 자식 클래스의 `context.metadata`는 부모 클래스의 메타데이터 객체를 프로토타입으로 가집니다. 그래서 `metadata.properties`를 그대로 읽으면 부모의 배열이 나옵니다. 위 코드는 `Object.hasOwn`으로 자기 배열이 있는지 확인하고, 없으면 부모 배열을 복사해 새로 만듭니다. 이 확인 없이 읽은 배열에 바로 추가하면 `TitleModel`의 메타데이터에도 `'subtitle:부제'`가 들어갑니다(`standard/src/inherit-naive.ts`).
+- 이 글에서 쓴 Node 22.20.0에는 `Symbol.metadata`가 없습니다. 첫 줄의 폴리필을 빼면 `context.metadata`가 `undefined`가 되어 `TypeError: Cannot convert undefined or null to object`가 납니다. 폴리필은 데코레이터가 붙은 클래스를 정의하는 모듈보다 먼저 실행돼야 합니다.
+- `Symbol.metadata`의 타입 정의는 `lib`의 `ESNext.Decorators`에 있습니다. 이 lib가 없으면 `context.metadata`가 `undefined`일 수 있다는 컴파일 에러도 납니다.
+- [TypeScript 5.2 문서](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-2.html)는 이 기능을 쓸 때 `target`을 `es2022` 이하로 두라고 안내합니다. 이 예제의 `target`은 `ES2022`입니다.
+- `design:type`처럼 속성 타입이 필요하면 `experimentalDecorators`와 reflect-metadata 조합을 써야 합니다.
+
+---
+
+## 정리
+
+글 앞에서 던진 질문과 확인한 결과를 정리하면 이렇습니다.
+
+| 질문 | 확인한 결과 |
+| --- | --- |
+| 언제 호출되는가 | 모듈을 처음 불러올 때 클래스 정의 직후 한 번 |
+| 무엇을 받는가 | 인스턴스 멤버는 프로토타입, static 멤버는 클래스 |
+| 압축한 번들에서도 꺼낼 수 있는가 | 꺼낼 수 있다. 다만 클래스 이름을 키로 쓰면 따로 빌드한 번들끼리 이름이 겹칠 수 있다 |
+| 데코레이터 정보가 번들에 들어가는가 | 데코레이터 호출, 인자로 넘긴 값, 속성 이름이 그대로 들어간다 |
+| 뺄 수 있는가 | `emitDecoratorMetadata`를 끄면 `__metadata` 호출과 클래스 타입 때문에 남던 import가 빠진다. 데코레이터 호출은 소스에서 지워야 빠진다 |
+
+- `emitDecoratorMetadata`는 `__metadata` 호출을 넣고, 기록은 런타임의 reflect-metadata가 합니다. reflect-metadata가 없거나 늦게 불러와도 기록 단계에서는 에러 없이 메타데이터만 비어 있습니다.
+- reflect-metadata는 엔트리 파일 첫 줄에서 불러옵니다.
+- `design:type`은 적은 타입 표기를 기준으로 런타임 생성자만 기록합니다. 인터페이스는 `Object`로 기록되고, 유니온도 구성원의 타입이 서로 다르면 `Object`입니다. 제네릭 타입 인자는 기록되지 않습니다.
+- 클래스를 타입으로 쓰면 그 클래스가 먼저 초기화돼 있어야 하고, 다른 모듈의 클래스라면 그 모듈의 import가 런타임에 남습니다.
+- 데코레이터로 모은 정보는 클래스 이름 대신 클래스 객체를 키로 저장하는 편이 낫습니다. 프로토타입과 클래스를 같은 키로 맞출 수 있고, 압축으로 바뀐 이름의 영향도 받지 않습니다.
+- Rollup 기본 설정에서는 데코레이터가 붙은 클래스를 쓰지 않아도 번들에서 빠지지 않았습니다. `treeshake.moduleSideEffects`를 `false`로 주면 쓰지 않는 모듈째 빠집니다.
+- esbuild와 tsx는 `design:type`을 만들지 않고, Vite 8은 일부만 만듭니다. 메타데이터에 의존하는 코드라면 빌드와 실행 도구를 먼저 확인합니다.
+
+## 마치며
+
+데코레이터 메타데이터는 세 단계를 거칩니다. 컴파일러가 `__metadata` 호출을 넣고, reflect-metadata가 값을 저장하고, 번들러가 그 호출을 결과물에 남깁니다. 메타데이터가 비어 있으면 컴파일 결과와 번들 결과물에 `design:type`이 있는지부터 확인합니다.
+
+데코레이터 문법과 Logger·Validator 같은 기본 구현은 [데코레이터 글](/posts/frontend/ts-decorator)에서 다뤘습니다.
+
+글에 나온 예제와 측정 스크립트는 [decorator-metadata 예제 저장소](https://github.com/Malloc72P/Blog/tree/main/playground/decorator-metadata)에 있습니다. `npm install`과 `npm run build`를 실행한 뒤 README의 스크립트로 각 결과를 다시 확인할 수 있습니다. 긴 글 읽어주셔서 감사합니다.

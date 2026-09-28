@@ -1,0 +1,36 @@
+{
+  "name": "decorator-metadata",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "데코레이터 메타데이터(design:type, reflect-metadata)와 번들 결과를 실제로 확인하는 예제",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.json --emitDecoratorMetadata false --outDir out-nometa && tsc -p tsconfig.json --importHelpers --outDir out-helpers",
+    "reflect": "node out/02-reflect/without-reflect.js && node out/02-reflect/with-reflect.js && node out/02-reflect/wrong-order.js && node out/02-reflect/inherit.js",
+    "types": "node out/03-types/types.js",
+    "types:nonstrict": "tsc -p tsconfig.json --strictNullChecks false --outDir out-nonstrict && node out-nonstrict/03-types/types.js",
+    "types:tdz": "node out/03-types/later-class-runner.js",
+    "import": "node out/09-import/main.js && node out-nometa/09-import/main.js",
+    "method": "node out/04-method/method.js",
+    "target": "node out/05-target/static-member.js && node out/05-target/by-name.js && node out/05-target/by-object.js",
+    "bundle": "node scripts/bundle.mjs",
+    "mangle": "node scripts/mangle.mjs && node dist/mangle/by-name.min.js && node out/07-mangle/app-unminified.js && node out/07-mangle/app.js && node out/08-object-key/app.js",
+    "esbuild": "esbuild src/02-reflect/with-reflect.ts --bundle --platform=node --format=esm --charset=utf8 --log-level=warning --outfile=dist/esbuild/with-reflect.js && node dist/esbuild/with-reflect.js",
+    "tsx": "tsx src/02-reflect/with-reflect.ts",
+    "vite": "vite build --logLevel warn && node dist/vite/with-reflect.js",
+    "vite:types": "vite build --config vite.types.config.mjs --logLevel warn && node dist/vite-types/types.js",
+    "standard": "tsc -p standard/tsconfig.json && node standard/out/standard.js && node standard/out/inherit-naive.js"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@types/node": "^22.20.4",
+    "esbuild": "^0.28.2",
+    "reflect-metadata": "^0.2.2",
+    "rollup": "^4.63.5",
+    "terser": "^5.51.2",
+    "tslib": "^2.8.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}
