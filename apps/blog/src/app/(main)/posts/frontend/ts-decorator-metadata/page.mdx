@@ -370,7 +370,7 @@ $ node out/03-types/later-class-runner.js
 ReferenceError: Cannot access 'Color' before initialization
 ```
 
-`__metadata("design:type", Color)`는 `TitleModel` 정의 직후에 실행되는데, 이때 `class Color`는 아직 선언되기 전입니다. 앞에서 본 경우들은 메타데이터가 비는 것으로 끝났지만, 이 경우는 모듈을 불러오는 것 자체가 실패합니다.
+`__metadata("design:type", Color)`는 `TitleModel` 정의 직후에 실행되는데, 이때 `Color`는 아직 초기화되기 전입니다. 앞에서 본 경우들은 메타데이터가 비는 것으로 끝났지만, 이 경우는 모듈을 불러오는 것 자체가 실패합니다.
 
 둘째, 다른 모듈의 클래스를 타입 자리에만 써도 그 모듈이 런타임에 실행됩니다.
 
@@ -648,13 +648,13 @@ chart 번들 로드 후: { r: [ 'visible' ] }
 map 번들 로드 후: { r: [ 'visible', 'visible' ] }
 ```
 
-압축 전에는 `ChartTitle`과 `MapLegend`로 따로 저장되던 정보가 압축 후에는 하나로 합쳐졌습니다. 두 번들의 코드 모양이 같아서 terser가 두 클래스에 똑같이 `r`이라는 이름을 붙였기 때문입니다. terser는 번들마다 따로 이름을 정하므로 다른 번들과 겹치는지는 확인하지 않습니다.
+압축 전에는 `ChartTitle`과 `MapLegend`로 따로 저장되던 정보가 압축 후에는 하나로 합쳐졌습니다. 두 번들은 코드 모양이 같고, terser는 두 클래스에 똑같이 `r`이라는 이름을 붙였습니다. terser는 번들마다 따로 이름을 정하므로 다른 번들과 겹치는지는 확인하지 않습니다.
 
 이름을 키로 쓰면 압축하지 않아도 다른 패키지에 같은 이름의 클래스가 있을 때 겹칩니다. 압축하면 원래 이름이 달라도 겹칠 수 있습니다.
 
 ### 클래스 객체를 키로 쓰는 저장소
 
-클래스 객체를 키로 쓰면, 클래스로 조회하면 못 찾는 문제와 압축 후 이름이 겹치는 문제가 함께 사라집니다. reflect-metadata도 이름이 아닌 target 객체를 `WeakMap`의 키로 씁니다.
+클래스 객체를 키로 쓰면, 클래스 객체로 조회하면 결과가 없는 문제와 압축 후 이름이 겹치는 문제가 함께 사라집니다. reflect-metadata도 이름이 아닌 target 객체를 `WeakMap`의 키로 씁니다.
 
 ```typescript
 // src/05-target/by-object.ts
@@ -717,7 +717,7 @@ map 번들 MapLegend 이름: f / 속성: [ 'visible' ]
 
 이제 데코레이터로 붙인 정보가 번들에 들어가는지 확인하겠습니다. 번들 예제(`src/06-bundle`)의 파일 구성은 이렇습니다.
 
-- `property.ts`: 클래스 객체를 키로 쓰는 `Property(label, editor)` 데코레이터와 `getProperties`
+- `property.ts`: 클래스 객체를 키로 쓰는 `Property(label, editor)` 데코레이터와 `getProperties`. `editor`는 편집기 종류(`'text'`, `'number'`, `'color'`)입니다
 - `title-decorated.ts`: 속성 세 개에 `Property`를 붙인 `TitleModel`
 - `legend-decorated.ts`: 속성 하나에 `Property`를 붙인 `LegendModel`
 - `lib-decorated.ts`: 위 셋을 함께 내보내는 라이브러리 파일
@@ -761,7 +761,7 @@ const t=new WeakMap;function e(t){return"function"==typeof t?t:t.constructor}fun
 - 메타데이터를 켜면 속성마다 `__metadata` 호출(`r`)이 하나씩 더 붙고, `__metadata` 헬퍼 정의도 들어갑니다.
 - `__decorate` 헬퍼 정의와 `Property`, 저장소 코드도 함께 들어갑니다.
 
-`emitDecoratorMetadata`를 꺼서 뺄 수 있는 것은 `__metadata` 호출과 헬퍼뿐입니다. 데코레이터 호출은 소스에서 데코레이터를 지워야 빠집니다.
+`emitDecoratorMetadata`를 끄면 `__metadata` 호출과 헬퍼가 빠집니다. 속성 타입이 다른 모듈의 클래스라면 그 때문에 남던 import도 함께 빠집니다. 데코레이터 호출은 소스에서 데코레이터를 지워야 빠집니다.
 
 속성 필드(`text=""` 등)는 데코레이터가 없는 버전에도 그대로 남습니다. 메타데이터를 달 목적으로만 만든 속성이라면 필드는 원래 남고, 여기에 `__decorate` 호출과 라벨 문자열이 더해집니다.
 
@@ -918,6 +918,7 @@ SubTitleModel: Object <[Object: null prototype]> {
 - 자식 클래스의 `context.metadata`는 부모 클래스의 메타데이터 객체를 프로토타입으로 가집니다. 그래서 `metadata.properties`를 그대로 읽으면 부모의 배열이 나옵니다. 위 코드는 `Object.hasOwn`으로 자기 배열이 있는지 확인하고, 없으면 부모 배열을 복사해 새로 만듭니다. 이 확인 없이 읽은 배열에 바로 추가하면 `TitleModel`의 메타데이터에도 `'subtitle:부제'`가 들어갑니다(`standard/src/inherit-naive.ts`).
 - 이 글에서 쓴 Node 22.20.0에는 `Symbol.metadata`가 없습니다. 첫 줄의 폴리필을 빼면 `context.metadata`가 `undefined`가 되어 `TypeError: Cannot convert undefined or null to object`가 납니다. 폴리필은 데코레이터가 붙은 클래스를 정의하는 모듈보다 먼저 실행돼야 합니다.
 - `Symbol.metadata`의 타입 정의는 `lib`의 `ESNext.Decorators`에 있습니다. 이 lib가 없으면 `context.metadata`가 `undefined`일 수 있다는 컴파일 에러도 납니다.
+- [TypeScript 5.2 문서](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-2.html)는 이 기능을 쓸 때 `target`을 `es2022` 이하로 두라고 안내합니다. 이 예제의 `target`은 `ES2022`입니다.
 - `design:type`처럼 속성 타입이 필요하면 `experimentalDecorators`와 reflect-metadata 조합을 써야 합니다.
 
 ---
@@ -932,7 +933,7 @@ SubTitleModel: Object <[Object: null prototype]> {
 | 무엇을 받는가 | 인스턴스 멤버는 프로토타입, static 멤버는 클래스 |
 | 압축한 번들에서도 꺼낼 수 있는가 | 꺼낼 수 있다. 다만 클래스 이름을 키로 쓰면 따로 빌드한 번들끼리 이름이 겹칠 수 있다 |
 | 데코레이터 정보가 번들에 들어가는가 | 데코레이터 호출, 인자로 넘긴 값, 속성 이름이 그대로 들어간다 |
-| 뺄 수 있는가 | `emitDecoratorMetadata`를 끄면 `__metadata`만 빠진다. 데코레이터 호출은 소스에서 지워야 빠진다 |
+| 뺄 수 있는가 | `emitDecoratorMetadata`를 끄면 `__metadata` 호출과 클래스 타입 때문에 남던 import가 빠진다. 데코레이터 호출은 소스에서 지워야 빠진다 |
 
 - `emitDecoratorMetadata`는 `__metadata` 호출을 넣고, 기록은 런타임의 reflect-metadata가 합니다. reflect-metadata가 없거나 늦게 불러와도 기록 단계에서는 에러 없이 메타데이터만 비어 있습니다.
 - reflect-metadata는 엔트리 파일 첫 줄에서 불러옵니다.
