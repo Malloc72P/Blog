@@ -3,7 +3,7 @@ import { frontmatter } from '@libs/frontmatter';
 export const metadata = frontmatter({
   title: 'TypeScript 바닥 타입 never와 꼭대기 타입 unknown',
   description:
-    'unknown을 any보다 안전하게 다루는 법, never가 나오는 상황, 그리고 never로 분기 누락을 컴파일 타임에 잡는 exhaustive check까지 실제 코드로 정리합니다.',
+    'unknown을 any보다 안전하게 다루는 법, never가 나오는 상황, never로 분기 누락을 컴파일 타임에 잡는 exhaustive check까지 실제 코드로 정리합니다.',
   seriesId: 'frontend',
   postId: 'ts-never-unknown',
   tags: ['TypeScript', 'never', 'unknown', '타입시스템'],
@@ -33,7 +33,7 @@ function lengthOf(input: unknown): number {
 }
 ```
 
-`input`이 문자열인지 배열인지 숫자인지 모르니, `length`가 있다고 보장할 수 없다는 것입니다. 컴파일러는 좁히기를 요구합니다.
+`input`이 문자열인지 배열인지 숫자인지 모르니, `length`가 있다고 보장할 수 없습니다. 컴파일러는 좁히기를 요구합니다.
 
 ```typescript
 function lengthOf(input: unknown): number {
@@ -49,7 +49,7 @@ console.log(lengthOf([1, 2, 3])); // 3
 console.log(lengthOf(42)); // 0
 ```
 
-`any`와 비교하면 `unknown`의 차이가 분명해집니다. `any`는 검사를 전부 꺼버립니다.
+`any`와 비교하면 `unknown`이 어떻게 다른지 분명해집니다. `any`는 검사를 전부 꺼버립니다.
 
 ```typescript
 const dangerous: any = 'just a string';
@@ -59,18 +59,18 @@ const safe: unknown = 'just a string';
 safe.foo; // error TS18046: 'safe' is of type 'unknown'.
 ```
 
-둘 다 "타입을 모른다"를 표현하지만, `any`는 모른다는 이유로 검사를 포기하고, `unknown`은 모르기 때문에 오히려 확인을 강제합니다. 외부에서 들어오는 값, 예를 들어 `JSON.parse`의 결과나 `catch` 절의 에러처럼 타입을 단정할 수 없는 자리에는 `any` 대신 `unknown`을 두는 편이 안전합니다.
+둘 다 "타입을 모른다"를 표현합니다. 하지만 `any`는 모른다는 이유로 검사를 포기하고, `unknown`은 모르기 때문에 오히려 확인을 강제합니다. `JSON.parse`의 결과나 `catch` 절의 에러처럼 외부에서 들어와 타입을 단정할 수 없는 값에는 `any` 대신 `unknown`을 쓰는 편이 안전합니다.
 
 ## never: 발생할 수 없는 값
 
-`never`는 우리가 직접 적기보다 컴파일러가 추론해서 등장하는 경우가 많습니다. 대표적으로 불가능한 교차 타입입니다.
+`never`는 직접 적기보다 컴파일러의 추론 결과로 나타나는 경우가 많습니다. 대표적인 예는 불가능한 교차 타입입니다.
 
 ```typescript
 // string이면서 동시에 number인 값은 존재할 수 없다.
 type Impossible = string & number; // 타입은 never
 ```
 
-`string`과 `number`를 동시에 만족하는 값은 없으므로, 교차한 결과는 빈 집합, 즉 `never`가 됩니다. 타입을 잘못 조합했을 때 에러 메시지에 `never`가 보이는 건 보통 이런 이유입니다.
+`string`과 `number`를 동시에 만족하는 값은 없으므로, 교차한 결과는 빈 집합, 즉 `never`가 됩니다. 타입을 잘못 조합했을 때 에러 메시지에 `never`가 보이는 건 보통 이 때문입니다.
 
 또 하나는 정상적으로 반환하지 않는 함수입니다. 예외를 던지거나 무한 루프에 빠지는 함수는 반환 타입이 `never`입니다.
 
@@ -126,7 +126,7 @@ console.log(area({ kind: 'square', size: 3 })); // 9
 
 모든 `kind`를 처리하면 `default`에 도달하는 `shape`의 타입은 `never`로 좁혀집니다. 그래서 `never`에 할당하는 코드가 문제없이 통과합니다.
 
-종류를 하나 추가했을 때를 예로 들어보겠습니다. `triangle`을 유니온에 더했는데 `switch`에 케이스를 빠뜨리면, `default`로 흘러드는 `shape`에는 아직 triangle 타입이 남아 있습니다. `never`가 아닌 값을 `never`에 넣으려 하니 컴파일 에러가 납니다.
+종류를 하나 추가했을 때를 예로 들어보겠습니다. `triangle`을 유니온에 더했는데 `switch`에 케이스를 빠뜨리면, `default`에 도달하는 `shape`에는 아직 triangle 타입이 남아 있습니다. `never`가 아닌 값을 `never`에 넣으려 하니 컴파일 에러가 납니다.
 
 ```typescript
 type Shape =
@@ -153,13 +153,13 @@ function area(shape: Shape): number {
 
 ![triangle 케이스 누락으로 tsc가 error TS2322를 출력한 터미널 화면](/ts-exhaustive-error.png)
 
-이 패턴을 쓰면 런타임에 실행해 보기 전에, 유니온에 타입을 추가하는 시점에 컴파일 에러로 누락을 알 수 있습니다.
+이 패턴을 쓰면 코드를 실행하지 않고도, 유니온에 타입을 추가하는 시점에 컴파일 에러로 누락을 알 수 있습니다.
 
 ## void와 never의 차이
 
-`never`를 처음 보면 `void`와 헷갈리기 쉽습니다. 둘 다 "반환값이 마땅치 않은" 자리에 쓰이지만 의미가 다릅니다.
+`never`를 처음 보면 `void`와 헷갈리기 쉽습니다. 둘 다 "마땅한 반환값이 없는" 자리에 쓰이지만 의미가 다릅니다.
 
-`void`는 함수가 정상적으로 끝나되 의미 있는 값을 반환하지 않는다는 뜻입니다. 반면 `never`는 함수가 **끝까지 도달하지 못한다**는 뜻입니다. 예외를 던지거나 무한 루프에 빠지는 함수입니다.
+`void`는 함수가 정상적으로 끝나되 의미 있는 값을 반환하지 않는다는 뜻입니다. 반면 `never`는 함수가 **끝까지 도달하지 못한다**는 뜻입니다. 예외를 던지거나 무한 루프에 빠지는 함수가 여기에 해당합니다.
 
 ```typescript
 function logMessage(msg: string): void {

@@ -3,7 +3,7 @@ import { frontmatter } from '@libs/frontmatter';
 export const metadata = frontmatter({
   title: 'NPM Classic Token 종료와 Trusted Publishing 전환',
   description:
-    'NPM은 보안 강화를 위해 Classic Token을 종료하고 Granular Token과 Trusted Publishing을 대안으로 제시했습니다. Trusted Publishing은 GitHub Actions와 연동해 토큰을 따로 관리하지 않아도 되고, 배포할 때만 유효한 임시 토큰을 사용합니다.',
+    'NPM은 보안 강화를 위해 Classic Token 지원을 종료하고 Granular Token과 Trusted Publishing을 대안으로 제시했습니다. Trusted Publishing은 GitHub Actions와 연동해 토큰을 따로 관리하지 않아도 되고, 배포할 때만 유효한 임시 토큰을 사용합니다.',
   seriesId: 'frontend',
   postId: 'npm-trusted-publishing',
   tags: ['npm', 'GitHub Actions', 'Trusted Publishing', 'OIDC'],
@@ -12,7 +12,7 @@ export const metadata = frontmatter({
 
 NPM이 보안 강화를 위해 **Classic Token** 지원을 종료했습니다. **2025년 12월 9일**부터 Classic Token은 더 이상 사용할 수 없습니다.
 
-Classic Token은 권한 범위가 넓고 유효기간도 강제하지 않았습니다. 그래서 토큰이 유출되면 계정 전체가 탈취될 위험이 컸습니다. NPM은 Classic Token 대신 **Granular Token**이나 **Trusted Publishing** 중 하나를 사용하도록 권장합니다.
+Classic Token은 권한 범위가 넓고 유효기간이 필수가 아니었습니다. 그래서 토큰이 유출되면 계정 전체가 탈취될 위험이 컸습니다. NPM은 Classic Token 대신 **Granular Token**이나 **Trusted Publishing** 중 하나를 사용하도록 권장합니다.
 
 ## Granular Token과 Trusted Publishing
 

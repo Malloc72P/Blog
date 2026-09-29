@@ -4,7 +4,7 @@ import { PostVideo } from '@components/post-detail/post-video';
 export const metadata = frontmatter({
   title: 'LLM Tool Calling으로 AI가 내 애플리케이션의 함수를 직접 호출하게 하기',
   description:
-    'LLM의 Tool Calling 기능을 통해, 내 애플리케이션에서 AI가 코드를 실행하는 방법에 대해 다룹니다.',
+    'LLM의 Tool Calling 기능을 통해, 내 애플리케이션에서 AI가 코드를 실행하는 방법을 다룹니다.',
   seriesId: 'ai',
   postId: 'ai-tool',
   tags: ['LLM', 'AI Chatting', 'Tool Calling'],
@@ -16,36 +16,36 @@ export const metadata = frontmatter({
 ## LLM이 내 애플리케이션의 코드를 실행하게 하려면?
 
 ChatGPT나 Gemini, Claude와 같은 LLM은 학습된 데이터 내에서만 답변을 생성할 수 있어 외부 시스템을 제어하는 작업에 약합니다.
-이러한 한계를 극복하게 해주는 기능이 Tool Calling이라고 부르는 기능입니다.
+이러한 한계를 극복하는 기능이 Tool Calling입니다.
 
-Tool Calling이란 사용자가 자신의 애플리케이션 내에 있는 함수의 이름, 설명, 매개변수 구조를 JSON 형태로 사전에 정의하여 모델에게 제공하는 방식으로 동작합니다.
+Tool Calling은 사용자가 자신의 애플리케이션에 있는 함수의 이름, 설명, 매개변수 구조를 JSON 형태로 사전에 정의하여 모델에게 제공하는 방식으로 동작합니다.
 LLM은 프롬프트를 분석한 뒤 상황에 맞는 Tool이 있는 경우 이를 호출해 달라는 요청(Tool Call)을 반환합니다.
-그러면 사용자의 애플리케이션에서 이 요청대로 실제 함수를 실행하고, 그 결과를 모델에게 다시 전달하는 방식으로 동작합니다.
+그러면 사용자의 애플리케이션이 이 요청대로 실제 함수를 실행하고, 그 결과를 모델에게 다시 전달합니다.
 
-이러한 방식을 통해 LLM은 보다 더 상황에 맞는 문맥을 기반으로 더 나은 품질의 답변을 해주거나, 외부 시스템을 제어할 수 있게 됩니다.
+이러한 방식을 통해 LLM은 상황에 더 맞는 문맥을 기반으로 더 나은 품질의 답변을 해주거나, 외부 시스템을 제어할 수 있습니다.
 
-이번 포스트에선 관리자 페이지의 AI 채팅패널을 통해, 사용자가 원하는 기간의 방문자 수 추이를 라인차트로 그리는 기능을 구현해보도록 하겠습니다.
+이번 포스트에선 관리자 페이지의 AI 채팅패널을 통해, 사용자가 원하는 기간의 방문자 수 추이를 라인 차트로 그리는 기능을 구현해보겠습니다.
 
 ### 방법 1: AI에게 코드를 작성해달라고 요청하기
 
 당장 떠오르는 쉬운 방법은, AI에게 코드를 작성해달라고 요청한 다음, 이를 eval 함수로 실행하는 것입니다.
 다만 이 방법은 여러 문제점이 있습니다.
 
-1. AI가 아주 조금만 실수해도 코드 실행이 안됨
+1. AI가 아주 조금만 실수해도 코드 실행이 안 됨
 2. eval 자체의 위험성
 
 먼저, AI가 작성한 코드가 완벽하다는 보장이 없습니다. 대부분의 경우 잘 실행되겠지만, 가끔가다가 따옴표를 이상하게 붙인다거나 하면 기능이 오동작하게 됩니다.
 그렇다고 예외처리를 하자니, 어떤 예외가 있을지도 모르고, 발생 가능한 예외도 너무 다양하니 어렵습니다.
 그리고 eval을 사용해야 한다는 것도 큰 문제입니다.
-eval은 사용자 브라우저에서 외부 코드를 실행하는 함수인 만큼, 만약 AI가 이상한 코드를 작성해서 준다면 예상치 못한 문제를 만날 수 있게 됩니다.
+eval은 사용자 브라우저에서 외부 코드를 실행하는 함수인 만큼, 만약 AI가 이상한 코드를 작성해서 준다면 예상치 못한 문제가 생길 수 있습니다.
 따라서 이 방법은 그다지 선택하고 싶은 방법이 아니네요.
 
 ### 방법 2: AI의 Tool Calling
 
 ChatGPT, Gemini, Claude와 같은 AI 서비스는 AI를 통해 함수를 호출하는 기능을 제공합니다. 흔히 이를 Tool Calling이라고 부르는데, 좀 더 자세히 설명하면,
-사전에 정의된 함수를 AI에게 알려주면, AI가 상황에 맞는 함수를 어떤 매개변수로 호출할지를 알려주는 기능이라고 할 수 있습니다.
-Tool Calling을 사용하면, AI가 전체 코드를 작성하고 이를 실행하는 방법이 아니기에, 실수할 확률도 현저하게 줄어들며, 의도하지 않은 코드가 실행될 가능성도 차단할 수 있습니다.  
-또한 여러 Tool Calling을 조합한다면, AI가 서비스에서 복잡한 기능을 보다 더 안전하게 실행할 수 있게 됩니다.
+사전에 정의된 함수를 AI에게 알려주면, AI가 상황에 맞는 함수를 어떤 매개변수로 호출할지를 알려주는 기능입니다.
+Tool Calling은 AI가 전체 코드를 작성하고 이를 실행하는 방법이 아니기에, 실수할 확률도 현저하게 줄어들며, 의도하지 않은 코드가 실행될 가능성도 차단할 수 있습니다.  
+또한 여러 Tool Calling을 조합한다면, AI가 서비스에서 복잡한 기능을 더 안전하게 실행할 수 있습니다.
 
 백문이 불여일타라고, 직접 실습하면서 사용 방법을 알아보겠습니다.
 
@@ -55,13 +55,13 @@ Tool Calling을 사용하면, AI가 전체 코드를 작성하고 이를 실행�
 
 ### 프로젝트 초기화
 
-먼저 Next.js 프로젝트를 설치하고 간단하게 세팅하겠습니다. 아래의 명령어를 실행해주세요.
+먼저 Next.js 프로젝트를 생성하고 간단하게 세팅하겠습니다. 아래의 명령어를 실행해주세요.
 
 ```sh
 pnpm create next-app@16.2.1 ai-tool-exam --yes
 ```
 
-실행하고 나면, 현재 경로 밑에 ai-tool-exam이라는 폴더가 생성되고, 그 안에 next.js 앱이 생성됩니다.  
+실행하고 나면, 현재 경로 밑에 ai-tool-exam이라는 폴더가 생기고, 그 안에 Next.js 앱이 생성됩니다.  
 필요한 차트 라이브러리를 추가로 설치하겠습니다.
 
 ```sh
@@ -73,7 +73,7 @@ pnpm install chart.js react-chartjs-2
 실습에서 사용할 차트 컴포넌트입니다. 아래와 같은 상황을 가정하겠습니다.
 
 - API를 통해 지정한 기간의 날짜별 방문자 수 정보를 구할 수 있는 상황.
-- 관리자는 AI 채팅을 통해 원하는 기간의 방문자 수 정보를 라인 차트로 보고 싶은 상황.
+- 관리자가 AI 채팅을 통해 원하는 기간의 방문자 수 정보를 라인 차트로 보고 싶어 하는 상황.
 
 app 폴더 밑에 line-chart.tsx라는 파일을 생성하고, 아래와 같이 작성합니다.
 
@@ -110,7 +110,7 @@ export function LineChart({ options, data }: LineChartProps) {
 }
 ```
 
-그 다음, app/use-query-data.ts 파일을 생성하고 아래와 같이 작성합니다.
+그다음, app/use-query-data.ts 파일을 생성하고 아래와 같이 작성합니다.
 
 ```tsx
 import { ChartData } from 'chart.js';
@@ -266,7 +266,7 @@ export default function Home() {
 
 지금은 Test 버튼을 누르면 차트를 그리도록 구현되어 있습니다. 이제 AI를 사용해서 사용자가 말한 범위 내의 데이터로 차트를 그리도록 구현해보겠습니다.
 
-아래의 명령어를 실행해서 next.js 앱을 실행하고, localhost:3000으로 접속 후, 차트 화면이 잘 나오는지 확인합니다.
+아래 명령어로 Next.js 앱을 실행하고, localhost:3000으로 접속해 차트 화면이 잘 나오는지 확인합니다.
 
 ```sh
 pnpm dev
@@ -285,7 +285,7 @@ GEMINI_API_KEY="GEMINI API키를 여기에 입력"
 
 ### Google GenAI SDK 설치
 
-아래 명령어를 실행하여 GenAI SDK를 설치합니다. 해당 라이브러리는 Gemini API를 호출할 수 있도록 도와주는 라이브러리입니다.
+아래 명령어를 실행하여 GenAI SDK를 설치합니다. 이 SDK는 Gemini API 호출을 도와주는 라이브러리입니다.
 
 ```sh
 pnpm install @google/genai
@@ -293,7 +293,7 @@ pnpm install @google/genai
 
 ### 채팅 요청을 처리하는 서버액션 구현하기
 
-앞서 설치한 genai 라이브러리를 통해 채팅 요청을 처리하는 서버액션을 구현하겠습니다.
+앞서 설치한 GenAI SDK를 통해 채팅 요청을 처리하는 서버액션을 구현하겠습니다.
 서버액션에 대해 잘 모르시는 분들은 [서버액션에 대한 포스트](https://blog.malloc72p.com/posts/fullstack/nextjs-grid-app-1)를 참고해주세요.
 
 먼저 프로젝트 루트 경로에 server/request-ai.ts 파일을 생성하고 아래와 같이 작성해주세요.
@@ -427,13 +427,13 @@ const response = await ai.models.generateContent({
 });
 ```
 
-- 모델은 Gemini 2.5 Flash Lite를 사용합니다. 해당 포스트를 작성하는 시점에 이 모델이 제일 저렴해서 골랐습니다.
+- 모델은 Gemini 2.5 Flash Lite를 사용합니다. 이 포스트를 작성하는 시점에 이 모델이 제일 저렴해서 골랐습니다.
 - config를 보면 systemInstruction과 tools가 있습니다.
   - systemInstruction은 시스템 프롬프트입니다. LLM은 해당 프롬프트에서 정한 규칙을 최우선으로 따릅니다. 주로 AI가 사용자의 요청을 어떻게 처리할지를 이곳에서 작성합니다.
   - tools는 LLM이 실행할 수 있는 Tool 정보입니다. LLM은 적절한 상황에 Tool Calling을 사용하게 됩니다.
 
 LLM의 응답에서 response.functionCalls를 통해, 지금 Tool Calling을 호출해야 하는 상황인지를 우리가 만든 애플리케이션에서 판단할 수 있습니다.
-호출해야 하는 경우, LLM은 functionCall의 name으로 어떤 툴을 실행해야 하고 매개변수는 뭔지 args에 담아서 응답하니, 이를 활용하면 됩니다.
+호출해야 하는 경우, LLM은 실행할 툴의 이름을 functionCall의 name에, 매개변수를 args에 담아서 응답하니, 이를 활용하면 됩니다.
 
 그럼 Tool Calling을 어떻게 선언했는지 보겠습니다.
 
@@ -461,21 +461,21 @@ const createLineChartDeclaration: FunctionDeclaration = {
 };
 ```
 
-- genai는 Tool Calling의 타입을 선언하는데 사용할 수 있도록, FunctionDeclaration, Type 등의 타입과 Enum을 제공합니다.
+- GenAI SDK는 Tool Calling의 타입을 선언하는 데 사용할 수 있도록, FunctionDeclaration, Type 등의 타입과 Enum을 제공합니다.
 - 해당 타입을 통해 툴에 대한 설명과 매개변수 정보를 설정할 수 있습니다.
-- 이를 간결하고 정확하게 적어주어야 LLM이 실수하지 않고 해당 함수의 파라미터를 작성해주니, 꼼꼼하게 적어주어야 합니다.
+- LLM이 실수하지 않고 해당 함수의 파라미터를 작성하도록, 이 정보를 간결하고 정확하게 적어주어야 합니다.
 - 또한 필수 파라미터는 required 배열에 명시해주어, LLM이 빠뜨리지 않고 args를 작성할 수 있도록 해야 합니다.
-- 이걸 언제 다 작성하지... 라고 걱정하실 수 있는데, Tool에서 호출할 함수를 Copilot이나 Claude Code한테 알려주고 Tool 선언을 만들어달라고 하면 잘 만들어주니, 이를 활용하면 좋습니다.
+- 이걸 언제 다 작성하지...라고 걱정하실 수 있는데, Tool에서 호출할 함수를 Copilot이나 Claude Code한테 알려주고 Tool 선언을 만들어달라고 하면 잘 만들어주니, 이를 활용하면 좋습니다.
 
 ### Tool Calling 실행하기
 
-이어서, Tool Calling을 실행하는 코드를 작성하겠습니다. "앞서 한거가 Tool Calling을 실행한게 아니냐?" 라고 하실 수 있는데 아직입니다.
+이어서, Tool Calling을 실행하는 코드를 작성하겠습니다. "앞서 한 게 Tool Calling을 실행한 게 아니냐?"라고 하실 수 있는데 아직입니다.
 앞서 했던 코드에선 LLM에게 이러이러한 도구가 있다고 알려주었고(createLineChartDeclaration),
-LLM이 어떤 도구를 사용하겠다(response.functionCalls) 라고 응답한 것 까지 다루었습니다.
+LLM이 어떤 도구를 사용하겠다(response.functionCalls)라고 응답한 것까지 다루었습니다.
 
-이제 response.functionCalls를 가지고 실제 함수를 호출하는 코드를 작성하려고 합니다. 그 전에, AI와의 대화를 할 수 있도록 채팅패널을 구현해보겠습니다.
+이제 response.functionCalls를 가지고 실제 함수를 호출하는 코드를 작성하려고 합니다. 그 전에, AI와 대화할 수 있도록 채팅패널을 구현해보겠습니다.
 
-app/chat-panel.tsx파일을 생성하고 아래와 같이 작성해줍니다.
+app/chat-panel.tsx 파일을 생성하고 아래와 같이 작성해줍니다.
 
 ```tsx
 'use client';
@@ -620,7 +620,7 @@ export default function Home() {
 }
 ```
 
-ChatPanel 컴포넌트를 사용해서 사용자에게 채팅 메시지를 보여주도록 구현해보았습니다. 코드가 좀 길었는데, 주요 코드를 따로 보도록 하겠습니다.
+ChatPanel 컴포넌트를 사용해서 사용자에게 채팅 메시지를 보여주도록 구현해보았습니다. 코드가 좀 길었는데, 주요 코드를 따로 보겠습니다.
 
 ```ts
 // 채팅 메시지 전송을 처리하는 핸들러
@@ -641,7 +641,7 @@ const handleSend = async (content: string) => {
 ```
 
 앞서 만든 서버액션인 requestAi를 호출하는 것을 볼 수 있는데요,
-이 때 결과인 result에서 functionCall에 따라 해당하는 함수를 호출하는 것을 볼 수 있습니다. 함수를 호출하는데 까지 성공했다면, 아래와 같이 사용자 채팅메시지를 통해 차트를 생성하는 기능까지 완성입니다.
+이때 결과인 result의 functionCall에 따라 해당하는 함수를 호출합니다. 함수를 호출하는 데까지 성공했다면, 아래와 같이 사용자 채팅 메시지를 통해 차트를 생성하는 기능까지 완성입니다.
 
 <PostVideo
   src="/create-chart.mp4"
@@ -651,23 +651,23 @@ const handleSend = async (content: string) => {
 />
 
 > Gemini API는 사용량이 워낙 많아서 간헐적으로 실패할 수 있습니다. 또, 저희는 Free Tier라서 사용량 초과 문제도 발생할 수 있습니다.
-> 그러니 오류가 발생하는 경우, VS Code의 터미널에서 어떤 오류 메시지가 발생하는지 확인해주셔야 합니다.
-> 만약 사용량 초과인 경우, 다른 모델로 변경하시거나 아니면 그냥 기존 Google AI Studio로 가셔서 기존 프로젝트를 지운 뒤 새로 만드셔도 됩니다.(이러면 할당량 초기화 되거든요)
+> 그러니 오류가 발생하는 경우, VS Code의 터미널에서 어떤 오류 메시지가 나오는지 확인해주셔야 합니다.
+> 만약 사용량 초과인 경우, 다른 모델로 변경하시거나 아니면 그냥 Google AI Studio로 가셔서 기존 프로젝트를 지운 뒤 새로 만드셔도 됩니다(이러면 할당량이 초기화되거든요).
 
 ## 중간 정리
 
-여기까지 해서 LLM이 텍스트 생성 외에도 외부 시스템에 개입해서 함수를 호출하는 방법에 대해 알아보았습니다. 또한 실습을 통해 직접 Next.js에서 Gemini로 이를 구현해보았구요.
+여기까지 해서 LLM이 텍스트 생성 외에도 외부 시스템에 개입해서 함수를 호출하는 방법에 대해 알아보았습니다. 또한 실습을 통해 직접 Next.js에서 Gemini로 이를 구현해보았고요.
 
 핵심은 아래와 같습니다.
 
-- AI에게 사용 가능한 Tool 정보를 제공한다(Gemini의 경우 tools의 functionDeclarations)
+- AI에게 사용 가능한 Tool 정보를 제공한다(Gemini의 경우 tools의 functionDeclarations).
 - 시스템 프롬프트를 통해 어떤 상황에서 어떤 툴을 사용할지를 명시한다.
-- AI의 응답에서 실행해야 하는 Tool 정보를 추출하고, 이를 토대로 필요한 함수를 호출한다.(response.functionCalls)
+- AI의 응답에서 실행해야 하는 Tool 정보를 추출하고, 이를 토대로 필요한 함수를 호출한다(response.functionCalls).
 
 ## 차트를 수정하는 Tool Calling 추가하기
 
-이번엔 차트를 수정하는 Tool Calling도 구현해보겠습니다. 다만 수정 기능을 구현하기 위해선 히스토리 기능을 구현해야 합니다.
-LLM은 기본적으로 상태를 유지하지 않는 stateless 모델입니다. 따라서 LLM에게 차트를 수정해줘 라고 요청해도,
+이번엔 차트를 수정하는 Tool Calling도 구현해보겠습니다. 다만 수정 기능을 구현하려면 히스토리 기능이 필요합니다.
+LLM은 기본적으로 상태를 유지하지 않는 stateless 모델입니다. 따라서 LLM에게 "차트를 수정해줘"라고 요청해도,
 LLM 입장에선 생성한 차트가 없으니 정상적으로 작업을 처리할 수 없게 됩니다.
 
 이를 위해, 이전 대화 내용을 첨부해서 요청할 수 있도록 기능을 개선해야 합니다.
@@ -682,7 +682,7 @@ import에 UpdateChartOptionsArgs를 추가합니다.
 import { requestAi, UpdateChartOptionsArgs } from '../server/request-ai';
 ```
 
-handleSend를 아래와 같이 수정하여, AI 응답결과에 따라 updateChartOptions 함수를 호출할 수 있도록 합니다.  
+handleSend를 아래와 같이 수정하여, AI 응답 결과에 따라 updateChartOptions 함수를 호출할 수 있도록 합니다.  
 또한, requestAi 함수를 호출할 때, 이전 메시지 기록도 인자로 전달하여 LLM이 문맥을 이해하고 답변할 수 있도록 합니다.
 
 ```ts
@@ -794,7 +794,7 @@ const updateChartOptionsDeclaration: FunctionDeclaration = {
 };
 ```
 
-그 다음 서버액션의 리턴타입을 아래와 같이 수정합니다.
+그다음 서버액션의 리턴타입을 아래와 같이 수정합니다.
 
 ```ts
 export interface UpdateChartOptionsArgs {
@@ -888,9 +888,9 @@ export async function requestAi(
 ## 마치며
 
 이번 포스트에선 LLM을 통해 외부 시스템을 제어하는 방법인 Tool Calling에 대해 알아보았습니다.
-구현하기 어려운 기능이 아닐까 싶었지만 생각보다 간단했습니다. 어떤 Tool인지 설명과 파라미터에 대한 명세를 적어주고,
-응답 결과를 통해 Tool Calling을 호출해야 하는지 확인하고 호출하는 방식이었는데요, 이를 통해 사용자를 보다 더 편하게 하는 애플리케이션을 개발할 수 있을거라고 생각합니다.
+구현하기 어려운 기능이 아닐까 싶었지만 생각보다 간단했습니다. Tool에 대한 설명과 파라미터 명세를 적어주고,
+응답 결과를 통해 Tool Calling을 호출해야 하는지 확인하고 호출하는 방식이었는데요, 이를 통해 사용자를 더 편하게 하는 애플리케이션을 개발할 수 있을 거라고 생각합니다.
 
-실습에서는 Gemini만 사용했지만, ChatGPT나 Claude API도 Tool Calling 기능을 제공합니다. 다만 함수 선언 방식이나 옵션등이 다소 차이가 날 수 있으니, 이 점만 유념해서 개발하면 됩니다.
+실습에서는 Gemini만 사용했지만, ChatGPT나 Claude API도 Tool Calling 기능을 제공합니다. 다만 함수 선언 방식이나 옵션 등이 다소 차이가 날 수 있으니, 이 점만 유념해서 개발하면 됩니다.
 이번 실습의 코드는 [ai-tool-exam](https://github.com/Malloc72P/ai-tool-exam) 저장소에서 확인하실 수 있습니다.  
 긴 글 읽어주셔서 감사합니다!
