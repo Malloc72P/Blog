@@ -89,7 +89,7 @@ const d = Direction.Up;
 // 컴파일 결과: const d = 0; (Direction 객체 자체가 사라진다)
 ```
 
-값을 인라인하려면 컴파일러가 enum 선언을 볼 수 있어야 합니다. 문제는 컴파일된 라이브러리가 넘겨주는 ambient const enum(`.d.ts`의 `declare const enum`)입니다. 파일을 하나씩 독립적으로 변환하는 환경에서는 그 값을 알 수 없어, `isolatedModules`가 켜져 있으면 아예 에러로 막습니다.
+값을 인라인하려면 컴파일러가 enum 선언을 볼 수 있어야 합니다. 문제는 컴파일된 라이브러리가 넘겨주는 ambient const enum(`.d.ts`의 `declare const enum`)입니다. 파일을 하나씩 독립적으로 변환하는 환경에서는 그 값을 알 수 없어, `isolatedModules`가 켜져 있으면 컴파일러가 아예 에러로 막습니다.
 
 ```typescript
 // tsconfig에 "isolatedModules": true (이 블로그를 포함한 Next.js 환경의 기본값)
@@ -104,7 +104,7 @@ const c = Color.Red;
 
 ## as const로 리터럴 타입 고정하기
 
-여기서 쓰는 도구가 `as const`입니다. 평범한 객체는 그 프로퍼티 타입이 넓게 추론됩니다.
+여기서 쓰는 도구가 `as const`입니다. 평범한 객체는 프로퍼티 타입이 넓게 추론됩니다.
 
 ```typescript
 const direction = {
@@ -115,7 +115,7 @@ const direction = {
 // 추론된 타입: { Up: string; Down: string }
 ```
 
-값이 `'UP'`인데도 타입은 `string`으로 넓어집니다. 나중에 `direction.Up`을 다른 문자열로 바꿔도 괜찮다고 보기 때문입니다. 여기에 `as const`를 붙이면 결과가 달라집니다.
+값이 `'UP'`인데도 타입은 `string`으로 넓어집니다. 나중에 `direction.Up`을 다른 문자열로 바꿔도 괜찮다고 TypeScript가 보기 때문입니다. 여기에 `as const`를 붙이면 결과가 달라집니다.
 
 ```typescript
 const Direction = {
@@ -136,7 +136,7 @@ const Direction = {
 
 `as const`는 두 가지 일을 합니다. 모든 프로퍼티를 `readonly`로 만들고, 값을 넓은 타입이 아니라 **가장 좁은 리터럴 타입**으로 고정합니다. `direction.Up`의 타입은 이제 `string`이 아니라 `'UP'`이라는 하나의 값입니다.
 
-이 객체는 컴파일 후에도 그냥 평범한 객체 리터럴로 남습니다. 역방향 매핑도, IIFE도 없습니다.
+이 객체는 컴파일 후에도 평범한 객체 리터럴로 남습니다. 역방향 매핑도, IIFE도 없습니다.
 
 ```javascript
 // 위 코드의 컴파일 결과 (타입 애너테이션만 사라짐)
@@ -150,7 +150,7 @@ const Direction = {
 
 ## keyof typeof로 유니온 타입 뽑아내기
 
-값은 준비됐으니 이제 타입이 필요합니다. `enum`은 이름 하나가 값과 타입 역할을 겸했지만, `as const` 객체에서는 타입을 따로 만듭니다. 여기서 `typeof`와 `keyof`를 이어 붙입니다.
+값은 준비됐으니 이제 타입이 필요합니다. `enum`은 이름 하나가 값과 타입 역할을 함께 맡았지만, `as const` 객체에서는 타입을 따로 만듭니다. 여기서 `typeof`와 `keyof`를 이어 붙입니다.
 
 먼저 `typeof`로 객체의 타입을 가져옵니다.
 
@@ -166,7 +166,7 @@ type DirectionKey = keyof typeof Direction;
 // 'Up' | 'Down' | 'Left' | 'Right'
 ```
 
-우리가 원하는 건 키가 아니라 **값**의 유니온입니다. 그래서 인덱스 접근으로 키에 해당하는 값 타입을 꺼냅니다.
+필요한 건 키가 아니라 **값**의 유니온입니다. 그래서 인덱스 접근으로 키에 해당하는 값 타입을 꺼냅니다.
 
 ```typescript
 type Direction = (typeof Direction)[keyof typeof Direction];
@@ -175,7 +175,7 @@ type Direction = (typeof Direction)[keyof typeof Direction];
 
 `(typeof Direction)[keyof typeof Direction]`을 풀어 읽으면 "`Direction` 객체 타입에서, 모든 키로 접근했을 때 나오는 값들의 유니온"입니다. 값이 `readonly` 리터럴로 고정돼 있었기 때문에 결과가 `string`이 아니라 정확한 문자열 유니온으로 나옵니다.
 
-여기서 값(`const Direction`)과 타입(`type Direction`)에 같은 이름을 썼습니다. TypeScript는 값 공간과 타입 공간을 분리해서 관리하므로, `enum`처럼 하나의 이름으로 값과 타입을 함께 쓰는 사용감을 그대로 얻을 수 있습니다.
+여기서 값(`const Direction`)과 타입(`type Direction`)에 같은 이름을 썼습니다. TypeScript는 값 공간과 타입 공간을 분리해서 관리하므로, `enum`처럼 하나의 이름을 값과 타입으로 함께 쓸 수 있습니다.
 
 ## 함수에 적용해 보기
 
@@ -202,7 +202,7 @@ move('DIAGONAL'); // error: '"DIAGONAL"' 형식은 'Direction' 형식에 할당�
 
 앞서 문자열 `enum`이 값이 같은 `'UP'`마저 거부했던 것과 대비됩니다. `as const` 유니온은 구조적이라 `'DOWN'` 같은 평범한 리터럴은 그대로 받으면서, `'DIAGONAL'` 같은 범위 밖 값은 컴파일 타임에 막습니다. 값이 이미 문자열로 들어오는 자리와도 자연스럽게 맞물립니다.
 
-값을 순회하는 것도 평범한 객체라 자연스럽습니다.
+`Direction`은 평범한 객체라서 값을 순회하는 것도 자연스럽습니다.
 
 ```typescript
 // 역방향 매핑이 없으니 값이 두 배로 나오지 않는다.
@@ -223,13 +223,13 @@ const Direction = {
 } as const satisfies Record<string, string>;
 ```
 
-`satisfies Record<string, string>`는 각 값이 문자열인지 검사하되, 타입을 `Record<string, string>`으로 넓혀버리지 않습니다. `as const` 덕분에 `Up`의 타입은 여전히 `'UP'` 리터럴로 남습니다. 실수로 값에 숫자를 넣으면 위처럼 그 자리에서 잡습니다.
+`satisfies Record<string, string>`은 각 값이 문자열인지 검사하되, 타입을 `Record<string, string>`으로 넓혀버리지 않습니다. `as const` 덕분에 `Up`의 타입은 여전히 `'UP'` 리터럴로 남습니다. 실수로 값에 숫자를 넣으면 위처럼 그 자리에서 잡습니다.
 
 `satisfies`를 더 깊게 보고 싶다면 [타입 좁히기](/posts/frontend/ts-type-narrowing) 글에서 다룬 좁히기 개념과 함께 이해하면 좋습니다.
 
 ## 그래도 enum이 나은 경우
 
-`as const` 패턴을 기본으로 삼되, `enum`이 여전히 편한 자리도 있습니다. 값 자체는 중요하지 않고 이름만 필요할 때, 그리고 자동 증가하는 숫자가 자연스러운 경우입니다. 다만 이때도 대부분은 `as const`로 대체할 수 있으니, "런타임 객체와 역방향 매핑을 감수할 만큼 이 enum이 필요한가"를 한 번 따져보는 편이 좋습니다.
+`as const` 패턴을 기본으로 삼되, `enum`이 여전히 편한 자리도 있습니다. 값 자체는 중요하지 않고 이름만 필요할 때, 그리고 자동 증가하는 숫자가 자연스러운 경우입니다. 다만 이때도 대부분은 `as const`로 대체할 수 있으니, 런타임 객체와 역방향 매핑을 감수할 만큼 이 enum이 필요한지 한 번 따져보는 편이 좋습니다.
 
 ## 정리
 

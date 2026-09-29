@@ -3,7 +3,7 @@ import { frontmatter } from '@libs/frontmatter';
 export const metadata = frontmatter({
   title: 'TypeScript 타입 단언(as)과 타입 좁히기',
   description:
-    'as 타입 단언이 위험한 이유와 typeof·in·instanceof를 이용한 타입 좁히기, param is T 형태의 사용자 정의 타입 가드로 타입을 안전하게 다루는 방법을 정리합니다.',
+    'as 타입 단언이 위험한 이유를 살펴보고, typeof·in·instanceof를 이용한 타입 좁히기와 param is T 형태의 사용자 정의 타입 가드로 타입을 안전하게 다루는 방법을 정리합니다.',
   seriesId: 'frontend',
   postId: 'ts-type-narrowing',
   tags: ['TypeScript', '타입가드', '타입좁히기', '타입단언'],
@@ -12,7 +12,7 @@ export const metadata = frontmatter({
 
 타입스크립트에서 컴파일러가 타입 에러를 표시할 때, `as`로 타입을 단언하면 에러가 사라집니다. 값의 타입을 개발자가 알고 있다고 생각할 때 흔히 쓰는 방법입니다.
 
-하지만 `as`로 에러를 지워도 타입 오류가 없어지는 것은 아닙니다. 이 글에서는 `as`가 어떤 검사를 건너뛰는지, 그리고 검사를 건너뛰지 않고 타입을 좁히는 방법을 정리합니다.
+하지만 `as`로 에러를 지웠다고 해서 타입이 맞지 않는 문제까지 없어지는 것은 아닙니다. 이 글에서는 `as`가 어떤 검사를 건너뛰는지, 그리고 검사를 건너뛰지 않고 타입을 좁히는 방법을 정리합니다.
 
 ## as가 건너뛰는 컴파일러 검사
 
@@ -33,7 +33,7 @@ console.log(price.toFixed(2));
 
 ![npx tsx 실행 결과로 TypeError: price.toFixed is not a function이 출력된 터미널 화면](/ts-as-runtime-error.png)
 
-타입 검사를 통과했는데 런타임에 `TypeError: price.toFixed is not a function`이 났습니다. 타입스크립트를 쓰는 이유가 이런 에러를 컴파일 타임에 잡으려는 것인데, `as`가 그 검사를 껐습니다.
+타입 검사를 통과했는데 런타임에 `TypeError: price.toFixed is not a function`이 났습니다. 타입스크립트를 쓰는 이유는 이런 에러를 컴파일 타임에 잡기 위해서인데, `as`가 그 검사를 껐습니다.
 
 `as`는 값을 변환하지 않습니다. 런타임에는 아무 일도 하지 않고, 컴파일러가 값을 다른 타입으로 보게 할 뿐입니다. 그래서 단언이 틀려도 막는 장치가 없습니다.
 
@@ -51,7 +51,7 @@ function format(value: string | number): string {
 }
 ```
 
-`value`가 number일 수도 있으니 `trim`을 보장할 수 없습니다. 여기서 `as string`으로 우회하는 대신, `typeof`로 분기하면 컴파일러가 알아서 타입을 좁혀줍니다.
+`value`가 number일 수도 있으니 `trim`이 있다고 보장할 수 없습니다. 여기서 `as string`으로 우회하는 대신, `typeof`로 분기하면 컴파일러가 알아서 타입을 좁혀줍니다.
 
 ```typescript
 function format(value: string | number): string {
@@ -133,7 +133,7 @@ function speak(animal: Cat | Dog): string {
 
 `isCat`은 평범한 함수처럼 boolean을 반환하지만, 반환 타입을 `animal is Cat`으로 적었기 때문에 컴파일러는 이 함수가 `true`를 주면 인자를 Cat으로 간주합니다. 검사 로직을 함수 하나로 묶어두고, 호출하는 쪽은 좁혀진 타입을 그대로 받습니다.
 
-DOM API에도 같은 방법을 씁니다. `getElementById`의 반환 타입은 `HTMLElement | null`이라 바로 `value`에 접근할 수 없고, 이때 `as HTMLInputElement`로 단언하기 쉽습니다.
+DOM API에도 같은 방법을 씁니다. `getElementById`의 반환 타입은 `HTMLElement | null`이라 바로 `value`에 접근할 수 없습니다. 이때 `as HTMLInputElement`로 단언하기 쉽습니다.
 
 ```typescript
 // as HTMLInputElement로 단언하는 대신, 타입 가드로 검증한다.
@@ -157,7 +157,7 @@ function readValue(id: string): string {
 
 `as`를 쓰면 안 되는 것은 아닙니다. 컴파일러는 알 수 없지만 개발자는 문맥상 타입을 확신하는 경우가 있습니다. 테스트에서 일부 속성만 채운 목 객체를 만들 때나, 라이브러리 타입 정의가 실제보다 느슨할 때가 그렇습니다.
 
-이때도 두 가지를 기억하면 좋습니다. 첫째, `as`는 런타임에 아무것도 검사하지 않으므로 단언이 틀려도 막을 방법이 없습니다. 둘째, `as`를 쓰기 전에 `typeof`나 타입 가드로 바꿀 수 있는지 먼저 확인합니다. 좁히기로 표현할 수 있는 검사는 좁히기로 두는 편이 안전합니다.
+이때도 두 가지를 기억하면 좋습니다. 첫째, `as`는 런타임에 아무것도 검사하지 않으므로 단언이 틀려도 막을 방법이 없습니다. 둘째, `as`를 쓰기 전에 `typeof`나 타입 가드로 바꿀 수 있는지 확인합니다. 좁히기로 표현할 수 있는 검사는 좁히기로 두는 편이 안전합니다.
 
 참고로 `as const`는 여기서 말하는 타입 단언과 목적이 다릅니다. `as const`는 값을 리터럴 타입으로 고정하는 용도라 타입 검사를 건너뛰지 않습니다.
 
