@@ -1,0 +1,529 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: 'DB 정규화와 함수 종속: 1NF부터 3NF까지',
+  description:
+    '주문, 주문상품, 상품, 고객 데이터를 한 테이블에서 시작해 함수 종속을 찾아 1NF, 2NF, 3NF 순서로 분할합니다. PostgreSQL 18에서 갱신, 삽입, 삭제 이상을 실행하고 분할 뒤 JOIN으로 원본이 복원되는지 확인합니다.',
+  seriesId: 'backend',
+  postId: 'db-normalization',
+  tags: ['PostgreSQL', 'DB', '정규화', '함수종속', '테이블설계'],
+  date: '2026-10-14 21:00',
+});
+
+정규화는 테이블을 이상현상이 생기지 않는 형태로 바꾸고 분할하는 작업입니다. 이상현상은 한 테이블에 서로 다른 대상의 정보가 섞여 있을 때 생기는 삽입 이상, 갱신 이상, 삭제 이상을 말합니다. 정규화는 1NF, 2NF, 3NF처럼 단계를 나누어 진행합니다.
+
+이 글은 세 단계를 하나의 기준으로 설명합니다. 함수 종속을 찾아서 그 종속을 기준으로 테이블을 분할한다는 기준입니다. 단계마다 찾는 종속의 종류만 달라집니다.
+
+| 단계 | 찾는 종속 | 분할 |
+| --- | --- | --- |
+| 1NF | 한 셀에 값이 여러 개 들어 있는 경우 | 값을 하나씩 풀고, 반복되는 주문 정보를 주문 테이블로 분할 |
+| 2NF | 키의 일부에만 종속되는 속성 | 그 속성을 일부 키를 기본키로 하는 테이블로 분할 |
+| 3NF | 키가 아닌 속성을 거쳐 이행되는 종속 | 중간에 낀 속성을 기본키로 하는 테이블로 분할 |
+
+주문, 주문상품, 상품, 고객 정보를 담은 테이블 하나에서 시작해 PostgreSQL 18.4에서 실제로 분할하면서 확인합니다. 예제 SQL과 실행 스크립트는 저장소의 `playground/db-normalization`에 있습니다.
+
+---
+
+## 정규화와 이상현상
+
+정규화하지 않은 테이블에서는 세 가지 이상현상이 생깁니다.
+
+| 이상현상 | 내용 |
+| --- | --- |
+| 갱신 이상 | 같은 정보가 여러 행에 있어서 일부 행만 고치면 값이 서로 달라진다 |
+| 삽입 이상 | 다른 정보가 없으면 필요한 정보를 저장할 수 없다 |
+| 삭제 이상 | 행 하나를 지웠더니 함께 들어 있던 다른 정보까지 사라진다 |
+
+정규화를 하는 이유는 네 가지입니다.
+
+- 데이터 중복이 줄어듭니다.
+- 하나의 데이터가 한 곳에만 있어서 한 곳만 고치면 됩니다. 이것이 일관성입니다.
+- 테이블을 나누고 외래 키로 연결하므로, 없는 값을 참조하는 행을 DB가 막습니다. 이것이 무결성입니다.
+- 구조를 바꾸거나 유지보수하기 쉽습니다.
+
+---
+
+## 예제 환경
+
+docker로 PostgreSQL 18을 띄웁니다.
+
+```bash
+# scripts/up.sh
+docker run -d --name pg-norm-lab \
+  -e POSTGRES_PASSWORD=lab -e POSTGRES_DB=lab \
+  -p 55434:5432 postgres:18
+```
+
+SQL은 `docker exec -i pg-norm-lab psql -U postgres -d lab`로 실행했습니다. 실행 결과는 psql이 출력한 그대로 옮겼습니다.
+
+---
+
+## 정규화 전 테이블
+
+처음 상태는 주문 한 건이 상품 여러 개를 담은 표입니다.
+
+| 주문번호 | 고객 | 연락처 | 주문상품 |
+| --- | --- | --- | --- |
+| 1001 | 김민수 | 010-1111-2222 | 키보드 1개, 마우스 2개 |
+| 1002 | 이영희 | 010-3333-4444 | 키보드 2개, 모니터 1개 |
+
+`주문상품` 셀 하나에 상품 여러 개가 들어 있어서, 특정 상품을 주문한 건을 찾거나 상품별 판매 개수를 합계하려면 문자열을 잘라야 합니다. 1NF는 한 셀에 값 하나만 두는 원자값 조건을 요구합니다. 셀을 상품 하나씩 풀어서 행으로 늘리면 아래 `order_flat` 테이블이 됩니다.
+
+```sql
+-- sql/01_flat_table.sql
+CREATE TABLE order_flat (
+  order_no       int  NOT NULL,
+  customer_id    text NOT NULL,
+  customer_name  text NOT NULL,
+  customer_phone text NOT NULL,
+  product_code   text NOT NULL,
+  product_name   text NOT NULL,
+  quantity       int  NOT NULL,
+  PRIMARY KEY (order_no, product_code)
+);
+
+INSERT INTO order_flat VALUES
+  (1001, 'C001', '김민수', '010-1111-2222', 'P100', '키보드',   1),
+  (1001, 'C001', '김민수', '010-1111-2222', 'P200', '마우스',   2),
+  (1002, 'C002', '이영희', '010-3333-4444', 'P100', '키보드',   2),
+  (1002, 'C002', '이영희', '010-3333-4444', 'P300', '모니터',   1),
+  (1003, 'C001', '김민수', '010-1111-2222', 'P200', '마우스',   1),
+  (1003, 'C001', '김민수', '010-1111-2222', 'P300', '모니터',   1),
+  (1003, 'C001', '김민수', '010-1111-2222', 'P400', 'USB 허브', 3),
+  (1004, 'C003', '박지훈', '010-5555-6666', 'P100', '키보드',   1);
+```
+
+```text
+ order_no | customer_id | customer_name | customer_phone | product_code | product_name | quantity 
+----------+-------------+---------------+----------------+--------------+--------------+----------
+     1001 | C001        | 김민수        | 010-1111-2222  | P100         | 키보드       |        1
+     1001 | C001        | 김민수        | 010-1111-2222  | P200         | 마우스       |        2
+     1002 | C002        | 이영희        | 010-3333-4444  | P100         | 키보드       |        2
+     1002 | C002        | 이영희        | 010-3333-4444  | P300         | 모니터       |        1
+     1003 | C001        | 김민수        | 010-1111-2222  | P200         | 마우스       |        1
+     1003 | C001        | 김민수        | 010-1111-2222  | P300         | 모니터       |        1
+     1003 | C001        | 김민수        | 010-1111-2222  | P400         | USB 허브     |        3
+     1004 | C003        | 박지훈        | 010-5555-6666  | P100         | 키보드       |        1
+(8 rows)
+```
+
+한 행은 주문번호와 상품코드 조합으로 식별하므로 기본키는 `(order_no, product_code)` 복합 키입니다. 값은 모두 원자값이어서 이 테이블도 1NF 조건은 만족합니다. 다만 같은 주문번호의 행마다 고객 정보가 반복되고, 같은 상품코드의 행마다 상품명이 반복됩니다. 이 글은 이 테이블을 정규화 전 상태의 기준으로 씁니다.
+
+---
+
+## 이상현상 실행
+
+### 갱신 이상
+
+키보드(`P100`)의 이름을 `기계식 키보드`로 바꾸려는 상황입니다. 키보드가 들어 있는 행은 세 개인데 한 행만 고쳤습니다.
+
+```sql
+BEGIN;
+UPDATE order_flat
+SET product_name = '기계식 키보드'
+WHERE order_no = 1001 AND product_code = 'P100';
+
+SELECT order_no, product_code, product_name
+FROM order_flat
+WHERE product_code = 'P100'
+ORDER BY order_no;
+
+SELECT product_code, count(DISTINCT product_name) AS name_count
+FROM order_flat
+GROUP BY product_code
+HAVING count(DISTINCT product_name) > 1;
+ROLLBACK;
+```
+
+![정규화 전 테이블에서 상품명을 한 행만 고친 뒤 같은 상품코드에 이름이 두 개가 된 psql 실행 결과](/db-normalization-update-anomaly.png)
+
+DB는 이 갱신을 막지 않습니다. 같은 상품코드 `P100`에 이름이 `기계식 키보드`와 `키보드` 두 개 생겼습니다. 어느 쪽이 맞는지는 테이블만 봐서는 알 수 없습니다. 모든 행을 빠짐없이 고쳐야만 일관성이 유지되는 구조입니다.
+
+### 삽입 이상
+
+아직 주문이 없는 새 상품 웹캠(`P500`)을 등록하려는 상황입니다.
+
+```sql
+INSERT INTO order_flat (product_code, product_name)
+VALUES ('P500', '웹캠');
+```
+
+```text
+ERROR:  null value in column "order_no" of relation "order_flat" violates not-null constraint
+DETAIL:  Failing row contains (null, null, null, null, P500, 웹캠, null).
+```
+
+기본키 `(order_no, product_code)`에 `order_no`가 들어 있어서 주문 없이는 상품을 저장할 수 없습니다.
+
+### 삭제 이상
+
+`P400`(USB 허브)은 1003번 주문에만 있습니다. 1003번 주문에서 USB 허브 행을 지웠습니다.
+
+```sql
+BEGIN;
+SELECT product_code, product_name FROM order_flat WHERE product_code = 'P400';
+DELETE FROM order_flat WHERE order_no = 1003 AND product_code = 'P400';
+SELECT product_code, product_name FROM order_flat WHERE product_code = 'P400';
+ROLLBACK;
+```
+
+```text
+ product_code | product_name 
+--------------+--------------
+ P400         | USB 허브
+(1 row)
+
+DELETE 1
+ product_code | product_name 
+--------------+--------------
+(0 rows)
+```
+
+주문 항목 하나를 지웠을 뿐인데 USB 허브라는 상품 정보가 테이블에서 사라졌습니다.
+
+세 이상현상의 원인은 같습니다. 주문, 고객, 상품이라는 서로 다른 대상의 정보가 한 행에 들어 있어서, 한 대상의 정보를 독립적으로 추가, 수정, 삭제할 수 없습니다. 이 구분을 판단하는 도구가 함수 종속입니다.
+
+---
+
+## 함수 종속
+
+### 정의
+
+속성 `X`의 값이 정해지면 속성 `Y`의 값이 하나로 정해질 때, `Y`는 `X`에 함수 종속된다고 하고 `X → Y`로 씁니다. `X`를 결정자라고 부릅니다. 같은 `X` 값을 가진 행은 항상 같은 `Y` 값을 가진다는 뜻입니다.
+
+`order_flat`에서 업무 규칙으로 성립하는 함수 종속은 아래와 같습니다.
+
+| 함수 종속 | 의미 |
+| --- | --- |
+| `(order_no, product_code) → quantity` | 한 주문의 한 상품에는 개수가 하나 있다 |
+| `order_no → customer_id` | 주문 한 건은 고객 한 명의 주문이다 |
+| `customer_id → customer_name, customer_phone` | 고객 한 명에는 성명과 연락처가 하나씩 있다 |
+| `product_code → product_name` | 상품 하나에는 이름이 하나 있다 |
+
+![order_flat 테이블 컬럼 위에 함수 종속 네 개를 화살표로 표시한 다이어그램](/db-normalization-flat-dependencies.png)
+
+키와 속성의 관계로 보면 이렇습니다.
+
+- `quantity`는 `order_no`와 `product_code`가 둘 다 있어야 정해집니다. 키 전체에 종속됩니다. 이를 완전 함수 종속이라고 합니다.
+- `customer_id`는 `order_no`만으로 정해집니다. 키의 일부에만 종속됩니다. 이를 부분 종속이라고 합니다.
+- `product_name`은 `product_code`만으로 정해집니다. 이것도 부분 종속입니다.
+- `customer_name`과 `customer_phone`은 `customer_id`로 정해지고, `customer_id`는 `order_no`로 정해집니다. 키가 아닌 속성을 거쳐 이어지는 이 관계를 이행 종속이라고 합니다.
+
+앞의 이상현상은 이 종속들에서 나옵니다. 상품명은 `product_code`만으로 정해지는데 주문 행마다 저장하므로 갱신 이상이 생기고, 상품코드만으로 상품 정보를 저장할 수 없으므로 삽입 이상과 삭제 이상이 생깁니다.
+
+### 데이터로 확인하는 방법
+
+`X → Y`가 깨졌는지는 쿼리로 찾을 수 있습니다. 같은 `X` 값에 서로 다른 `Y` 값이 둘 이상 있으면 이 데이터에서 `X → Y`는 성립하지 않습니다.
+
+```sql
+-- sql/03_dependency_check.sql
+-- product_code → product_name
+SELECT product_code FROM order_flat
+GROUP BY product_code HAVING count(DISTINCT product_name) > 1;
+```
+
+원본 데이터에서 `product_code → product_name`, `order_no → customer_id`, `customer_id → customer_name, customer_phone`을 같은 방식으로 확인하면 세 쿼리 모두 0행입니다. 성립하지 않는 종속은 행을 반환합니다.
+
+```sql
+-- product_code → quantity
+SELECT product_code FROM order_flat
+GROUP BY product_code HAVING count(DISTINCT quantity) > 1;
+
+-- customer_id → order_no
+SELECT customer_id FROM order_flat
+GROUP BY customer_id HAVING count(DISTINCT order_no) > 1;
+```
+
+```text
+ product_code 
+--------------
+ P100
+ P200
+(2 rows)
+
+ customer_id 
+-------------
+ C001
+(1 row)
+```
+
+`P100`은 주문마다 개수가 달라서 `product_code → quantity`가 깨졌고, `C001`은 주문이 두 건(1001, 1003)이라 `customer_id → order_no`가 깨졌습니다. 앞에서 상품명을 한 행만 고친 뒤에 첫 번째 쿼리를 다시 실행하면 `P100`이 나옵니다. 갱신 이상은 이 종속이 깨진 상태입니다.
+
+데이터로 할 수 있는 것은 반증까지입니다. 0행이 나왔다는 것은 지금 들어 있는 행에서 종속이 깨지지 않았다는 뜻이고, 앞으로 입력될 행까지 보장하지 않습니다. 함수 종속은 업무 규칙으로 정합니다. 상품코드 하나가 상품 하나를 가리킨다는 규칙이 있어서 `product_code → product_name`이 성립하고, 같은 상품코드에 이름이 둘이면 그 규칙을 어긴 데이터입니다. 규칙을 DB가 강제하게 만드는 방법이 종속의 결정자를 기본키로 하는 테이블로 분할하는 것입니다. 아래에서 단계별로 분할합니다.
+
+---
+
+## 1NF: 원자값과 주문 분할
+
+1NF는 모든 속성이 원자값을 가지는 형태입니다. 앞에서 `주문상품` 셀의 여러 값을 행으로 풀어 이 조건을 맞췄습니다. 그 결과 같은 주문번호의 행이 여러 개 생겼고, 행마다 `customer_id`, `customer_name`, `customer_phone`이 반복됩니다. 이 정보는 주문번호가 정하는 값입니다(`order_no → customer_id`). 그래서 주문번호를 기본키로 하는 주문 테이블과, `(주문번호, 상품코드)`를 기본키로 하는 주문상품 테이블로 분할합니다.
+
+엄밀히는 이 분할은 주문번호에만 종속되는 속성을 떼어 내는 작업이어서, 뒤에 나오는 2NF의 부분 종속 제거와 같은 종류입니다. 이 글은 반복되는 주문 정보를 먼저 분리하는 순서로 진행합니다.
+
+```sql
+-- sql/04_normalize.sql
+CREATE SCHEMA nf1;
+
+CREATE TABLE nf1.orders (
+  order_no       int  PRIMARY KEY,
+  customer_id    text NOT NULL,
+  customer_name  text NOT NULL,
+  customer_phone text NOT NULL
+);
+
+CREATE TABLE nf1.order_items (
+  order_no     int  NOT NULL REFERENCES nf1.orders (order_no),
+  product_code text NOT NULL,
+  product_name text NOT NULL,
+  quantity     int  NOT NULL,
+  PRIMARY KEY (order_no, product_code)
+);
+
+INSERT INTO nf1.orders
+SELECT DISTINCT order_no, customer_id, customer_name, customer_phone FROM order_flat;
+
+INSERT INTO nf1.order_items
+SELECT order_no, product_code, product_name, quantity FROM order_flat;
+```
+
+`orders`에는 주문 4건이, `order_items`에는 8행이 들어갔습니다. 주문 정보는 주문당 한 번만 저장됩니다.
+
+![1NF 단계의 orders 테이블과 order_items 테이블 구조. 상품명과 고객 성명, 연락처에 남은 종속이 표시되어 있다](/db-normalization-1nf.png)
+
+`order_items.product_name`은 아직 `product_code`만으로 정해지는 값입니다. 다음 단계에서 이것을 분할합니다.
+
+---
+
+## 2NF: 부분 종속 제거
+
+2NF는 1NF이면서, 키가 아닌 모든 속성이 기본키 전체에 완전 함수 종속인 형태입니다. 부분 종속이 없어야 합니다. 이 글의 예제는 후보 키가 기본키 하나뿐이라고 보고 기본키 기준으로 설명합니다.
+
+- `orders`의 기본키는 `order_no` 컬럼 하나입니다. 키가 한 컬럼이면 키의 일부만 종속되는 경우가 있을 수 없어서 부분 종속이 없습니다.
+- `order_items`의 기본키는 `(order_no, product_code)`입니다. `quantity`는 두 컬럼이 모두 필요합니다. `product_name`은 `product_code`만으로 정해지므로 부분 종속입니다.
+
+`product_code → product_name`을 기준으로 상품 테이블을 분할합니다. 결정자인 `product_code`가 새 테이블의 기본키가 됩니다.
+
+```sql
+CREATE SCHEMA nf2;
+
+CREATE TABLE nf2.orders (
+  order_no       int  PRIMARY KEY,
+  customer_id    text NOT NULL,
+  customer_name  text NOT NULL,
+  customer_phone text NOT NULL
+);
+
+CREATE TABLE nf2.products (
+  product_code text PRIMARY KEY,
+  product_name text NOT NULL
+);
+
+CREATE TABLE nf2.order_items (
+  order_no     int  NOT NULL REFERENCES nf2.orders (order_no),
+  product_code text NOT NULL REFERENCES nf2.products (product_code),
+  quantity     int  NOT NULL,
+  PRIMARY KEY (order_no, product_code)
+);
+
+INSERT INTO nf2.orders   SELECT * FROM nf1.orders;
+INSERT INTO nf2.products SELECT DISTINCT product_code, product_name FROM nf1.order_items;
+INSERT INTO nf2.order_items SELECT order_no, product_code, quantity FROM nf1.order_items;
+```
+
+```sql
+SELECT * FROM nf2.products ORDER BY product_code;
+```
+
+```text
+ product_code | product_name 
+--------------+--------------
+ P100         | 키보드
+ P200         | 마우스
+ P300         | 모니터
+ P400         | USB 허브
+(4 rows)
+```
+
+상품 4개가 상품명과 함께 한 번씩만 저장됩니다. 상품명은 `products`에만 있으므로 이름을 바꾸려면 한 행만 고치면 됩니다. `order_items.product_code`는 `products`를 참조하는 외래 키여서, 상품 테이블에 없는 코드는 주문상품에 들어갈 수 없습니다.
+
+![2NF 단계의 orders, order_items, products 테이블 구조. 고객 성명과 연락처의 이행 종속이 표시되어 있다](/db-normalization-2nf.png)
+
+---
+
+## 3NF: 이행 종속 제거
+
+3NF는 2NF이면서, 키가 아닌 속성이 키에 이행적으로 종속되지 않는 형태입니다. `X → Y`이고 `Y → Z`이며 `Y`가 키가 아니면, `Z`는 `X`에 이행 종속입니다.
+
+`nf2.orders`가 이 경우입니다.
+
+```sql
+SELECT * FROM nf2.orders ORDER BY order_no;
+```
+
+```text
+ order_no | customer_id | customer_name | customer_phone 
+----------+-------------+---------------+----------------
+     1001 | C001        | 김민수        | 010-1111-2222
+     1002 | C002        | 이영희        | 010-3333-4444
+     1003 | C001        | 김민수        | 010-1111-2222
+     1004 | C003        | 박지훈        | 010-5555-6666
+(4 rows)
+```
+
+같은 고객이 여러 번 주문하면 성명과 연락처가 주문마다 반복됩니다. `C001`의 두 행이 그 예입니다. 종속은 `order_no → customer_id → (customer_name, customer_phone)`입니다. `customer_id`는 `orders`의 키가 아닙니다. 그리고 앞의 확인 쿼리에서 봤듯 `customer_id → order_no`는 성립하지 않습니다. 고객 한 명이 주문을 여러 건 할 수 있기 때문입니다.
+
+`customer_id → customer_name, customer_phone`을 기준으로 고객 테이블을 분할합니다. `orders`에는 고객을 가리키는 `customer_id`만 남겨 외래 키로 연결합니다.
+
+```sql
+CREATE SCHEMA nf3;
+
+CREATE TABLE nf3.customers (
+  customer_id    text PRIMARY KEY,
+  customer_name  text NOT NULL,
+  customer_phone text NOT NULL
+);
+
+CREATE TABLE nf3.orders (
+  order_no    int  PRIMARY KEY,
+  customer_id text NOT NULL REFERENCES nf3.customers (customer_id)
+);
+
+CREATE TABLE nf3.products (
+  product_code text PRIMARY KEY,
+  product_name text NOT NULL
+);
+
+CREATE TABLE nf3.order_items (
+  order_no     int  NOT NULL REFERENCES nf3.orders (order_no),
+  product_code text NOT NULL REFERENCES nf3.products (product_code),
+  quantity     int  NOT NULL,
+  PRIMARY KEY (order_no, product_code)
+);
+
+INSERT INTO nf3.customers
+SELECT DISTINCT customer_id, customer_name, customer_phone FROM nf2.orders;
+INSERT INTO nf3.orders   SELECT order_no, customer_id FROM nf2.orders;
+INSERT INTO nf3.products SELECT * FROM nf2.products;
+INSERT INTO nf3.order_items SELECT * FROM nf2.order_items;
+```
+
+![3NF 단계의 customers, orders, order_items, products 테이블 구조](/db-normalization-3nf.png)
+
+단계별 행 수는 아래와 같습니다.
+
+```text
+ stage |     tbl     | row_count 
+-------+-------------+-----------
+ nf1   | orders      |         4
+ nf1   | order_items |         8
+ nf2   | orders      |         4
+ nf2   | products    |         4
+ nf2   | order_items |         8
+ nf3   | customers   |         3
+ nf3   | orders      |         4
+ nf3   | products    |         4
+ nf3   | order_items |         8
+(9 rows)
+```
+
+3NF에서 고객 성명과 연락처는 `customers`에 고객당 한 행씩만 있고, 상품명은 `products`에 상품당 한 행씩만 있습니다.
+
+---
+
+## JOIN으로 복원 확인
+
+테이블을 분할해도 정보가 손실되지 않아야 합니다. 분할한 테이블을 JOIN으로 다시 합쳤을 때 원본 `order_flat`과 같은 결과가 나오는지 `EXCEPT`로 확인했습니다. 한쪽 결과에서 다른 쪽 결과를 뺀 행이 양방향 모두 0이면 두 결과는 같습니다.
+
+```sql
+-- sql/05_verify_join.sql
+CREATE TEMP VIEW restored_nf3 AS
+SELECT o.order_no, c.customer_id, c.customer_name, c.customer_phone,
+       i.product_code, p.product_name, i.quantity
+FROM nf3.orders o
+JOIN nf3.customers c ON c.customer_id = o.customer_id
+JOIN nf3.order_items i ON i.order_no = o.order_no
+JOIN nf3.products p ON p.product_code = i.product_code;
+
+SELECT 'flat에만 있음' AS side, count(*)
+FROM (SELECT * FROM order_flat EXCEPT SELECT * FROM restored_nf3) d
+UNION ALL
+SELECT 'nf3에만 있음', count(*)
+FROM (SELECT * FROM restored_nf3 EXCEPT SELECT * FROM order_flat) d;
+```
+
+```text
+     side      | count 
+---------------+-------
+ flat에만 있음 |     0
+ nf3에만 있음  |     0
+(2 rows)
+```
+
+nf1과 nf2도 같은 방식으로 확인했고, 두 단계 모두 양방향 0행이었습니다. 분할마다 JOIN에 쓰는 컬럼(`order_no`, `product_code`, `customer_id`)이 한쪽 테이블의 기본키이기 때문에, 원래 행이 중복이나 누락 없이 복원됩니다. 단계마다 테이블을 분리하고, 다시 결합할 수 있도록 키를 지정하는 것이 정규화의 규칙입니다.
+
+---
+
+## 분할 후 이상현상 확인
+
+3NF 구조(`SET search_path = nf3`)에서 앞의 이상현상을 다시 실행했습니다.
+
+```sql
+-- sql/06_after_normalization.sql
+BEGIN;
+UPDATE products SET product_name = '기계식 키보드' WHERE product_code = 'P100';
+
+SELECT o.order_no, i.product_code, p.product_name
+FROM orders o
+JOIN order_items i ON i.order_no = o.order_no
+JOIN products p ON p.product_code = i.product_code
+WHERE i.product_code = 'P100'
+ORDER BY o.order_no;
+ROLLBACK;
+
+INSERT INTO order_items VALUES (1001, 'P999', 1);
+DELETE FROM products WHERE product_code = 'P100';
+```
+
+![3NF 구조에서 UPDATE 한 행으로 세 주문의 상품명이 모두 바뀌고, 없는 상품코드 삽입과 참조 중인 상품 삭제가 외래 키 오류로 막힌 psql 실행 결과](/db-normalization-after-split.png)
+
+- 갱신: 상품명 변경이 `UPDATE 1`, 한 행으로 끝났습니다. 상품 `P100`이 들어 있던 세 주문이 모두 새 이름으로 조회됩니다.
+- 무결성: 상품 테이블에 없는 `P999`를 주문상품에 넣으면 외래 키 제약이 막습니다. 주문상품이 참조하고 있는 `P100` 상품도 지울 수 없습니다.
+
+삽입 이상과 삭제 이상이 사라졌는지도 같은 파일에서 확인했습니다.
+
+```sql
+-- 삽입: 주문이 없는 상품을 등록
+INSERT INTO products VALUES ('P500', '웹캠');
+
+-- 삭제: 주문상품 행을 지워도 상품 정보가 남는지 확인
+DELETE FROM order_items WHERE order_no = 1003 AND product_code = 'P400';
+SELECT * FROM products WHERE product_code = 'P400';
+```
+
+`P500`은 주문 없이 `products`에 들어갔고(`INSERT 0 1`), `P400` 주문상품 행을 지운 뒤에도 `products`에서 `P400 | USB 허브`가 조회됩니다. 상품 정보가 주문과 독립된 테이블에 있어서 두 이상현상이 사라졌습니다.
+
+---
+
+## 정리
+
+| 단계 | 조건 | 찾은 종속 | 분할 결과 |
+| --- | --- | --- | --- |
+| 정규화 전 | 원자값, 복합 기본키 `(order_no, product_code)` | 부분 종속, 이행 종속이 모두 있음 | `order_flat` 하나 |
+| 1NF | 모든 속성이 원자값 | `order_no → customer_id, customer_name, customer_phone` 반복 | `orders`, `order_items` |
+| 2NF | 1NF + 부분 종속 없음 | `product_code → product_name` | `products` 추가 |
+| 3NF | 2NF + 이행 종속 없음 | `order_no → customer_id → customer_name, customer_phone` | `customers` 추가 |
+
+- 분할 기준은 함수 종속입니다. 결정자를 기본키로 하는 테이블을 만들고, 종속되는 속성을 그 테이블로 옮깁니다.
+- 분할한 테이블은 외래 키로 연결합니다. 하나의 데이터는 한 곳에만 저장되므로 고칠 곳이 하나입니다.
+- 종속은 업무 규칙으로 정합니다. 데이터에 대한 쿼리는 종속이 깨졌는지만 보여 줍니다.
+
+---
+
+## 마치며
+
+정규화는 테이블에 섞여 있는 서로 다른 대상을 함수 종속으로 찾아 분리하는 작업입니다. 1NF는 원자값, 2NF는 키의 일부에만 종속되는 속성, 3NF는 키가 아닌 속성을 거쳐 종속되는 속성을 같은 방식으로 분리합니다.
+
+3NF 위에는 BCNF가 있습니다. 3NF는 키의 구성 요소인 속성이 다른 속성에 종속되는 경우를 허용하고, BCNF는 모든 결정자가 후보 키여야 합니다. 이 글의 예제는 최종 테이블의 결정자가 모두 각 테이블의 기본키여서 BCNF도 만족합니다. 후보 키가 여러 개이고 서로 겹치는 테이블에서는 3NF와 BCNF가 달라질 수 있습니다.
+
+정규화하면 조회할 때 JOIN이 늘어납니다. 읽기 성능을 위해 일부러 중복을 허용하는 반정규화도 있지만, 먼저 종속을 파악하고 정규화한 구조를 기준으로 삼아야 어디에 중복이 생기는지 알 수 있습니다.
+
+예제 SQL과 실행 스크립트는 `playground/db-normalization`에 있으니 docker만 있으면 그대로 실행해 볼 수 있습니다. 긴 글 읽어주셔서 감사합니다.
