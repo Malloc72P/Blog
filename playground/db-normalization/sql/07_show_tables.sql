@@ -1,9 +1,4 @@
 -- 단계별로 분할된 테이블의 내용을 확인한다.
-\echo '== nf1.orders'
-SELECT * FROM nf1.orders ORDER BY order_no;
-\echo '== nf1.order_items'
-SELECT * FROM nf1.order_items ORDER BY order_no, product_code;
-
 \echo '== nf2.products'
 SELECT * FROM nf2.products ORDER BY product_code;
 \echo '== nf2.order_items'

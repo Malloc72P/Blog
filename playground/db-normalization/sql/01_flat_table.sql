@@ -1,6 +1,5 @@
 -- 정규화 전 테이블: 주문 한 행에 고객, 주문, 상품 정보가 모두 들어 있다.
 SET client_min_messages = warning;
-DROP SCHEMA IF EXISTS nf1 CASCADE;
 DROP SCHEMA IF EXISTS nf2 CASCADE;
 DROP SCHEMA IF EXISTS nf3 CASCADE;
 DROP TABLE IF EXISTS order_flat;
