@@ -47,7 +47,7 @@ export function createMercatorView(svg, readout, countries) {
     marker.setAttribute('cy', String(-forward.y * RADIUS));
     marker.setAttribute('visibility', 'visible');
     clickLog = [
-      `클릭한 화면 좌표: (${px.toFixed(0)}, ${py.toFixed(0)})`,
+      `클릭한 화면 좌표: (${px.toFixed(2)}, ${py.toFixed(2)})`,
       `1) transform 역변환: (${local.x.toFixed(1)}, ${local.y.toFixed(1)})`,
       `2) 역메르카토르: ${formatLonLat(lonLat)}`,
     ].join('\n');

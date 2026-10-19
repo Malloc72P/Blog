@@ -49,12 +49,12 @@ export function createGlobeView(svg, readout, countries) {
     const unit = { x: local.x / RADIUS, y: -local.y / RADIUS };
     const lonLat = invertOrthographic(unit.x, unit.y, center); // 2) 역직교투영 3) 역회전
     if (lonLat === null) {
-      clickLog = `클릭한 화면 좌표: (${px.toFixed(0)}, ${py.toFixed(0)})\n지구 바깥입니다.`;
+      clickLog = `클릭한 화면 좌표: (${px.toFixed(2)}, ${py.toFixed(2)})\n지구 바깥입니다.`;
       return;
     }
     const withoutRotation = invertOrthographic(unit.x, unit.y, { lon: 0, lat: 0 });
     clickLog = [
-      `클릭한 화면 좌표: (${px.toFixed(0)}, ${py.toFixed(0)})`,
+      `클릭한 화면 좌표: (${px.toFixed(2)}, ${py.toFixed(2)})`,
       `1) transform 역변환: (${local.x.toFixed(1)}, ${local.y.toFixed(1)}) -> 단위 원판 (${unit.x.toFixed(4)}, ${unit.y.toFixed(4)})`,
       `2~3) 역직교투영 + 역회전: ${formatLonLat(lonLat)}`,
       `참고) 회전을 무시하고 (0°, 0°) 중심으로 역변환: ${formatLonLat(withoutRotation ?? [NaN, NaN])}`,
