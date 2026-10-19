@@ -1,0 +1,455 @@
+import { frontmatter } from '@libs/frontmatter';
+
+export const metadata = frontmatter({
+  title: '원통 투영과 직교 투영의 지도 이동 구현',
+  description:
+    '메르카토르 같은 원통 투영 지도는 translate로 이동(패닝)하지만 직교 투영 지구본은 구를 회전시킨 뒤 다시 투영해야 합니다. 경위도와 3차원 벡터 변환, 회전, 뒷면 판별, 클릭 좌표의 역변환을 JavaScript로 구현하고 d3-geo 결과와 비교합니다.',
+  seriesId: 'frontend',
+  postId: 'map-projection-panning',
+  tags: ['지도', '투영', '메르카토르', '직교투영', 'JavaScript', '시각화'],
+  date: '2026-10-21 21:00',
+});
+
+지도를 드래그해서 옮기는 동작(패닝)은 투영 방식에 따라 구현이 다릅니다. 메르카토르 같은 원통 투영 지도는 평면 위의 지도를 평행이동하면 끝납니다. 직교 투영으로 그린 지구본은 평행이동으로 지도를 옮길 수 없고, 구를 회전시켜 보고 싶은 지역이 정면에 오게 한 뒤 다시 투영해야 합니다.
+
+이 글은 두 방식의 차이를 순수 JavaScript로 구현하면서 확인합니다. 다루는 내용은 다음과 같습니다.
+
+1. 메르카토르 지도의 패닝과 클릭 좌표 역변환: 부모 요소의 `translate`
+2. 직교 투영 지구본의 패닝: 경위도를 3차원 벡터로 바꾸고 회전한 뒤 투영, 뒷면 판별
+3. 직교 투영 지구본의 클릭 좌표 역변환
+4. `d3-geo`의 결과와 수치 비교
+
+예제 코드는 저장소([Malloc72P/Blog](https://github.com/Malloc72P/Blog))의 [`playground/globe-panning`](https://github.com/Malloc72P/Blog/tree/main/playground/globe-panning)에 있고, 투영 수학에는 라이브러리를 쓰지 않았습니다. 이 폴더에서 `npm install`을 실행한 뒤 `npm run isolated:dev`로 예제 페이지를 띄우고(포트 5174), `npm run example`로 단계별 계산 출력을, `npm test`로 테스트를 실행합니다. `npm run build:data`는 국가 경계 데이터를 다시 만들 때만 씁니다.
+
+---
+
+## 원통 투영과 직교 투영
+
+투영은 3차원 모델인 지구를 2차원 평면에 그리는 방법입니다. 이 글에서는 두 가지를 비교합니다.
+
+| 구분 | 원통 투영 | 직교 투영 |
+| --- | --- | --- |
+| 방식 | 경위도 각도로 원통 위에 점을 배치하고 원통을 펼친다 | 지구를 정면에서 바라본 모습을 평면에 옮긴다 (원근 없는 평행 투영) |
+| 평면 좌표와 경위도 | x는 경도만으로, y는 위도만으로 정해진다 | 같은 평면 좌표라도 정면(투영 중심)이 어디냐에 따라 다른 경위도를 가리킨다 |
+| 패닝 | x, y를 더하고 빼는 평행이동(translate) | 구를 회전시킨 뒤 다시 투영 |
+| 예 | 메르카토르, 밀러 | 지구본 |
+
+원통 투영에서는 원통에 점을 배치할 때 생기는 왜곡을 어떻게 다루느냐에 따라 메르카토르, 밀러 같은 도법이 나뉩니다. 이 글에서는 메르카토르를 사용합니다.
+
+직교 투영은 정면 방향이 고정되어 있고, 보이는 지역을 바꾸려면 지구를 회전합니다. 평면 좌표 (0, 0)이 가리키는 경위도가 회전에 따라 달라지므로, 평행이동으로는 지역을 바꿀 수 없습니다.
+
+예제는 같은 세계 지도 데이터(국가 경계)를 두 방식으로 나란히 그립니다. 데이터는 `world-atlas`의 110m 해상도 TopoJSON을 `topojson-client`로 GeoJSON으로 바꿔 저장한 파일입니다. 두 라이브러리는 이 변환에만 쓰고 투영 계산에는 쓰지 않습니다. GeoJSON에서 좌표를 읽고 SVG path로 바꾸는 과정은 [라이브러리 없이 GeoJSON으로 지도 그리기](/posts/frontend/geojson-visualization)에서 다룹니다.
+
+---
+
+## 메르카토르 지도의 이동
+
+### 투영 공식
+
+메르카토르는 경도를 x에 비례하게, 위도를 로그 식으로 y에 대응시킵니다. 아래 함수는 라디안 단위의 평면 좌표를 돌려주며, y는 위쪽이 양수입니다.
+
+```js
+// src/mercator.js
+// 극점에서는 y가 무한대가 되므로 위도를 자른다.
+// 85.0511...°는 y가 ±π가 되는 위도(atan(sinh π))다. 이때 지도가 정사각형이 되고, 웹 지도가 이 범위를 쓴다.
+export const MAX_LATITUDE = 85.0511287798;
+
+export function projectMercator([lon, lat]) {
+  const clampedLat = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, lat));
+  return {
+    x: lon * DEG,
+    y: Math.log(Math.tan(Math.PI / 4 + (clampedLat * DEG) / 2)),
+  };
+}
+
+export function invertMercator(x, y) {
+  return [x / DEG, (2 * Math.atan(Math.exp(y)) - Math.PI / 2) / DEG];
+}
+```
+
+`DEG`는 `Math.PI / 180`입니다. 이 평면 좌표에 스케일을 곱하고 y의 부호를 뒤집으면 SVG 좌표가 됩니다. 예제의 메르카토르 스케일은 `RADIUS = 76`px이고, 세계 전체 너비는 2π × 76 ≈ 477px입니다. 여기까지는 한 번만 계산하면 되고, 이후의 이동과 확대는 이 좌표를 담은 부모 `<g>`의 `transform`에 맡깁니다.
+
+### translate로 이동
+
+패닝은 `translate(tx ty) scale(k)`에서 `tx`, `ty`를 바꾸는 일입니다. 드래그한 거리만큼 더합니다.
+
+```js
+// src/mercator-view.js
+attachPointerControls(svg, {
+  onDrag: (dx, dy) => {
+    transform = { ...transform, tx: transform.tx + dx, ty: transform.ty + dy };
+    layer.setAttribute('transform', `translate(${transform.tx} ${transform.ty}) scale(${transform.k})`);
+  },
+});
+```
+
+드래그 중에는 path를 다시 계산하지 않습니다. 이동 전과 후의 화면은 다음과 같습니다.
+
+![이동 전 메르카토르 세계 지도. 부모 g의 transform은 translate(280 215) scale(1.00)이다](/map-projection-mercator-before.png)
+
+![마우스로 왼쪽 아래로 드래그한 뒤의 메르카토르 지도. transform이 translate(100 255) scale(1.00)으로 바뀌었고 서울 위치에 마커가 찍혀 있다](/map-projection-mercator-after.png)
+
+두 번째 화면은 Playwright로 마우스 입력을 보내 만들었습니다. 지도 위의 (300, 200)에서 (120, 240)까지 드래그해 `translate(280 215)`가 `translate(100 255)`로 바뀌었습니다. 그다음 서울(126.98°E, 37.57°N)을 이 `transform`에서 정방향 투영한 화면 위치를 클릭했습니다.
+
+### 클릭 좌표의 역변환
+
+클릭한 화면 좌표를 경위도로 바꾸려면 그리는 순서를 거꾸로 적용합니다. 먼저 `transform`을 역으로 적용하고, 그 결과에 역투영을 적용합니다.
+
+```js
+// src/transform.js
+export function applyTransform({ tx, ty, k }, x, y) {
+  return { x: tx + k * x, y: ty + k * y };
+}
+
+export function invertTransform({ tx, ty, k }, x, y) {
+  return { x: (x - tx) / k, y: (y - ty) / k };
+}
+```
+
+```js
+// src/mercator-view.js
+const local = invertTransform(transform, px, py); // 1) transform 역변환
+const lonLat = invertMercator(local.x / RADIUS, -local.y / RADIUS); // 2) 역메르카토르
+```
+
+위 화면의 클릭 결과는 다음과 같습니다.
+
+```text
+클릭한 화면 좌표: (268.43, 201.15)
+1) transform 역변환: (168.4, -53.8)
+2) 역메르카토르: 경도 126.98°, 위도 37.57°
+```
+
+클릭 위치를 서울의 정방향 투영 좌표로 정했으므로, 역변환 결과가 서울 좌표로 돌아오는지를 확인한 것입니다. 화면의 값은 소수 둘째 자리까지 반올림해 표시합니다. 지도를 얼마나 옮겼든 `transform`의 역변환이 그 이동을 상쇄하므로, 투영 계산은 이동과 무관하게 그대로 쓸 수 있습니다.
+
+### 날짜변경선을 지나는 링
+
+경도 ±180°(날짜변경선)를 가로지르는 폴리곤은 한 링 안에서 경도가 179°에서 -179°로 튑니다. 이 링을 그대로 그리면 지도 전체 너비를 가로지르는 가로 띠가 생깁니다. 예제에서는 인접한 두 점의 경도 차이가 180°를 넘는 곳마다 ±360°를 더해 경도를 이어 붙였습니다. 이어 붙인 링이 지도 바깥으로 나간 경우에는 반대편에 360° 옮긴 복사본도 함께 그립니다.
+
+```js
+// src/paths.js
+export function unwrapRing(ring) {
+  const unwrapped = [ring[0]];
+  let offset = 0;
+  for (let i = 1; i < ring.length; i += 1) {
+    const jump = ring[i][0] - ring[i - 1][0];
+    if (jump > 180) offset -= 360;
+    else if (jump < -180) offset += 360;
+    unwrapped.push([ring[i][0] + offset, ring[i][1]]);
+  }
+  // 이어 붙인 링이 닫히지 않으면(남극처럼 극점을 감싸는 링) 원래대로 둔다.
+  const closed = Math.abs(unwrapped[unwrapped.length - 1][0] - unwrapped[0][0]) < 1e-9;
+  return closed ? unwrapped : ring;
+}
+```
+
+---
+
+## 직교 투영 지구본의 이동
+
+### 평행이동으로 안 되는 이유
+
+직교 투영의 평면 좌표는 투영 중심(정면)을 기준으로 정해집니다. 정면이 (0°, 0°)인 지구본과 정면이 (127°E, 37°N)인 지구본은 같은 평면 좌표 (0, 0)이 서로 다른 경위도를 가리킵니다. 지도를 평행이동해서 한국을 중앙으로 가져오면 한국의 모양은 그대로인데, 실제로 정면에서 본 한국은 모양이 달라야 합니다. 정면에서 멀어질수록 지표면이 비스듬하게 보여 찌그러지기 때문입니다.
+
+그래서 직교 투영의 패닝은 다음 순서를 따릅니다.
+
+1. 보고 싶은 지역이 정면에 오도록 경위도를 회전한다.
+2. 회전한 점을 직교 투영해 평면 좌표를 얻는다.
+3. 화면 배치를 위해 부모 요소에 `transform`(translate, scale)을 적용한다.
+
+드래그할 때마다 1번의 회전값이 바뀌므로 path 좌표 자체를 다시 계산합니다. 메르카토르와 달리 부모 `transform`만으로는 이동이 표현되지 않습니다.
+
+### 경위도를 3차원 벡터로
+
+회전은 3차원 벡터에 행렬을 곱해서 구현합니다. 먼저 경위도를 반지름이 1인 구 위의 점으로 바꿉니다. 축은 다음과 같이 정했습니다.
+
+```text
+X: 화면 오른쪽(동쪽)   Y: 화면 위쪽(북쪽)   Z: 화면에서 보는 사람 쪽
+경도 λ, 위도 φ (라디안)
+
+x = cosφ · sinλ
+y = sinφ
+z = cosφ · cosλ
+```
+
+경도 0°, 위도 0°인 점이 (0, 0, 1)이므로, 아무것도 회전하지 않은 상태의 정면은 (0°, 0°)입니다. 역변환은 `λ = atan2(x, z)`, `φ = asin(y)`입니다.
+
+```js
+// src/vector.js
+export const DEG = Math.PI / 180;
+
+export function lonLatToVector([lon, lat]) {
+  const lambda = lon * DEG;
+  const phi = lat * DEG;
+  return [Math.cos(phi) * Math.sin(lambda), Math.sin(phi), Math.cos(phi) * Math.cos(lambda)];
+}
+
+export function vectorToLonLat([x, y, z]) {
+  // 부동소수점 오차로 y가 1을 넘으면 asin이 NaN이 되므로 범위를 맞춘다.
+  const clampedY = Math.max(-1, Math.min(1, y));
+  return [Math.atan2(x, z) / DEG, Math.asin(clampedY) / DEG];
+}
+```
+
+### 회전행렬
+
+보고 싶은 위치 (λ0, φ0)을 정면 (0, 0, 1)로 보내는 회전은 두 번의 회전을 곱한 것입니다. 경도 회전은 Y축을, 위도 회전은 X축을 기준으로 합니다.
+
+```text
+Y축 회전 (각도 θ)            X축 회전 (각도 α)
+| cosθ   0  sinθ |           | 1    0      0   |
+|  0     1   0   |           | 0  cosα  -sinα  |
+| -sinθ  0  cosθ |           | 0  sinα   cosα  |
+
+v' = Rx(φ0) · Ry(-λ0) · v
+```
+
+`Ry(θ)`는 모든 점의 경도를 θ만큼 늘립니다. `Rx(α)`는 X축 회전이라 경도 0° 자오선 위의 점에서만 위도를 α만큼 줄입니다. `Ry(-λ0)`를 적용하면 정면이 경도 0° 자오선 위로 오므로, 이어서 `Rx(φ0)`를 적용하면 정면의 위도가 0이 됩니다.
+
+적용 순서도 정해져 있습니다. 경도 회전을 먼저 하면 지축(Y축)이 화면 세로 방향을 유지해 북쪽이 위를 향합니다. 정면이 (127°E, 37°N)일 때 올바른 순서에서는 북극이 (0, 0.7986, 0.6018)로 가서 x가 0입니다. 순서를 바꿔 `Rx(φ0)`를 먼저 적용하면 정면은 (0, 0, 1)이 아닌 (-0.3665, 0.7699, 0.5224)로 가고 북극은 x가 -0.4806이 되어, 지구본이 기울어집니다.
+
+```js
+// src/rotation.js
+export function rotateAroundY([x, y, z], theta) {
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  return [x * cos + z * sin, y, -x * sin + z * cos];
+}
+
+export function rotateAroundX([x, y, z], alpha) {
+  const cos = Math.cos(alpha);
+  const sin = Math.sin(alpha);
+  return [x, y * cos - z * sin, y * sin + z * cos];
+}
+
+export function rotateToCenter(vector, center) {
+  const aroundY = rotateAroundY(vector, -center.lon * DEG);
+  return rotateAroundX(aroundY, center.lat * DEG);
+}
+
+// 투영 때와 반대 순서로, 반대 각도만큼 돌린다.
+export function rotateFromCenter(vector, center) {
+  const aroundX = rotateAroundX(vector, -center.lat * DEG);
+  return rotateAroundY(aroundX, center.lon * DEG);
+}
+```
+
+### 직교 투영과 뒷면 판별
+
+회전한 벡터 (x, y, z)에서 z를 버리면 직교 투영입니다. 정면이 (λ0, φ0)일 때 점 (λ, φ)에 `Ry(-λ0)`을 먼저 적용하면 (cosφ·sin(λ-λ0), sinφ, cosφ·cos(λ-λ0))이 되고, 여기에 `Rx(φ0)`을 곱하면 다음 식이 나옵니다.
+
+```text
+x = cosφ · sin(λ - λ0)
+y = cosφ0 · sinφ - sinφ0 · cosφ · cos(λ - λ0)
+z = sinφ0 · sinφ + cosφ0 · cosφ · cos(λ - λ0)
+```
+
+정면이 (0°, 0°)이면 `x = cosφ·sinλ`, `y = sinφ`로 단순해집니다. 정면이 (0, 0, 1)이므로 `z`는 점과 정면의 내적이고, 두 벡터 사이 각 c의 코사인(`cos c`)입니다. `z < 0`이면 지구 반대편이라 보이지 않습니다.
+
+```js
+// src/orthographic.js
+export function projectOrthographic(lonLat, center) {
+  const rotated = rotateToCenter(lonLatToVector(lonLat), center);
+  return { x: rotated[0], y: rotated[1], visible: rotated[2] >= 0 };
+}
+```
+
+반환하는 (x, y)는 반지름이 1인 원판 위의 값입니다. 화면에 그리려면 반지름(px)을 곱하고, 화면 y축이 아래로 커지므로 y의 부호를 뒤집습니다.
+
+폴리곤을 그릴 때는 뒷면 점을 건너뛰기만 하면 안 됩니다. 수평선은 지구본의 가장자리, 즉 앞면과 뒷면이 만나는 `z = 0`인 원입니다. 수평선을 지나는 폴리곤은 앞면 구간만 남기고 잘라야 합니다. 예제에서는 다음 순서로 처리합니다.
+
+1. 변을 구 위의 대원 호(최단 경로)로 해석하고 점을 더 넣는다. 대원 호는 직교 투영에서 곡선이 되기 때문이다. GeoJSON 명세(RFC 7946)는 변을 경위도 평면의 직선으로 정의하지만, 예제는 d3와 같이 대원 호로 해석했다.
+2. 앞면에서 뒷면으로 넘어가는 변은 수평선과 만나는 점에서 자른다.
+3. 잘려 나간 구간의 양 끝점은 수평선 위의 호로 이어서 폴리곤을 닫는다.
+
+```js
+// src/clip.js (일부)
+// 앞면(z >= 0)에서 뒷면(z < 0)으로 넘어가는 변 a→b가 수평선과 만나는 점
+function horizonCrossing(a, b) {
+  const t = a[2] / (a[2] - b[2]);
+  const [x, y] = normalize([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0]);
+  return [x, y, 0];
+}
+```
+
+수평선 호는 두 끝점 사이의 짧은 쪽을 택하고 링의 방향은 보지 않습니다. 그래서 수평선 호가 180°를 넘어야 하는 폴리곤이나, 전체가 뒷면인데 보이는 반구를 덮는 폴리곤은 올바르게 그려지지 않을 수 있습니다.
+
+### 회전값을 바꿔 그린 결과
+
+같은 지구본을 회전값만 바꿔서 그린 결과입니다. 첫 번째는 정면이 (127°E, 37°N)이고, 두 번째는 Playwright로 지구본 위의 (250, 200)에서 (100, 260)까지 드래그해 정면이 (174.75°E, 56.10°N)이 된 상태입니다.
+
+![정면이 경도 127도, 위도 37도인 직교 투영 지구본. 한반도와 동아시아가 중앙에 보인다](/map-projection-globe-a.png)
+
+![드래그로 정면이 경도 174.75도, 위도 56.10도가 된 지구본. 북태평양과 알래스카, 시베리아 동쪽이 보인다](/map-projection-globe-b.png)
+
+### 드래그와 회전값
+
+드래그는 정면 (λ0, φ0)을 바꿉니다. 지표면을 오른쪽으로 끌면 정면은 서쪽으로, 아래로 끌면 북쪽으로 이동합니다. 정면 근처에서는 화면 1px이 지구 표면에서 `1 / 반지름(px)` 라디안에 해당하므로, 드래그한 픽셀 수를 이 값으로 환산해 더하고 뺍니다.
+
+```js
+// src/globe-view.js
+onDrag: (dx, dy) => {
+  const radiansPerPixel = 1 / (RADIUS * transform.k);
+  center = {
+    lon: normalizeLon(center.lon - (dx * radiansPerPixel) / DEG),
+    lat: clamp(center.lat + (dy * radiansPerPixel) / DEG, -90, 90),
+  };
+  render(); // 회전값이 바뀌었으므로 모든 path를 다시 계산한다.
+},
+```
+
+이 환산은 정면이 적도 위에 있고 정면 근처를 잡았을 때만 지표면이 커서를 정확히 따라옵니다. 경도가 dλ만큼 변하면 위도 φ0인 정면의 점은 화면에서 cosφ0·dλ만 움직입니다. 그래서 정면이 고위도이면 정면 근처를 잡아도 가로 드래그가 커서보다 느립니다. 위의 두 번째 지구본처럼 정면이 56.10°N이면 cos 56.1° ≈ 0.56배입니다. 정면에서 먼 점을 잡아도 느려집니다. 위도는 ±90°로 제한하므로 극점을 넘어 지구본을 뒤집어 볼 수 없습니다.
+
+더 일반적인 방법은 드래그를 시작할 때 역직교투영으로 잡은 점의 경위도를 구해 두고, 그 점이 커서 아래에 계속 오도록 회전값을 구하는 방식입니다. 이 글은 구현하지 않았습니다.
+
+---
+
+## 직교 투영의 좌표 역변환
+
+### 그리는 순서와 역변환 순서
+
+한 점이 경위도에서 화면 좌표가 되는 과정과, 그 반대 과정을 도쿄(139.69°E, 35.69°N)를 예로 따라갑니다. 정면은 (127°E, 37°N), 반지름은 예제 페이지 지구본과 같은 180px, 부모 `transform`은 `translate(210 210)`입니다. 아래 숫자는 `npm run example`의 출력이고, 이미지의 단계 번호와 출력의 번호가 같습니다.
+
+![그리는 순서. 경위도 [139.69, 35.69]에서 단위벡터, 회전, 직교 투영, 화면 배치를 거쳐 화면 좌표 [242.12, 211.97]이 되는 5단계](/map-projection-draw-order.png)
+
+```text
+--- 그리는 순서 ---
+1) 경위도                        [139.6900, 35.6900]
+2) 3차원 단위벡터                [0.5254, 0.5834, -0.6193]
+3) 회전: Y축 -127°               [0.1784, 0.5834, 0.7923]
+         이어서 X축 +37°         [0.1784, -0.0109, 0.9839] <- z >= 0이면 앞면
+4) 직교 투영 (x, y)              [0.1784, -0.0109] true
+   반지름 180 곱하고 y 뒤집기    [32.1152, 1.9660]
+5) translate(210 210) 적용       [242.1152, 211.9660]
+```
+
+2단계의 단위벡터는 z가 -0.6193이라 회전하지 않은 상태에서는 뒷면입니다. 정면을 (127°E, 37°N)으로 돌리면 z가 0.9839가 되어 정면에 가깝게 보입니다.
+
+역변환은 이 순서를 거꾸로 적용합니다.
+
+![역변환 순서. 화면 좌표 [242.12, 211.97]에서 transform 역변환, 역직교투영, 역회전을 거쳐 경위도 [139.69, 35.69]를 얻는 5단계](/map-projection-inverse-order.png)
+
+```text
+--- 역변환 순서 ---
+1) 화면 좌표                     [242.1152, 211.9660]
+2) transform 역변환              [32.1152, 1.9660]
+3) 역직교투영: 단위 원판 + z 복원 [0.1784, -0.0109, 0.9839]
+4) 역회전                        [0.5254, 0.5834, -0.6193]
+5) 경위도                        [139.6900, 35.6900]
+```
+
+### 역직교투영
+
+화면에서 (x, y)를 얻으면 z가 없어졌으므로 먼저 복원합니다. 점은 반지름이 1인 구 위에 있고 앞면이므로 `z = √(1 - x² - y²)`입니다. `x² + y² > 1`이면 지구 바깥을 클릭한 것입니다.
+
+복원한 (x, y, z)는 회전된 상태의 좌표입니다. 투영할 때와 반대 순서로 반대 각도만큼 회전하면 원래 좌표가 됩니다. 위도 회전(`Rx(-φ0)`)을 먼저 취소하고, 그다음 경도 회전(`Ry(λ0)`)을 취소합니다.
+
+```js
+// src/orthographic.js
+export function invertOrthographic(x, y, center) {
+  const squaredDistance = x * x + y * y;
+  if (squaredDistance > 1) return null; // 지구 바깥
+  const z = Math.sqrt(1 - squaredDistance); // 앞면의 z를 복원한다.
+  return vectorToLonLat(rotateFromCenter([x, y, z], center)); // 역회전 후 경위도로 바꾼다.
+}
+```
+
+지구본 클릭 처리는 메르카토르와 같이 `transform` 역변환으로 시작합니다.
+
+```js
+// src/globe-view.js
+const local = invertTransform(transform, px, py); // 1) 화면 배치 transform 역변환
+const unit = { x: local.x / RADIUS, y: -local.y / RADIUS }; // 단위 원판 좌표
+const lonLat = invertOrthographic(unit.x, unit.y, center); // 2) 역직교투영 3) 역회전
+```
+
+### 투영 중심을 무시한 역변환
+
+메르카토르는 이동과 확대가 모두 부모 `transform`에 있어서 `transform` 역변환과 역투영만 하면 경위도가 맞게 나옵니다. 직교 투영은 회전값이 path 좌표 자체에 반영되어 있습니다. `transform` 역변환까지만 같고, 그 뒤에 회전을 상쇄하는 단계가 하나 더 필요합니다.
+
+역투영에서 투영 중심을 항상 (0°, 0°)으로 가정하면 정면이 (0°, 0°) 근처일 때만 맞고, 지구본을 돌리면 틀립니다. 위의 도쿄 예제에서 중심을 (0°, 0°)으로 가정해 같은 좌표를 역변환하면 다음 값이 나옵니다.
+
+```text
+5) 경위도                        [139.6900, 35.6900]
+   (중심을 0,0으로 가정한 경우)  [10.2782, -0.6258]
+```
+
+예제 페이지에서 정면이 (127°E, 37°N)인 지구본의 도쿄 위치를 클릭한 결과입니다. 클릭 위치는 위 계산에서 도쿄를 정방향 투영한 화면 좌표 (242.12, 211.97)입니다. 마커는 구한 경위도를 다시 정방향으로 투영해 찍은 것이므로, 클릭한 자리에 마커가 찍히면 왕복이 맞다는 뜻입니다.
+
+![정면이 한국인 지구본에서 일본 도쿄 위치를 클릭한 화면. 마커가 클릭한 위치에 찍혀 있고 아래 패널에 역변환 결과 경도 139.69도, 위도 35.69도와 회전을 무시한 값 경도 10.28도, 위도 -0.63도가 표시된다](/map-projection-globe-click.png)
+
+역변환 결과는 도쿄 좌표 (139.69°E, 35.69°N)로 돌아옵니다. 회전을 무시한 값은 경도가 10.28°로 100° 이상 어긋납니다.
+
+---
+
+## 검증
+
+정답 대조에는 `d3-geo`의 `geoOrthographic`, `geoMercator`를 devDependency로 설치해 사용했습니다. 투영 수학은 `d3-geo` 없이 구현했고, 테스트에서만 같은 점의 결과를 비교합니다.
+
+### 회전 부호 규약
+
+d3의 `projection.rotate([λ, φ])`는 경위도가 (-λ, -φ)인 점을 정면으로 보냅니다. 이 글의 `center`는 정면으로 보낼 점 자체이므로, `center = { lon, lat }`는 d3의 `rotate([-lon, -lat])`에 해당합니다. d3의 화면 y는 아래로 커지고 이 글의 투영 결과 y는 위로 커져서, 비교할 때 y의 부호도 맞췄습니다.
+
+```js
+// test/d3-compare.test.js
+const d3Projection = geoOrthographic().scale(200).translate([0, 0]).rotate([-center.lon, -center.lat]).clipAngle(90);
+const expected = d3Projection(lonLat);
+const actual = projectOrthographic(lonLat, center);
+// expected[0] ≈ actual.x * 200,  expected[1] ≈ -actual.y * 200
+```
+
+d3-geo 3.1.1 기준으로 `projection(point)`는 뒷면 점에도 좌표를 돌려주고, 잘라내기는 스트림 단계에서 합니다. 그래서 뒷면 판별의 정답은 `geoDistance(점, 정면)`이 90°(π/2) 이하인지로 정했습니다.
+
+### 실행 결과
+
+`node --test`로 17개 테스트를 실행했습니다. 무작위 점은 시드를 고정한 난수로 만들었고, 허용 오차는 투영 좌표 1e-8px(테스트의 반지름 200px 기준), 경위도 1e-7도입니다. 비교한 점은 위도 ±85° 이내의 무작위 점이고, 역직교투영 비교는 원판 반지름의 99% 이내에서 뽑은 화면 좌표 중 원판 안에 든 3952점입니다. 잘라낸 path 자체는 d3와 비교하지 않았습니다.
+
+![node test 실행 결과. d3 대조 3개 로그와 17개 테스트가 모두 통과했다](/map-projection-test-output.png)
+
+d3와의 비교 결과는 다음과 같습니다.
+
+| 비교 대상 | 점 개수 | 최대 오차 |
+| --- | --- | --- |
+| `geoOrthographic` 투영 좌표 | 좌표 오차는 앞면 2532점, 가시성은 5000점(앞면 2532점, 뒷면 2468점) 모두 일치 | 1.05e-12px |
+| `projection.invert`와 역직교투영 경위도 | 3952점 | 1.44e-12도 |
+| `geoMercator` 투영 좌표 | 3000점 | 2.84e-14px |
+
+그 밖에 다음을 검사합니다.
+
+- 경위도와 단위벡터의 왕복, 정면 점이 (0, 0, 1)로 오는지
+- 회전 후 역회전의 항등
+- 뒷면 판별, 직교 투영과 역투영의 왕복(앞면 점), 원판 밖 점의 `null`
+- 중심을 (0°, 0°)으로 가정한 역변환이 회전된 지구본에서 틀리는지
+- 메르카토르에서 `translate` 뒤에도 역변환이 맞는지
+- 폴리곤과 선의 잘라내기
+
+---
+
+## 정리
+
+| 구분 | 메르카토르(원통 투영) | 직교 투영 |
+| --- | --- | --- |
+| 평면 좌표 | 경도 → x, 위도 → 로그 식 y | 회전한 3차원 벡터에서 z를 버린 (x, y) |
+| 패닝 | 부모 `transform`의 `translate`를 바꾼다. path는 그대로 | 정면(회전값)을 바꾸고 모든 path를 다시 계산한다 |
+| 보이지 않는 점 | 없음(모든 점이 평면에 있다) | `z < 0`인 뒷면은 그리지 않고, 수평선에서 폴리곤을 자른다 |
+| 클릭 역변환 | `transform` 역변환 → 역메르카토르 | `transform` 역변환 → 역직교투영(z 복원) → 역회전 |
+| 투영 중심 | 없음 | 역변환에도 필요하다. (0°, 0°)으로 가정하면 회전된 지구본에서 틀린다 |
+
+- 회전은 경위도를 3차원 벡터로 바꾸고 Y축, X축 회전행렬을 곱해서 구현하며, 역변환은 반대 순서로 반대 각도만큼 회전합니다.
+- 직교 투영의 `transform`은 화면 배치에만 쓰이므로, 역변환할 때 `transform` 역변환 뒤에 역직교투영과 역회전이 더 필요합니다.
+
+---
+
+## 마치며
+
+두 방식의 차이는 평면 좌표가 투영 중심에 의존하는지 여부에서 나옵니다. 이 의존성 때문에 직교 투영에서는 그리는 쪽과 클릭 좌표를 되돌리는 쪽 모두 회전을 처리해야 합니다.
+
+이 예제는 클릭 좌표를 경위도로 바꾸는 데서 끝나고, 그 경위도가 어느 국가에 속하는지는 찾지 않습니다. 국가를 찾으려면 쿼드 트리로 그 좌표 근처의 폴리곤 후보를 먼저 고르고, 후보마다 레이캐스팅으로 좌표가 폴리곤 안에 있는지 검사하는 방법을 쓸 수 있습니다.
+
+메르카토르 투영과 SVG path 변환은 [라이브러리 없이 GeoJSON으로 지도 그리기](/posts/frontend/geojson-visualization)에서 다뤘습니다. 이 글의 전체 예제와 테스트는 `playground/globe-panning`에 있습니다.
+
+긴 글 읽어주셔서 감사합니다.
+
+---
+
+> 지도 데이터는 `world-atlas` 2.0.2의 `countries-110m.json`(Natural Earth 기반)을 GeoJSON으로 변환해 사용했습니다. 변환 스크립트는 `playground/globe-panning/scripts/build-data.mjs`입니다.
