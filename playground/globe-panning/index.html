@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>원통 투영과 직교 투영의 지도 이동</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --ocean: #e0f2fe;
+        --land: #bbf7d0;
+        --land-stroke: #15803d;
+        --grid: #94a3b8;
+        --marker: #dc2626;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      }
+      h1 { margin: 0 0 16px; font-size: 20px; }
+      main { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+      .panel { display: flex; flex-direction: column; gap: 8px; }
+      .panel h2 { margin: 0; font-size: 15px; }
+      .panel p { margin: 0; font-size: 12px; color: var(--muted); }
+      svg {
+        display: block;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+        overflow: hidden;
+      }
+      svg:active { cursor: grabbing; }
+      .ocean { fill: var(--ocean); }
+      .outline { fill: none; stroke: var(--land-stroke); stroke-width: 1; vector-effect: non-scaling-stroke; }
+      .graticule { fill: none; stroke: var(--grid); stroke-width: 0.5; stroke-opacity: 0.7; vector-effect: non-scaling-stroke; }
+      .land path { fill: var(--land); fill-rule: evenodd; stroke: var(--land-stroke); stroke-width: 0.6; vector-effect: non-scaling-stroke; }
+      .marker { fill: var(--marker); stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+      .readout {
+        margin: 0;
+        padding: 10px 12px;
+        width: 100%;
+        min-height: 112px;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 6px;
+        font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, 'Apple SD Gothic Neo', monospace;
+        white-space: pre-wrap;
+      }
+      #mercator-readout { width: 560px; }
+      #globe-readout { width: 640px; }
+    </style>
+  </head>
+  <body>
+    <h1>원통 투영과 직교 투영의 지도 이동</h1>
+    <main>
+      <section class="panel" id="mercator-panel">
+        <h2>메르카토르 (원통 투영): 드래그하면 translate가 바뀐다</h2>
+        <p>드래그: 패닝, 휠: 줌, 클릭: 경위도 역변환</p>
+        <svg id="mercator" aria-label="메르카토르 세계 지도"></svg>
+        <pre id="mercator-readout" class="readout"></pre>
+      </section>
+      <section class="panel" id="globe-panel">
+        <h2>직교 투영 (지구본): 드래그하면 회전값이 바뀐다</h2>
+        <p>드래그: 회전, 휠: 줌, 클릭: 경위도 역변환</p>
+        <svg id="globe" aria-label="직교 투영 지구본"></svg>
+        <pre id="globe-readout" class="readout"></pre>
+      </section>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "globe-panning",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "라이브러리 없이 메르카토르 평면 지도와 직교 투영 지구본의 이동(패닝)을 구현하는 예제",
+  "scripts": {
+    "build:data": "node scripts/build-data.mjs",
+    "test": "node --test test/*.test.js",
+    "example": "node scripts/example.mjs",
+    "isolated:dev": "npx --yes serve@14 -l 5174 ."
+  },
+  "devDependencies": {
+    "d3-geo": "^3.1.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  }
+}
